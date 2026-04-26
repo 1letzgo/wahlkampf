@@ -4,6 +4,8 @@ WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+# DB und Uploads liegen unter /data — beim Deploy ein Volume mounten, z. B. -v wahlkampf-data:/data
+# (sonst ist jeder neue Container leer und die SQLite-Datei wirkt „überschrieben“).
 ENV DATABASE_URL=sqlite:////data/wahlkampf.db
 ENV UPLOAD_DIR=/data/uploads
 

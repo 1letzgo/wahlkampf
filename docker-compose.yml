@@ -1,0 +1,13 @@
+# SQLite + Uploads nur über Volume überlebensfähig machen (sonst: bei jedem Deploy leerer Container).
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-dev-change-me-in-production}
+    volumes:
+      - wahlkampf-data:/data
+
+volumes:
+  wahlkampf-data:
