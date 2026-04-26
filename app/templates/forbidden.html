@@ -3,12 +3,14 @@
 {% block title %}Keine Berechtigung — Wahlkampf{% endblock %}
 {% block body %}
 <header>
-  <h1>Zugriff verweigert</h1>
-  <nav class="nav">
-    <a href="/termine" class="btn btn-ghost btn-ico" aria-label="Zur Übersicht">
-      {{ ico.svg_arrow_left() }}<span class="btn-text">Zur Übersicht</span>
-    </a>
-  </nav>
+  <div class="header-inner">
+    <h1>Zugriff verweigert</h1>
+    <nav class="header-toolbar">
+      <a href="/termine" class="btn btn-ghost btn-ico" aria-label="Zur Übersicht">
+        {{ ico.svg_arrow_left() }}<span class="btn-text">Zur Übersicht</span>
+      </a>
+    </nav>
+  </div>
 </header>
 <div class="card">
   <p style="margin:0;">{{ message }}</p>

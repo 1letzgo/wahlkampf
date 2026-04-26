@@ -3,26 +3,26 @@
 {% block title %}Wahlkampf{% endblock %}
 {% block body %}
 <header>
-  <div class="header-leading">
+  <div class="header-inner">
     <h1>Wahlkampf</h1>
-    <button type="button" class="btn header-ics-btn btn-ico" id="ics-open" aria-label="Kalender abonnieren">
-      {{ ico.svg_calendar() }}<span class="btn-text">Abonnieren</span>
-    </button>
+    <nav class="header-toolbar" aria-label="Hauptaktionen">
+      <button type="button" class="btn btn-ico" id="ics-open" aria-label="Kalender abonnieren">
+        {{ ico.svg_calendar() }}<span class="btn-text">Abonnieren</span>
+      </button>
+      <a href="/termine/neu" class="btn btn-ico" aria-label="Neuer Termin">
+        {{ ico.svg_plus() }}<span class="btn-text">Neuer Termin</span>
+      </a>
+      {% if user.is_admin %}
+      <a href="/admin/benutzer" class="btn btn-admin btn-ico" aria-label="{% if pending_count %}Administration, {{ pending_count }} ausstehend{% else %}Administration{% endif %}">
+        {{ ico.svg_cog() }}<span class="btn-text">Admin{% if pending_count %} ({{ pending_count }}){% endif %}</span>
+        {% if pending_count %}<span class="btn-pending-badge" aria-hidden="true">{{ pending_count }}</span>{% endif %}
+      </a>
+      {% endif %}
+      <a href="/logout" class="btn btn-ghost btn-ico" aria-label="Ausloggen">
+        {{ ico.svg_logout() }}<span class="btn-text">Ausloggen</span>
+      </a>
+    </nav>
   </div>
-  <nav class="nav">
-    <a href="/termine/neu" class="btn btn-ico" aria-label="Neuer Termin">
-      {{ ico.svg_plus() }}<span class="btn-text">Neuer Termin</span>
-    </a>
-    {% if user.is_admin %}
-    <a href="/admin/benutzer" class="btn btn-admin btn-ico" aria-label="{% if pending_count %}Administration, {{ pending_count }} ausstehend{% else %}Administration{% endif %}">
-      {{ ico.svg_cog() }}<span class="btn-text">Admin{% if pending_count %} ({{ pending_count }}){% endif %}</span>
-      {% if pending_count %}<span class="btn-pending-badge" aria-hidden="true">{{ pending_count }}</span>{% endif %}
-    </a>
-    {% endif %}
-    <a href="/logout" class="btn btn-ghost btn-ico" aria-label="Ausloggen">
-      {{ ico.svg_logout() }}<span class="btn-text">Ausloggen</span>
-    </a>
-  </nav>
 </header>
 
 {% if feed_url.startswith('https://') %}
