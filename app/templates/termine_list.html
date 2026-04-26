@@ -15,10 +15,25 @@
   </nav>
 </header>
 
+{% if feed_url.startswith('https://') %}
+{% set webcal_url = 'webcal://' ~ feed_url[8:] %}
+{% elif feed_url.startswith('http://') %}
+{% set webcal_url = 'webcal://' ~ feed_url[7:] %}
+{% else %}
+{% set webcal_url = feed_url %}
+{% endif %}
+{% set google_cal_url = 'https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=' ~ (feed_url|urlencode) %}
+
 <dialog id="ics-dialog" class="popup-dialog" aria-labelledby="ics-dialog-title">
   <form method="dialog">
-    <h2 id="ics-dialog-title" style="margin-top:0; font-size:1.05rem;">Kalender abonnieren (ICS)</h2>
-    <p class="muted" style="margin-top:0;">Diesen Link in Outlook, Google Kalender oder Apple Kalender als „Internetkalender“ einbinden:</p>
+    <h2 id="ics-dialog-title" style="margin-top:0; font-size:1.05rem;">Kalender abonnieren</h2>
+    <p class="muted" style="margin-top:0;">Mit einem Tipp direkt abonnieren — oder den Link unten kopieren und manuell einfügen.</p>
+    <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin:.85rem 0 0;">
+      <a class="btn btn-sm" href="{{ webcal_url }}">Apple Kalender (iPhone, iPad, Mac)</a>
+      <a class="btn btn-sm" href="{{ google_cal_url }}" target="_blank" rel="noopener noreferrer">Google Kalender (Android &amp; Web)</a>
+    </div>
+    <p class="muted" style="margin:.65rem 0 0; font-size:.82rem;">Apple öffnet oft direkt die Kalender-App. Google führt zur Seite „Über URL hinzufügen“ — einmal bestätigen.</p>
+    <p style="margin:.85rem 0 0; font-size:.85rem;"><strong>Link zum Kopieren</strong></p>
     <p style="word-break: break-all; font-size: .85rem; background: var(--bg); padding: .65rem; border-radius: 8px; border: 1px solid var(--border); margin:0;"><code>{{ feed_url }}</code></p>
     <p style="margin:1rem 0 0; display:flex; gap:.5rem; justify-content:flex-end;">
       <button type="submit" class="btn btn-ghost btn-sm">Schließen</button>
