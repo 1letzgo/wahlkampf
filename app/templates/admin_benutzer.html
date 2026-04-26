@@ -44,7 +44,7 @@
         </td>
         <td style="padding:.65rem .85rem;" class="muted">{{ u.created_at.strftime('%d.%m.%Y') }}</td>
         <td style="padding:.5rem .85rem; text-align:right;">
-          <div style="display:flex; flex-wrap:wrap; gap:.35rem; justify-content:flex-end;">
+          <div style="display:flex; flex-wrap:wrap; gap:.5rem; justify-content:flex-end;">
             {% if not u.is_approved %}
             <form method="post" action="/admin/benutzer/{{ u.id }}/freigeben" style="margin:0;">
               <button type="submit" class="btn btn-sm btn-ico" aria-label="Nutzer {{ u.display_name or u.username }} freigeben">
