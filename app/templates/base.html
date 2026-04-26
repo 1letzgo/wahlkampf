@@ -32,38 +32,26 @@
       min-height: 100dvh;
       -webkit-font-smoothing: antialiased;
     }
-    body::before {
-      content: "";
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: 99;
-      pointer-events: none;
-      background: var(--bg);
-      height: constant(safe-area-inset-top);
-      height: env(safe-area-inset-top, 0px);
-    }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
     .wrap {
       max-width: 720px;
       margin: 0 auto;
-      padding-top: 1.25rem;
+      padding-top: calc(6.5rem + env(safe-area-inset-top, 0px));
       padding-right: max(1rem, env(safe-area-inset-right, 0px));
       padding-bottom: max(3rem, calc(1.25rem + env(safe-area-inset-bottom, 0px)));
       padding-left: max(1rem, env(safe-area-inset-left, 0px));
     }
     header {
-      position: sticky;
+      position: fixed;
+      left: 0;
+      right: 0;
       top: 0;
       z-index: 100;
-      margin-left: calc(-1 * max(1rem, env(safe-area-inset-left, 0px)));
-      margin-right: calc(-1 * max(1rem, env(safe-area-inset-right, 0px)));
-      margin-bottom: 1.5rem;
-      padding-right: max(1rem, env(safe-area-inset-right, 0px));
+      margin: 0;
+      padding-left: 0;
+      padding-right: 0;
       padding-bottom: 0.65rem;
-      padding-left: max(1rem, env(safe-area-inset-left, 0px));
       padding-top: calc(0.65rem + constant(safe-area-inset-top));
       padding-top: calc(0.65rem + env(safe-area-inset-top, 0px));
       background: var(--bg);
@@ -71,11 +59,17 @@
     }
     header h1 { font-size: 1.25rem; margin: 0; font-weight: 650; }
     .header-inner {
+      max-width: 720px;
+      margin-left: auto;
+      margin-right: auto;
+      padding-left: max(1rem, env(safe-area-inset-left, 0px));
+      padding-right: max(1rem, env(safe-area-inset-right, 0px));
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       gap: 0.5rem;
       width: 100%;
+      box-sizing: border-box;
     }
     .header-inner > h1 {
       flex: 1 1 10rem;
@@ -240,5 +234,31 @@
   <div class="wrap">
     {% block body %}{% endblock %}
   </div>
+  <script>
+    (function () {
+      function syncWrapHeaderPad() {
+        var header = document.querySelector("header");
+        var wrap = document.querySelector(".wrap");
+        if (!header || !wrap) return;
+        var gapRem = 1.5;
+        var gapPx = gapRem * parseFloat(getComputedStyle(document.documentElement).fontSize) || 24;
+        wrap.style.paddingTop = Math.ceil(header.getBoundingClientRect().height + gapPx) + "px";
+      }
+      function init() {
+        syncWrapHeaderPad();
+        requestAnimationFrame(syncWrapHeaderPad);
+        window.addEventListener("resize", syncWrapHeaderPad);
+        var header = document.querySelector("header");
+        if (header && typeof ResizeObserver !== "undefined") {
+          new ResizeObserver(syncWrapHeaderPad).observe(header);
+        }
+      }
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", init);
+      } else {
+        init();
+      }
+    })();
+  </script>
 </body>
 </html>
