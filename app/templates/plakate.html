@@ -39,6 +39,10 @@
   }
   button.plakate-focus-map:hover { color: var(--accent-dim); }
   #plakate-add-dialog { z-index: 10000; }
+  .leaflet-div-icon.plakate-user-loc {
+    background: transparent !important;
+    border: none !important;
+  }
 </style>
 {% endblock %}
 {% block body %}
@@ -110,6 +114,7 @@
   var markersLayer = L.layerGroup().addTo(map);
   var previewMarker = null;
   var markerById = {};
+  var userLocationMarker = null;
 
   function openAddDialog() {
     if (dialog && typeof dialog.showModal === "function" && !dialog.open) {
@@ -163,6 +168,26 @@
         var lat = pos.coords.latitude;
         var lng = pos.coords.longitude;
         map.setView([lat, lng], 16);
+        if (userLocationMarker) {
+          map.removeLayer(userLocationMarker);
+          userLocationMarker = null;
+        }
+        var icon = L.divIcon({
+          className: "plakate-user-loc",
+          html:
+            '<span style="display:block;width:18px;height:18px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.35);" aria-hidden="true"></span>',
+          iconSize: [18, 18],
+          iconAnchor: [9, 9],
+        });
+        userLocationMarker = L.marker([lat, lng], {
+          icon: icon,
+          interactive: true,
+          zIndexOffset: 500,
+        }).addTo(map);
+        userLocationMarker.bindTooltip("Dein Standort", {
+          permanent: false,
+          direction: "top",
+        });
       },
       function () {
         alert("Standort konnte nicht ermittelt werden (Berechtigung prüfen).");
