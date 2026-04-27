@@ -29,6 +29,8 @@ from app.database import engine, get_db
 from app.db_migrate import run_sqlite_migrations
 from app.deps import AdminUser, CurrentUser
 from app.ics_service import all_termine_for_feed, build_ics_calendar
+from app.plakate_db import PlakatBase, get_plakate_db, plakate_engine
+from app.plakate_models import Plakat
 from app.settings_store import ensure_ics_token_for_ui, verify_ics_token
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
@@ -42,12 +44,16 @@ ALLOWED_IMAGE = {"image/jpeg", "image/png", "image/webp"}
 EXT_MAP = {".jpg": ".jpg", ".jpeg": ".jpg", ".png": ".png", ".webp": ".webp"}
 USERNAME_PATTERN = re.compile(r"^[\w.-]+$", re.UNICODE)
 
+PlakatDB = Annotated[Session, Depends(get_plakate_db)]
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     models.Base.metadata.create_all(bind=engine)
     run_sqlite_migrations(engine)
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    (UPLOAD_DIR / "plakate").mkdir(parents=True, exist_ok=True)
+    PlakatBase.metadata.create_all(bind=plakate_engine)
     yield
 
 
@@ -155,6 +161,50 @@ def _pending_approval_count(db: Session, user: models.User) -> int:
     )
 
 
+def _user_display_names(db: Session, user_ids: set[int]) -> dict[int, str]:
+    if not user_ids:
+        return {}
+    rows = (
+        db.query(models.User)
+        .filter(models.User.id.in_(user_ids))
+        .all()
+    )
+    return {
+        u.id: ((u.display_name or u.username).strip() or u.username) for u in rows
+    }
+
+
+def _plakate_list_payload(db: Session, pdb: Session) -> list[dict]:
+    rows = pdb.query(Plakat).order_by(Plakat.hung_at.desc()).all()
+    ids: set[int] = set()
+    for r in rows:
+        ids.add(r.hung_by_user_id)
+        if r.removed_by_user_id:
+            ids.add(r.removed_by_user_id)
+    names = _user_display_names(db, ids)
+    out: list[dict] = []
+    for r in rows:
+        out.append(
+            {
+                "id": r.id,
+                "lat": r.latitude,
+                "lng": r.longitude,
+                "active": r.removed_at is None,
+                "hung_by_id": r.hung_by_user_id,
+                "hung_by_name": names.get(r.hung_by_user_id, "Unbekannt"),
+                "hung_at": r.hung_at.isoformat(),
+                "image_url": f"/media/{r.image_path}" if r.image_path else None,
+                "note": (r.note or "").strip(),
+                "removed_by_id": r.removed_by_user_id,
+                "removed_by_name": names.get(r.removed_by_user_id)
+                if r.removed_by_user_id
+                else None,
+                "removed_at": r.removed_at.isoformat() if r.removed_at else None,
+            },
+        )
+    return out
+
+
 @app.get("/", response_class=HTMLResponse)
 def root(request: Request):
     if request.session.get("user_id"):
@@ -252,13 +302,106 @@ def app_menu(
 @app.get("/plakate", response_class=HTMLResponse)
 def plakate_view(
     request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    pdb: PlakatDB,
     user: CurrentUser,
 ):
     return templates.TemplateResponse(
         request,
         "plakate.html",
-        {"user": user},
+        {
+            "user": user,
+            "plakate_initial": _plakate_list_payload(db, pdb),
+            "max_mb": MAX_UPLOAD_MB,
+        },
     )
+
+
+@app.get("/plakate/api/list")
+def plakate_api_list(
+    db: Annotated[Session, Depends(get_db)],
+    pdb: PlakatDB,
+    _: CurrentUser,
+):
+    return JSONResponse(_plakate_list_payload(db, pdb))
+
+
+@app.post("/plakate/api/hinzufuegen")
+async def plakate_hinzufuegen(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    pdb: PlakatDB,
+    user: CurrentUser,
+    lat: Annotated[str, Form()],
+    lng: Annotated[str, Form()],
+    note: Annotated[str, Form()] = "",
+    foto: Annotated[Optional[UploadFile], File()] = None,
+):
+    try:
+        lat_f = float(lat.replace(",", "."))
+        lng_f = float(lng.replace(",", "."))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Koordinaten ungültig.")
+    if not (-90 <= lat_f <= 90 and -180 <= lng_f <= 180):
+        raise HTTPException(status_code=400, detail="Koordinaten außerhalb des gültigen Bereichs.")
+    p = Plakat(
+        latitude=lat_f,
+        longitude=lng_f,
+        hung_by_user_id=user.id,
+        note=note.strip(),
+    )
+    pdb.add(p)
+    pdb.flush()
+    if foto and foto.filename:
+        ext = _safe_ext(foto.filename, foto.content_type)
+        if ext and foto.content_type in ALLOWED_IMAGE:
+            max_b = MAX_UPLOAD_MB * 1024 * 1024
+            dest_name = f"{p.id}_{uuid.uuid4().hex}{ext}"
+            rel = f"plakate/{dest_name}"
+            dest = UPLOAD_DIR / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            size = 0
+            with dest.open("wb") as f:
+                while chunk := await foto.read(1024 * 1024):
+                    size += len(chunk)
+                    if size > max_b:
+                        dest.unlink(missing_ok=True)
+                        pdb.rollback()
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Bild zu groß (max. {MAX_UPLOAD_MB} MB).",
+                        )
+                    f.write(chunk)
+            p.image_path = rel
+            pdb.add(p)
+        elif foto.filename:
+            pdb.rollback()
+            raise HTTPException(
+                status_code=400,
+                detail="Nur JPEG-, PNG- oder WebP-Bilder erlaubt.",
+            )
+    pdb.commit()
+    return JSONResponse({"ok": True, "plakate": _plakate_list_payload(db, pdb)})
+
+
+@app.post("/plakate/api/abhaengen/{plakat_id}")
+def plakate_abhaengen(
+    plakat_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    pdb: PlakatDB,
+    user: CurrentUser,
+):
+    p = pdb.get(Plakat, plakat_id)
+    if not p or p.removed_at is not None:
+        raise HTTPException(
+            status_code=404,
+            detail="Plakat nicht gefunden oder bereits abgehängt.",
+        )
+    p.removed_by_user_id = user.id
+    p.removed_at = datetime.utcnow()
+    pdb.add(p)
+    pdb.commit()
+    return JSONResponse({"ok": True, "plakate": _plakate_list_payload(db, pdb)})
 
 
 @app.get("/registrierung", response_class=HTMLResponse)

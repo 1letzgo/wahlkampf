@@ -6,6 +6,8 @@ services:
       - "8000:8000"
     environment:
       SECRET_KEY: ${SECRET_KEY:-dev-change-me-in-production}
+      # Optional: eigene SQLite-Datei für Plakate (Default im Image: /data/plakate.db)
+      PLAKATE_DATABASE_URL: ${PLAKATE_DATABASE_URL:-sqlite:////data/plakate.db}
     volumes:
       - wahlkampf-data:/data
 

@@ -1,10 +1,337 @@
 {% extends "base.html" %}
 {% from '_ui_macros.html' import app_header %}
 {% block title %}Plakate — Wahlkampf{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  .plakate-map-wrap { margin-bottom: 1rem; }
+  #plakate-map {
+    height: min(55vh, 420px);
+    width: 100%;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    z-index: 1;
+  }
+  .plakate-form .row-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.75rem; }
+  .plakate-coords { font-size: 0.85rem; color: var(--muted); margin: 0.35rem 0 0; }
+  .plakate-table-wrap { overflow-x: auto; margin-top: 0.5rem; }
+  .plakate-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .plakate-table th, .plakate-table td { padding: 0.5rem 0.6rem; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .plakate-table th { background: var(--bg); font-weight: 650; }
+  .plakate-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); }
+  .badge-active { color: #1e4d2e; font-weight: 650; }
+  .badge-done { color: var(--muted); }
+  .leaflet-control-attribution { font-size: 10px; }
+</style>
+{% endblock %}
 {% block body %}
 {{ app_header('Plakate') }}
 
-<div class="card">
-  <p class="muted" style="margin-top:0;">Hier gibt es bald Material und Hinweise zu Plakaten und Öffentlichkeitsarbeit.</p>
+<p class="muted" style="margin-top:0;">Gemeinsame Übersicht: Wo hängen Plakate, wer hat sie gemeldet, wer hat sie abgehängt. Klicke auf die Karte, um einen neuen Standort zu setzen (dann Foto optional hochladen).</p>
+
+<div class="card plakate-map-wrap">
+  <div style="display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; margin-bottom:.65rem;">
+    <button type="button" class="btn btn-sm" id="plakate-locate">Mein Standort</button>
+    <span class="muted" style="font-size:.82rem;">Karte: Klick setzt Position für neues Plakat · © <a href="https://www.openstreetmap.org/copyright" rel="noopener noreferrer">OpenStreetMap</a></span>
+  </div>
+  <div id="plakate-map" role="application" aria-label="Karte Plakat-Standorte"></div>
 </div>
+
+<div class="card plakate-form">
+  <h2 style="margin:0 0 .75rem; font-size:1.05rem;">Neues Plakat melden</h2>
+  <form id="plakate-add-form" enctype="multipart/form-data">
+    <input type="hidden" name="lat" id="plakate-lat" value="">
+    <input type="hidden" name="lng" id="plakate-lng" value="">
+    <p class="plakate-coords" id="plakate-coords-hint">Bitte Position auf der Karte wählen.</p>
+    <label for="plakate-note">Notiz (optional)</label>
+    <input id="plakate-note" name="note" type="text" maxlength="500" placeholder="z. B. Litfaßsäule, Hauswand …">
+    <label for="plakate-foto">Foto (optional, JPEG/PNG/WebP, max. {{ max_mb }} MB)</label>
+    <input id="plakate-foto" name="foto" type="file" accept="image/jpeg,image/png,image/webp" capture="environment">
+    <div class="row-actions">
+      <button type="submit" class="btn" id="plakate-submit" disabled>Plakat hängt hier</button>
+    </div>
+  </form>
+  <p class="muted" id="plakate-form-msg" style="margin:.75rem 0 0; font-size:.85rem;"></p>
+</div>
+
+<div class="card">
+  <h2 style="margin:0 0 .75rem; font-size:1.05rem;">Alle Plakate</h2>
+  <div class="plakate-table-wrap">
+    <table class="plakate-table" id="plakate-table">
+      <thead>
+        <tr>
+          <th>Foto</th>
+          <th>Position</th>
+          <th>Status</th>
+          <th>Aufgehängt</th>
+          <th>Abgehängt</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="plakate-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  var initial = {{ plakate_initial | tojson }};
+
+  function deDt(iso) {
+    if (!iso) return "—";
+    var d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleString("de-DE");
+  }
+
+  var map = L.map("plakate-map", { scrollWheelZoom: true }).setView([51.1657, 10.4515], 6);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap-Mitwirkende",
+  }).addTo(map);
+
+  var markersLayer = L.layerGroup().addTo(map);
+  var previewMarker = null;
+  var markerById = {};
+
+  function setPreview(lat, lng) {
+    document.getElementById("plakate-lat").value = String(lat);
+    document.getElementById("plakate-lng").value = String(lng);
+    document.getElementById("plakate-coords-hint").textContent =
+      "Position: " + lat.toFixed(5) + ", " + lng.toFixed(5);
+    document.getElementById("plakate-submit").disabled = false;
+    if (previewMarker) map.removeLayer(previewMarker);
+    previewMarker = L.marker([lat, lng], {
+      draggable: true,
+      title: "Neues Plakat",
+    }).addTo(map);
+    previewMarker.on("dragend", function () {
+      var p = previewMarker.getLatLng();
+      setPreview(p.lat, p.lng);
+    });
+  }
+
+  map.on("click", function (e) {
+    setPreview(e.latlng.lat, e.latlng.lng);
+  });
+
+  document.getElementById("plakate-locate").addEventListener("click", function () {
+    if (!navigator.geolocation) {
+      alert("Ortung wird von diesem Gerät nicht unterstützt.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      function (pos) {
+        var lat = pos.coords.latitude;
+        var lng = pos.coords.longitude;
+        map.setView([lat, lng], 16);
+        setPreview(lat, lng);
+      },
+      function () {
+        alert("Standort konnte nicht ermittelt werden (Berechtigung prüfen).");
+      },
+      { enableHighAccuracy: true, timeout: 12000 }
+    );
+  });
+
+  function clearMarkers() {
+    markersLayer.clearLayers();
+    markerById = {};
+  }
+
+  function renderMarkers(rows) {
+    clearMarkers();
+    rows.forEach(function (r) {
+      var color = r.active ? "#1e7a4c" : "#888";
+      var icon = L.divIcon({
+        className: "plakate-pin",
+        html: '<span style="display:block;width:14px;height:14px;border-radius:50%;background:' + color + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);"></span>',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
+      });
+      var m = L.marker([r.lat, r.lng], { icon: icon }).addTo(markersLayer);
+      var imgHtml = r.image_url
+        ? '<p style="margin:.35rem 0 0;"><img src="' + r.image_url + '" alt="" style="max-width:180px;border-radius:6px;border:1px solid #ddd;"></p>'
+        : "";
+      var pop =
+        "<strong>Plakat #" +
+        r.id +
+        "</strong><br>" +
+        (r.active ? '<span style="color:#1e4d2e;font-weight:600;">hängt</span>' : "abgehängt") +
+        "<br>Aufgehängt: " +
+        escapeHtml(r.hung_by_name) +
+        " · " +
+        deDt(r.hung_at) +
+        (r.note ? "<br>Notiz: " + escapeHtml(r.note) : "") +
+        imgHtml +
+        (r.active
+          ? '<p style="margin:.5rem 0 0;"><button type="button" class="btn btn-sm plakate-pop-remove" data-id="' +
+            r.id +
+            '">Abhängen</button></p>'
+          : r.removed_by_name
+            ? "<br>Abgehängt: " +
+              escapeHtml(r.removed_by_name) +
+              " · " +
+              deDt(r.removed_at)
+            : "");
+      m.bindPopup(pop);
+      markerById[r.id] = m;
+    });
+  }
+
+  function escapeHtml(s) {
+    if (!s) return "";
+    var d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function renderTable(rows) {
+    var tb = document.getElementById("plakate-tbody");
+    tb.innerHTML = "";
+    if (!rows.length) {
+      var tr = document.createElement("tr");
+      tr.innerHTML = '<td colspan="6" class="muted">Noch keine Einträge.</td>';
+      tb.appendChild(tr);
+      return;
+    }
+    rows.forEach(function (r) {
+      var tr = document.createElement("tr");
+      var imgCell = r.image_url
+        ? '<a href="' + r.image_url + '"><img class="plakate-thumb" src="' + r.image_url + '" alt=""></a>'
+        : "—";
+      var pos =
+        '<a href="https://www.openstreetmap.org/?mlat=' +
+        r.lat +
+        "&mlon=" +
+        r.lng +
+        '&zoom=17" rel="noopener noreferrer">' +
+        r.lat.toFixed(5) +
+        ", " +
+        r.lng.toFixed(5) +
+        "</a>";
+      var status = r.active
+        ? '<span class="badge-active">hängt</span>'
+        : '<span class="badge-done">abgehängt</span>';
+      var hung =
+        escapeHtml(r.hung_by_name) + "<br><span class='muted'>" + deDt(r.hung_at) + "</span>";
+      var rem = r.removed_at
+        ? escapeHtml(r.removed_by_name || "—") + "<br><span class='muted'>" + deDt(r.removed_at) + "</span>"
+        : "—";
+      var btn = r.active
+        ? '<button type="button" class="btn btn-ghost btn-sm plakate-row-remove" data-id="' +
+          r.id +
+          '">Abhängen</button>'
+        : "";
+      tr.innerHTML =
+        "<td>" +
+        imgCell +
+        "</td><td>" +
+        pos +
+        "</td><td>" +
+        status +
+        "</td><td>" +
+        hung +
+        "</td><td>" +
+        rem +
+        "</td><td>" +
+        btn +
+        "</td>";
+      tb.appendChild(tr);
+    });
+  }
+
+  function applyData(rows) {
+    renderMarkers(rows);
+    renderTable(rows);
+    try {
+      var group = L.featureGroup(Object.values(markerById));
+      if (group.getLayers().length) map.fitBounds(group.getBounds().pad(0.15));
+    } catch (e) {}
+  }
+
+  applyData(initial);
+
+  document.body.addEventListener("click", function (e) {
+    var btn = e.target.closest(".plakate-pop-remove, .plakate-row-remove");
+    if (!btn) return;
+    var id = btn.getAttribute("data-id");
+    if (!id || !confirm("Dieses Plakat als abgehängt melden?")) return;
+    fetch("/plakate/api/abhaengen/" + id, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(function (r) {
+        return r.json().then(function (j) {
+          if (!r.ok) {
+            var d = j.detail;
+            var msg = "Fehler";
+            if (typeof d === "string") msg = d;
+            else if (Array.isArray(d) && d[0] && d[0].msg) msg = d[0].msg;
+            throw new Error(msg);
+          }
+          return j;
+        });
+      })
+      .then(function (j) {
+        applyData(j.plakate);
+        document.getElementById("plakate-form-msg").textContent = "";
+      })
+      .catch(function (err) {
+        alert(err.message || "Abhängen fehlgeschlagen.");
+      });
+  });
+
+  document.getElementById("plakate-add-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var lat = document.getElementById("plakate-lat").value;
+    var lng = document.getElementById("plakate-lng").value;
+    if (!lat || !lng) {
+      alert("Bitte zuerst auf der Karte klicken.");
+      return;
+    }
+    var fd = new FormData(e.target);
+    var msg = document.getElementById("plakate-form-msg");
+    msg.textContent = "Speichern…";
+    fetch("/plakate/api/hinzufuegen", {
+      method: "POST",
+      body: fd,
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(function (r) {
+        return r.json().then(function (j) {
+          if (!r.ok) {
+            var d = j.detail;
+            var err = "Fehler";
+            if (typeof d === "string") err = d;
+            else if (Array.isArray(d) && d[0] && d[0].msg) err = d[0].msg;
+            throw new Error(err);
+          }
+          return j;
+        });
+      })
+      .then(function (j) {
+        applyData(j.plakate);
+        msg.textContent = "Gespeichert.";
+        e.target.reset();
+        document.getElementById("plakate-lat").value = "";
+        document.getElementById("plakate-lng").value = "";
+        document.getElementById("plakate-submit").disabled = true;
+        document.getElementById("plakate-coords-hint").textContent =
+          "Bitte Position auf der Karte wählen.";
+        if (previewMarker) {
+          map.removeLayer(previewMarker);
+          previewMarker = null;
+        }
+      })
+      .catch(function (err) {
+        msg.textContent = "";
+        alert(err.message || "Speichern fehlgeschlagen.");
+      });
+  });
+})();
+</script>
 {% endblock %}
