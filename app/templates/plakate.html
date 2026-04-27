@@ -25,6 +25,7 @@
   .plakate-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); }
   .badge-active { color: #1e4d2e; font-weight: 650; }
   .badge-done { color: var(--muted); }
+  .plakate-pos-label { display: block; font-weight: 650; margin-bottom: 0.25rem; line-height: 1.3; }
   .leaflet-control-attribution { font-size: 10px; }
   button.plakate-focus-map {
     background: none;
@@ -271,7 +272,12 @@
       var imgCell = r.image_url
         ? '<a href="' + r.image_url + '"><img class="plakate-thumb" src="' + r.image_url + '" alt=""></a>'
         : "—";
+      var noteStr = r.note && String(r.note).trim() ? String(r.note).trim() : "";
+      var posLabel = noteStr
+        ? '<span class="plakate-pos-label">' + escapeHtml(noteStr) + "</span>"
+        : "";
       var pos =
+        posLabel +
         '<button type="button" class="plakate-focus-map" data-id="' +
         r.id +
         '" data-lat="' +
