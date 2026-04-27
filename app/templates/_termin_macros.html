@@ -1,0 +1,15 @@
+{% macro teilnehmer_liste(row) %}
+        <p style="margin:0 0 .5rem; font-size:.9rem;">
+          <strong>Teilnehmer{% if row.teilnehmer_display|length %} ({{ row.teilnehmer_display|length }}){% endif %}:</strong>
+          {% if row.teilnehmer_display|length %}
+          <span>
+            {% for item in row.teilnehmer_display %}
+              {% if not loop.first %}, {% endif %}
+              {% if item.extern %}<strong>{{ item.name }}</strong>{% else %}{{ item.name }}{% endif %}
+            {% endfor %}
+          </span>
+          {% else %}
+          <span class="muted">noch niemand</span>
+          {% endif %}
+        </p>
+{% endmacro %}

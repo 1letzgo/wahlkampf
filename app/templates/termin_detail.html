@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from '_ui_macros.html' import app_header %}
+{% from '_termin_macros.html' import teilnehmer_liste %}
 {% import '_icons.html' as ico %}
 {% set t = row.termin %}
 {% block title %}{{ t.title }} — Termin — Wahlkampf{% endblock %}
@@ -59,14 +60,7 @@
       </div>
 
       <div style="padding-top:.75rem; border-top:1px solid var(--border);">
-        <p style="margin:0 0 .5rem; font-size:.9rem;">
-          <strong>Teilnehmer{% if row.teilnehmer %} ({{ row.teilnehmer|length }}){% endif %}:</strong>
-          {% if row.teilnehmer %}
-          <span>{{ row.teilnehmer|join(', ') }}</span>
-          {% else %}
-          <span class="muted">noch niemand</span>
-          {% endif %}
-        </p>
+        {{ teilnehmer_liste(row) }}
         {% if not termin_vergangen %}
         <div style="display:flex; flex-wrap:wrap; gap:.5rem; align-items:center;">
           {% if row.ich_teilnehme %}

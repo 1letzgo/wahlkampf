@@ -5,7 +5,7 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import date, datetime, time
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated, List, Optional
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.exception_handlers import http_exception_handler
@@ -32,6 +32,13 @@ from app.ics_service import all_termine_for_feed, build_ics_calendar
 from app.plakate_db import PlakatBase, get_plakate_db, plakate_engine
 from app.plakate_models import Plakat
 from app.settings_store import ensure_ics_token_for_ui, verify_ics_token
+from app.termin_extern import (
+    EXTERNE_TEILNEHMER_KEYS,
+    EXTERNE_TEILNEHMER_OPTIONS,
+    externe_teilnehmer_decode,
+    externe_teilnehmer_encode,
+    externe_teilnehmer_labels,
+)
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -600,6 +607,16 @@ def logout(request: Request):
     return RedirectResponse("/login", status_code=302)
 
 
+def _termin_teilnehmer_display(t: models.Termin, internal_names: list[str]) -> list[dict]:
+    extern_keys = externe_teilnehmer_decode(t.externe_teilnehmer_json)
+    extern_names = externe_teilnehmer_labels(extern_keys)
+    items: list[dict] = [{"name": n, "extern": False} for n in internal_names]
+    for n in extern_names:
+        items.append({"name": n, "extern": True})
+    items.sort(key=lambda x: (x["name"].lower(), x["extern"]))
+    return items
+
+
 def _termin_row_from_instance(t: models.Termin, user: models.User) -> dict:
     names = sorted(
         {
@@ -610,11 +627,42 @@ def _termin_row_from_instance(t: models.Termin, user: models.User) -> dict:
     )
     ich = any(tn.user_id == user.id for tn in t.teilnahmen)
     kann = _can_manage_termin(user, t)
+    teilnehmer_display = _termin_teilnehmer_display(t, names)
     return {
         "termin": t,
         "teilnehmer": names,
+        "teilnehmer_display": teilnehmer_display,
         "ich_teilnehme": ich,
         "kann_verwalten": kann,
+    }
+
+
+def _filter_extern_gast_keys(extern_gast: Optional[List[str]]) -> list[str]:
+    if not extern_gast:
+        return []
+    return sorted({str(x) for x in extern_gast if str(x) in EXTERNE_TEILNEHMER_KEYS})
+
+
+def _termin_form_context(
+    *,
+    user: models.User,
+    termin: Optional[models.Termin],
+    error: Optional[str],
+    extern_gast: Optional[List[str]] = None,
+) -> dict:
+    if extern_gast is not None:
+        auswahl = _filter_extern_gast_keys(extern_gast)
+    elif termin is not None:
+        auswahl = externe_teilnehmer_decode(termin.externe_teilnehmer_json)
+    else:
+        auswahl = []
+    return {
+        "user": user,
+        "termin": termin,
+        "error": error,
+        "max_mb": MAX_UPLOAD_MB,
+        "externe_optionen": EXTERNE_TEILNEHMER_OPTIONS,
+        "externe_auswahl": auswahl,
     }
 
 
@@ -684,12 +732,7 @@ def termin_new_form(request: Request, user: CurrentUser):
     return templates.TemplateResponse(
         request,
         "termin_form.html",
-        {
-            "user": user,
-            "termin": None,
-            "error": None,
-            "max_mb": MAX_UPLOAD_MB,
-        },
+        _termin_form_context(user=user, termin=None, error=None),
     )
 
 
@@ -706,6 +749,7 @@ async def termin_create(
     nachbereitung: Annotated[str, Form()] = "",
     location: Annotated[str, Form()] = "",
     end_uhrzeit: Annotated[str, Form()] = "",
+    extern_gast: Annotated[Optional[List[str]], Form()] = None,
     bild: Annotated[Optional[UploadFile], File()] = None,
 ):
     err = _parse_times(start_uhrzeit, end_uhrzeit)
@@ -713,12 +757,12 @@ async def termin_create(
         return templates.TemplateResponse(
             request,
             "termin_form.html",
-            {
-                "user": user,
-                "termin": None,
-                "error": err,
-                "max_mb": MAX_UPLOAD_MB,
-            },
+            _termin_form_context(
+                user=user,
+                termin=None,
+                error=err,
+                extern_gast=extern_gast,
+            ),
             status_code=400,
         )
     st = _combine(datum, start_uhrzeit)
@@ -734,6 +778,9 @@ async def termin_create(
         location=location.strip(),
         starts_at=st,
         ends_at=en,
+        externe_teilnehmer_json=externe_teilnehmer_encode(
+            _filter_extern_gast_keys(extern_gast),
+        ),
         created_by_id=user.id,
     )
     db.add(t)
@@ -754,12 +801,12 @@ async def termin_create(
                         return templates.TemplateResponse(
                             request,
                             "termin_form.html",
-                            {
-                                "user": user,
-                                "termin": None,
-                                "error": f"Bild zu groß (max. {MAX_UPLOAD_MB} MB).",
-                                "max_mb": MAX_UPLOAD_MB,
-                            },
+                            _termin_form_context(
+                                user=user,
+                                termin=None,
+                                error=f"Bild zu groß (max. {MAX_UPLOAD_MB} MB).",
+                                extern_gast=extern_gast,
+                            ),
                             status_code=400,
                         )
                     f.write(chunk)
@@ -850,12 +897,7 @@ def termin_edit_form(
     return templates.TemplateResponse(
         request,
         "termin_form.html",
-        {
-            "user": user,
-            "termin": t,
-            "error": None,
-            "max_mb": MAX_UPLOAD_MB,
-        },
+        _termin_form_context(user=user, termin=t, error=None),
     )
 
 
@@ -874,6 +916,7 @@ async def termin_edit_save(
     location: Annotated[str, Form()] = "",
     end_uhrzeit: Annotated[str, Form()] = "",
     bild_entfernen: Annotated[str, Form()] = "",
+    extern_gast: Annotated[Optional[List[str]], Form()] = None,
     bild: Annotated[Optional[UploadFile], File()] = None,
 ):
     t = db.get(models.Termin, termin_id)
@@ -890,12 +933,12 @@ async def termin_edit_save(
         return templates.TemplateResponse(
             request,
             "termin_form.html",
-            {
-                "user": user,
-                "termin": t,
-                "error": err,
-                "max_mb": MAX_UPLOAD_MB,
-            },
+            _termin_form_context(
+                user=user,
+                termin=t,
+                error=err,
+                extern_gast=extern_gast,
+            ),
             status_code=400,
         )
     st = _combine(datum, start_uhrzeit)
@@ -910,6 +953,9 @@ async def termin_edit_save(
     t.location = location.strip()
     t.starts_at = st
     t.ends_at = en
+    t.externe_teilnehmer_json = externe_teilnehmer_encode(
+        _filter_extern_gast_keys(extern_gast),
+    )
 
     if bild_entfernen == "1":
         _unlink_upload(t.image_path)
@@ -932,12 +978,12 @@ async def termin_edit_save(
                         return templates.TemplateResponse(
                             request,
                             "termin_form.html",
-                            {
-                                "user": user,
-                                "termin": t,
-                                "error": f"Bild zu groß (max. {MAX_UPLOAD_MB} MB).",
-                                "max_mb": MAX_UPLOAD_MB,
-                            },
+                            _termin_form_context(
+                                user=user,
+                                termin=t,
+                                error=f"Bild zu groß (max. {MAX_UPLOAD_MB} MB).",
+                                extern_gast=extern_gast,
+                            ),
                             status_code=400,
                         )
                     f.write(chunk)

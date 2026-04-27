@@ -58,6 +58,7 @@ class Termin(Base):
     starts_at: Mapped[datetime] = mapped_column(DateTime)
     ends_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     image_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    externe_teilnehmer_json: Mapped[str] = mapped_column(Text, default="[]")
     created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

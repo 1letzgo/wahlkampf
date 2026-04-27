@@ -43,6 +43,17 @@
     <label for="nachbereitung">Nachbereitung</label>
     <textarea id="nachbereitung" name="nachbereitung" placeholder="To-dos, Ergebnisse nach dem Termin …">{{ termin.nachbereitung if termin else '' }}</textarea>
 
+    <p style="margin:1rem 0 .35rem; font-weight:650;">Externe Gäste</p>
+    <p class="muted" style="margin:0 0 .5rem; font-size:.85rem;">Wiederkehrende Gäste ohne Login — in der Teilnehmerliste <strong>fett</strong> dargestellt.</p>
+    <div style="display:flex; flex-direction:column; gap:.4rem; margin-bottom:.25rem;">
+      {% for key, label in externe_optionen %}
+      <label style="display:flex; align-items:center; gap:.5rem; font-weight:500;">
+        <input type="checkbox" name="extern_gast" value="{{ key }}"{% if key in externe_auswahl %} checked{% endif %}>
+        {{ label }}
+      </label>
+      {% endfor %}
+    </div>
+
     {% if termin and termin.image_path %}
     <p style="margin:.75rem 0 .35rem; font-size:.9rem;"><strong>Aktuelles Foto</strong></p>
     <p style="margin:0 0 .5rem;"><img src="/media/{{ termin.image_path }}" alt="" style="max-width:200px; border-radius:8px; border:1px solid var(--border);"></p>

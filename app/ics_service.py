@@ -7,6 +7,7 @@ from icalendar import Calendar, Event
 from sqlalchemy.orm import Session
 
 from app.models import Termin
+from app.termin_extern import externe_teilnehmer_decode, externe_teilnehmer_labels
 
 TZ = ZoneInfo("Europe/Berlin")
 
@@ -29,6 +30,11 @@ def build_ics_calendar(termine: list[Termin], cal_name: str = "SPD Wahlkampf") -
             desc_parts.append(f"Vorbereitung:\n{t.vorbereitung}")
         if t.nachbereitung:
             desc_parts.append(f"Nachbereitung:\n{t.nachbereitung}")
+        ext_names = externe_teilnehmer_labels(
+            externe_teilnehmer_decode(t.externe_teilnehmer_json),
+        )
+        if ext_names:
+            desc_parts.append("Externe Gäste: " + ", ".join(ext_names))
         if desc_parts:
             ev.add("description", "\n\n".join(desc_parts))
         if t.location:

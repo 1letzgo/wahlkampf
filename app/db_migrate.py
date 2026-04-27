@@ -56,3 +56,9 @@ def run_sqlite_migrations(engine: Engine) -> None:
                         "ALTER TABLE termine ADD COLUMN nachbereitung TEXT NOT NULL DEFAULT ''"
                     ),
                 )
+            if "externe_teilnehmer_json" not in term_cols:
+                conn.execute(
+                    text(
+                        "ALTER TABLE termine ADD COLUMN externe_teilnehmer_json TEXT NOT NULL DEFAULT '[]'"
+                    ),
+                )
