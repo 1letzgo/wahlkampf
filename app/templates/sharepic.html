@@ -24,14 +24,26 @@
     vertical-align: middle;
     border-radius: 6px;
     box-shadow: var(--shadow);
+    touch-action: none;
   }
+  #sharepic-canvas.sharepic-canvas--has-photo { cursor: grab; }
+  #sharepic-canvas.sharepic-canvas--drag { cursor: grabbing; }
   .sharepic-fields label { margin-top: 0.5rem; }
   .sharepic-fields textarea {
     min-height: 4.5rem;
     font-size: 0.9rem;
     line-height: 1.35;
   }
+  .sharepic-fields textarea#sharepic-text2 { min-height: 3.2rem; }
   .sharepic-hint { font-size: 0.82rem; color: var(--muted); margin: 0.25rem 0 0; }
+  .sharepic-zoom-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.35rem;
+  }
+  .sharepic-zoom-row input[type="range"] { flex: 1 1 140px; min-width: 120px; }
 </style>
 {% endblock %}
 {% block body %}
@@ -47,15 +59,23 @@
 <div class="card sharepic-layout">
   <div class="sharepic-preview-wrap">
     <canvas id="sharepic-canvas" width="768" height="1024" aria-label="Sharepic-Vorschau"></canvas>
-    <p class="muted sharepic-hint" style="margin-top:.65rem;">Ausgabe 768×1024 px — Bild wird zentriert beschnitten (Cover).</p>
+    <p class="muted sharepic-hint" style="margin-top:.65rem;">
+      Foto-Bereich: <strong>ziehen</strong> zum Verschieben, <strong>Mausrad</strong> zum Zoomen (oder Regler). Ausgabe 768×1024 px.
+    </p>
   </div>
   <div class="sharepic-fields">
     <label for="sharepic-photo">Foto hinter der Maske</label>
     <input id="sharepic-photo" type="file" accept="image/jpeg,image/png,image/webp">
+    <div class="sharepic-zoom-row">
+      <label for="sharepic-zoom" style="margin:0; font-weight:600;">Zoom</label>
+      <input type="range" id="sharepic-zoom" min="100" max="300" value="100" step="5" aria-valuemin="100" aria-valuemax="300" aria-valuenow="100">
+      <button type="button" class="btn btn-ghost btn-sm" id="sharepic-reset-view" aria-label="Bildausschnitt zurücksetzen">Zurücksetzen</button>
+    </div>
+    <p class="sharepic-hint">100&nbsp;% = voll sichtbar; zoomen und ziehen, um den Ausschnitt zu wählen.</p>
     <label for="sharepic-text1">Text Banner (max. 3 Zeilen)</label>
-    <textarea id="sharepic-text1" name="text1" rows="3" maxlength="500" placeholder="z. B. Gemeinsam für Westerstede"></textarea>
-    <label for="sharepic-text2">Text unten (max. 3 Zeilen)</label>
-    <textarea id="sharepic-text2" name="text2" rows="3" maxlength="500" placeholder="z. B. Termin und Ort"></textarea>
+    <textarea id="sharepic-text1" name="text1" rows="3" maxlength="500" placeholder="z. B. Olaf in WST"></textarea>
+    <label for="sharepic-text2">Text unten (max. 2 Zeilen)</label>
+    <textarea id="sharepic-text2" name="text2" rows="2" maxlength="500" placeholder="z. B. Termin und Ort"></textarea>
     <p class="sharepic-hint">Open Sans, 50 px, fett — Zeilenumbruch mit Enter oder automatisch.</p>
     <p style="margin-top:1rem; display:flex; flex-wrap:wrap; gap:.5rem;">
       <button type="button" class="btn btn-sm btn-ico btn-with-label" id="sharepic-download" aria-label="PNG herunterladen">
@@ -72,8 +92,10 @@
   var W = 768;
   var H = 1024;
   var PHOTO = { x: 0, y: 144, w: 768, h: 735 };
-  var TEXT1 = { x: 52, y: 112, maxW: 620, lineHeight: 52, maxLines: 3 };
-  var TEXT2 = { x: 40, y: 894, maxW: 688, lineHeight: 43, maxLines: 3 };
+  /* Banner: nur im roten Schrägbalken (unterhalb festem Kopf), nicht in der Fotofläche */
+  var TEXT1 = { x: 52, y: 188, maxW: 600, lineHeight: 48, maxLines: 3 };
+  /* Fußzeile: zwei Zeilen, im unteren roten Balken zentriert */
+  var TEXT2 = { x: 44, y: 918, maxW: 680, lineHeight: 50, maxLines: 2 };
   var FONT = '700 50px "Open Sans", system-ui, sans-serif';
   var FILL = "#ffffff";
 
@@ -82,10 +104,65 @@
   var maskImg = new Image();
   maskImg.crossOrigin = "anonymous";
   var userImg = null;
+  var photoZoom = 1;
+  var photoPanX = 0;
+  var photoPanY = 0;
+  var drag = false;
+  var lastPt = { x: 0, y: 0 };
 
-  function limitLines(el) {
+  function limitLines(el, maxN) {
     var parts = el.value.split(/\n/);
-    if (parts.length > 3) el.value = parts.slice(0, 3).join("\n");
+    if (parts.length > maxN) el.value = parts.slice(0, maxN).join("\n");
+  }
+
+  function toCanvas(e) {
+    var rect = canvas.getBoundingClientRect();
+    var sx = canvas.width / rect.width;
+    var sy = canvas.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * sx,
+      y: (e.clientY - rect.top) * sy,
+    };
+  }
+
+  function inPhotoRect(x, y) {
+    return x >= PHOTO.x && x <= PHOTO.x + PHOTO.w && y >= PHOTO.y && y <= PHOTO.y + PHOTO.h;
+  }
+
+  function clampPan() {
+    if (photoZoom <= 1) {
+      photoPanX = 0;
+      photoPanY = 0;
+      return;
+    }
+    var dw = PHOTO.w * photoZoom;
+    var dh = PHOTO.h * photoZoom;
+    var maxPX = Math.max(0, (dw - PHOTO.w) / 2);
+    var maxPY = Math.max(0, (dh - PHOTO.h) / 2);
+    photoPanX = Math.max(-maxPX, Math.min(maxPX, photoPanX));
+    photoPanY = Math.max(-maxPY, Math.min(maxPY, photoPanY));
+  }
+
+  function setZoomFromUI() {
+    var zEl = document.getElementById("sharepic-zoom");
+    photoZoom = Math.max(1, Math.min(3, parseInt(zEl.value, 10) / 100));
+    zEl.setAttribute("aria-valuenow", String(Math.round(photoZoom * 100)));
+    clampPan();
+    scheduleRedraw();
+  }
+
+  function resetPhotoView() {
+    photoZoom = 1;
+    photoPanX = 0;
+    photoPanY = 0;
+    var zEl = document.getElementById("sharepic-zoom");
+    zEl.value = "100";
+    zEl.setAttribute("aria-valuenow", "100");
+    scheduleRedraw();
+  }
+
+  function updateCanvasClass() {
+    canvas.classList.toggle("sharepic-canvas--has-photo", !!(userImg && userImg.complete && userImg.naturalWidth));
   }
 
   function wrapParagraph(ctx, text, maxW) {
@@ -136,9 +213,10 @@
     return out.slice(0, maxLines);
   }
 
-  function drawCover(img, x, y, w, h) {
+  function drawCoverPanZoom(img, rx, ry, rw, rh, zoom, panX, panY) {
+    if (!img || !img.naturalWidth) return;
     var ir = img.width / img.height;
-    var r = w / h;
+    var r = rw / rh;
     var sw, sh, sx, sy;
     if (ir > r) {
       sh = img.height;
@@ -151,7 +229,18 @@
       sx = 0;
       sy = (img.height - sh) / 2;
     }
-    ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+    var dw = rw * zoom;
+    var dh = rh * zoom;
+    var cx = rx + rw * 0.5 + panX;
+    var cy = ry + rh * 0.5 + panY;
+    var dx = cx - dw * 0.5;
+    var dy = cy - dh * 0.5;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(rx, ry, rw, rh);
+    ctx.clip();
+    ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+    ctx.restore();
   }
 
   function redraw() {
@@ -159,7 +248,7 @@
     ctx.fillStyle = "#e8e4dc";
     ctx.fillRect(0, 0, W, H);
     if (userImg && userImg.complete && userImg.naturalWidth) {
-      drawCover(userImg, PHOTO.x, PHOTO.y, PHOTO.w, PHOTO.h);
+      drawCoverPanZoom(userImg, PHOTO.x, PHOTO.y, PHOTO.w, PHOTO.h, photoZoom, photoPanX, photoPanY);
     }
     if (maskImg.complete && maskImg.naturalWidth) {
       ctx.drawImage(maskImg, 0, 0, W, H);
@@ -197,6 +286,8 @@
     var f = e.target.files && e.target.files[0];
     if (!f) {
       userImg = null;
+      resetPhotoView();
+      updateCanvasClass();
       scheduleRedraw();
       return;
     }
@@ -205,26 +296,87 @@
     im.onload = function () {
       URL.revokeObjectURL(url);
       userImg = im;
+      resetPhotoView();
+      updateCanvasClass();
       scheduleRedraw();
     };
     im.onerror = function () {
       URL.revokeObjectURL(url);
       userImg = null;
+      resetPhotoView();
+      updateCanvasClass();
       scheduleRedraw();
     };
     im.src = url;
   });
 
+  document.getElementById("sharepic-zoom").addEventListener("input", setZoomFromUI);
+  document.getElementById("sharepic-reset-view").addEventListener("click", function () {
+    resetPhotoView();
+    updateCanvasClass();
+  });
+
+  canvas.addEventListener("pointerdown", function (e) {
+    if (!userImg || !userImg.naturalWidth) return;
+    var pt = toCanvas(e);
+    if (!inPhotoRect(pt.x, pt.y)) return;
+    drag = true;
+    lastPt = pt;
+    canvas.classList.add("sharepic-canvas--drag");
+    try {
+      canvas.setPointerCapture(e.pointerId);
+    } catch (err) {}
+  });
+  canvas.addEventListener("pointermove", function (e) {
+    if (!drag) return;
+    var pt = toCanvas(e);
+    photoPanX += pt.x - lastPt.x;
+    photoPanY += pt.y - lastPt.y;
+    lastPt = pt;
+    clampPan();
+    scheduleRedraw();
+  });
+  function endDrag(e) {
+    if (drag) {
+      drag = false;
+      canvas.classList.remove("sharepic-canvas--drag");
+      try {
+        canvas.releasePointerCapture(e.pointerId);
+      } catch (err) {}
+    }
+  }
+  canvas.addEventListener("pointerup", endDrag);
+  canvas.addEventListener("pointercancel", endDrag);
+
+  canvas.addEventListener(
+    "wheel",
+    function (e) {
+      if (!userImg || !userImg.naturalWidth) return;
+      var pt = toCanvas(e);
+      if (!inPhotoRect(pt.x, pt.y)) return;
+      e.preventDefault();
+      var step = e.deltaY > 0 ? -0.08 : 0.08;
+      photoZoom = Math.max(1, Math.min(3, photoZoom + step));
+      var zEl = document.getElementById("sharepic-zoom");
+      zEl.value = String(Math.round(photoZoom * 100));
+      zEl.setAttribute("aria-valuenow", String(Math.round(photoZoom * 100)));
+      clampPan();
+      scheduleRedraw();
+    },
+    { passive: false }
+  );
+
   var ta1 = document.getElementById("sharepic-text1");
   var ta2 = document.getElementById("sharepic-text2");
   ta1.addEventListener("input", function () {
-    limitLines(ta1);
+    limitLines(ta1, 3);
     scheduleRedraw();
   });
   ta2.addEventListener("input", function () {
-    limitLines(ta2);
+    limitLines(ta2, 2);
     scheduleRedraw();
   });
+  limitLines(ta2, 2);
 
   document.getElementById("sharepic-download").addEventListener("click", function () {
     redraw();
