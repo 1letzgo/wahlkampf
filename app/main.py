@@ -306,6 +306,15 @@ def app_menu(
     )
 
 
+@app.get("/sharepic", response_class=HTMLResponse)
+def sharepic_creator(request: Request, user: CurrentUser):
+    return templates.TemplateResponse(
+        request,
+        "sharepic.html",
+        {"user": user},
+    )
+
+
 @app.get("/plakate", response_class=HTMLResponse)
 def plakate_view(
     request: Request,

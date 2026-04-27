@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% from '_ui_macros.html' import app_header %}
+{% import '_icons.html' as ico %}
+{% block title %}Sharepic — Wahlkampf{% endblock %}
+{% block head %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@700&display=swap" rel="stylesheet">
+<style>
+  .sharepic-layout { display: grid; gap: 1rem; }
+  @media (min-width: 720px) {
+    .sharepic-layout { grid-template-columns: minmax(0, 1fr) 280px; align-items: start; }
+  }
+  .sharepic-preview-wrap {
+    background: repeating-conic-gradient(var(--border) 0% 25%, var(--bg) 0% 50%) 50% / 16px 16px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 0.75rem;
+    text-align: center;
+  }
+  #sharepic-canvas {
+    max-width: 100%;
+    height: auto;
+    vertical-align: middle;
+    border-radius: 6px;
+    box-shadow: var(--shadow);
+  }
+  .sharepic-fields label { margin-top: 0.5rem; }
+  .sharepic-fields textarea {
+    min-height: 4.5rem;
+    font-size: 0.9rem;
+    line-height: 1.35;
+  }
+  .sharepic-hint { font-size: 0.82rem; color: var(--muted); margin: 0.25rem 0 0; }
+</style>
+{% endblock %}
+{% block body %}
+{% set path_prefix = request.scope.get('root_path') or '' %}
+{{ app_header('Sharepic') }}
+
+<div class="page-toolbar" aria-label="Navigation">
+  <a href="/menu" class="btn btn-sm btn-ghost btn-ico btn-with-label" aria-label="Zum Menü">
+    {{ ico.svg_arrow_left() }}<span class="btn-text">Menü</span>
+  </a>
+</div>
+
+<div class="card sharepic-layout">
+  <div class="sharepic-preview-wrap">
+    <canvas id="sharepic-canvas" width="768" height="1024" aria-label="Sharepic-Vorschau"></canvas>
+    <p class="muted sharepic-hint" style="margin-top:.65rem;">Ausgabe 768×1024 px — Bild wird zentriert beschnitten (Cover).</p>
+  </div>
+  <div class="sharepic-fields">
+    <label for="sharepic-photo">Foto hinter der Maske</label>
+    <input id="sharepic-photo" type="file" accept="image/jpeg,image/png,image/webp">
+    <label for="sharepic-text1">Text Banner (max. 3 Zeilen)</label>
+    <textarea id="sharepic-text1" name="text1" rows="3" maxlength="500" placeholder="z. B. Gemeinsam für Westerstede"></textarea>
+    <label for="sharepic-text2">Text unten (max. 3 Zeilen)</label>
+    <textarea id="sharepic-text2" name="text2" rows="3" maxlength="500" placeholder="z. B. Termin und Ort"></textarea>
+    <p class="sharepic-hint">Open Sans, 50 px, fett — Zeilenumbruch mit Enter oder automatisch.</p>
+    <p style="margin-top:1rem; display:flex; flex-wrap:wrap; gap:.5rem;">
+      <button type="button" class="btn btn-sm btn-ico btn-with-label" id="sharepic-download" aria-label="PNG herunterladen">
+        {{ ico.svg_check() }}<span class="btn-text">PNG herunterladen</span>
+      </button>
+    </p>
+  </div>
+</div>
+
+<script>
+(function () {
+  var pathPrefix = {{ path_prefix | tojson }};
+  var MASK_SRC = pathPrefix + "/static/sharepic-mask.png";
+  var W = 768;
+  var H = 1024;
+  var PHOTO = { x: 0, y: 144, w: 768, h: 735 };
+  var TEXT1 = { x: 52, y: 112, maxW: 620, lineHeight: 52, maxLines: 3 };
+  var TEXT2 = { x: 40, y: 894, maxW: 688, lineHeight: 43, maxLines: 3 };
+  var FONT = '700 50px "Open Sans", system-ui, sans-serif';
+  var FILL = "#ffffff";
+
+  var canvas = document.getElementById("sharepic-canvas");
+  var ctx = canvas.getContext("2d");
+  var maskImg = new Image();
+  maskImg.crossOrigin = "anonymous";
+  var userImg = null;
+
+  function limitLines(el) {
+    var parts = el.value.split(/\n/);
+    if (parts.length > 3) el.value = parts.slice(0, 3).join("\n");
+  }
+
+  function wrapParagraph(ctx, text, maxW) {
+    if (!text) return [];
+    var words = text.split(/\s+/).filter(Boolean);
+    var lines = [];
+    var line = "";
+    for (var i = 0; i < words.length; i++) {
+      var w = words[i];
+      var test = line ? line + " " + w : w;
+      if (ctx.measureText(test).width <= maxW) {
+        line = test;
+      } else {
+        if (line) lines.push(line);
+        if (ctx.measureText(w).width <= maxW) {
+          line = w;
+        } else {
+          var rest = w;
+          while (rest.length) {
+            var lo = 1;
+            var hi = rest.length;
+            while (lo < hi) {
+              var mid = Math.ceil((lo + hi) / 2);
+              if (ctx.measureText(rest.slice(0, mid)).width <= maxW) lo = mid;
+              else hi = mid - 1;
+            }
+            if (lo < 1) lo = 1;
+            lines.push(rest.slice(0, lo));
+            rest = rest.slice(lo);
+          }
+          line = "";
+        }
+      }
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  function textToLines(ctx, raw, maxW, maxLines) {
+    var paras = raw.split(/\n/);
+    var out = [];
+    for (var p = 0; p < paras.length && out.length < maxLines; p++) {
+      var wrapped = wrapParagraph(ctx, paras[p].trim(), maxW);
+      for (var j = 0; j < wrapped.length && out.length < maxLines; j++) {
+        out.push(wrapped[j]);
+      }
+    }
+    return out.slice(0, maxLines);
+  }
+
+  function drawCover(img, x, y, w, h) {
+    var ir = img.width / img.height;
+    var r = w / h;
+    var sw, sh, sx, sy;
+    if (ir > r) {
+      sh = img.height;
+      sw = sh * r;
+      sx = (img.width - sw) / 2;
+      sy = 0;
+    } else {
+      sw = img.width;
+      sh = sw / r;
+      sx = 0;
+      sy = (img.height - sh) / 2;
+    }
+    ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+  }
+
+  function redraw() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "#e8e4dc";
+    ctx.fillRect(0, 0, W, H);
+    if (userImg && userImg.complete && userImg.naturalWidth) {
+      drawCover(userImg, PHOTO.x, PHOTO.y, PHOTO.w, PHOTO.h);
+    }
+    if (maskImg.complete && maskImg.naturalWidth) {
+      ctx.drawImage(maskImg, 0, 0, W, H);
+    }
+    ctx.font = FONT;
+    ctx.fillStyle = FILL;
+    ctx.textBaseline = "top";
+
+    var t1 = document.getElementById("sharepic-text1").value;
+    var lines1 = textToLines(ctx, t1, TEXT1.maxW, TEXT1.maxLines);
+    var y1 = TEXT1.y;
+    for (var i = 0; i < lines1.length; i++) {
+      ctx.fillText(lines1[i], TEXT1.x, y1 + i * TEXT1.lineHeight);
+    }
+
+    var t2 = document.getElementById("sharepic-text2").value;
+    var lines2 = textToLines(ctx, t2, TEXT2.maxW, TEXT2.maxLines);
+    var y2 = TEXT2.y;
+    for (var j = 0; j < lines2.length; j++) {
+      ctx.fillText(lines2[j], TEXT2.x, y2 + j * TEXT2.lineHeight);
+    }
+  }
+
+  function scheduleRedraw() {
+    requestAnimationFrame(redraw);
+  }
+
+  maskImg.onload = scheduleRedraw;
+  maskImg.onerror = function () {
+    console.error("Maske konnte nicht geladen werden:", MASK_SRC);
+  };
+  maskImg.src = MASK_SRC;
+
+  document.getElementById("sharepic-photo").addEventListener("change", function (e) {
+    var f = e.target.files && e.target.files[0];
+    if (!f) {
+      userImg = null;
+      scheduleRedraw();
+      return;
+    }
+    var url = URL.createObjectURL(f);
+    var im = new Image();
+    im.onload = function () {
+      URL.revokeObjectURL(url);
+      userImg = im;
+      scheduleRedraw();
+    };
+    im.onerror = function () {
+      URL.revokeObjectURL(url);
+      userImg = null;
+      scheduleRedraw();
+    };
+    im.src = url;
+  });
+
+  var ta1 = document.getElementById("sharepic-text1");
+  var ta2 = document.getElementById("sharepic-text2");
+  ta1.addEventListener("input", function () {
+    limitLines(ta1);
+    scheduleRedraw();
+  });
+  ta2.addEventListener("input", function () {
+    limitLines(ta2);
+    scheduleRedraw();
+  });
+
+  document.getElementById("sharepic-download").addEventListener("click", function () {
+    redraw();
+    canvas.toBlob(function (blob) {
+      if (!blob) return;
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "sharepic-wahlkampf.png";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }, "image/png");
+  });
+
+  document.fonts.load(FONT).then(scheduleRedraw).catch(scheduleRedraw);
+})();
+</script>
+{% endblock %}
