@@ -846,6 +846,7 @@ def termin_teilnehmen(
     termin_id: int,
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser,
+    return_to: Annotated[str | None, Form()] = None,
 ):
     t = db.get(models.Termin, termin_id)
     if not t:
@@ -860,6 +861,8 @@ def termin_teilnehmen(
             models.TerminTeilnahme(termin_id=termin_id, user_id=user.id),
         )
         db.commit()
+    if return_to == "list":
+        return RedirectResponse("/termine", status_code=302)
     return RedirectResponse(f"/termine/{termin_id}", status_code=302)
 
 
@@ -869,6 +872,7 @@ def termin_abmelden(
     termin_id: int,
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser,
+    return_to: Annotated[str | None, Form()] = None,
 ):
     row = (
         db.query(models.TerminTeilnahme)
@@ -878,6 +882,8 @@ def termin_abmelden(
     if row:
         db.delete(row)
         db.commit()
+    if return_to == "list":
+        return RedirectResponse("/termine", status_code=302)
     return RedirectResponse(f"/termine/{termin_id}", status_code=302)
 
 

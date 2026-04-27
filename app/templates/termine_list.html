@@ -43,12 +43,14 @@
           {% if row.ich_teilnehme %}
           <span class="muted" style="font-size:.85rem;">Du nimmst teil.</span>
           <form method="post" action="/termine/{{ t.id }}/abmelden" style="margin:0;">
+            <input type="hidden" name="return_to" value="list">
             <button type="submit" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Vom Termin abmelden">
               {{ ico.svg_logout() }}<span class="btn-text">Vom Termin abmelden</span>
             </button>
           </form>
           {% else %}
           <form method="post" action="/termine/{{ t.id }}/teilnehmen" style="margin:0;">
+            <input type="hidden" name="return_to" value="list">
             <button type="submit" class="btn btn-sm btn-ico btn-with-label" aria-label="Am Termin teilnehmen">
               {{ ico.svg_check() }}<span class="btn-text">Teilnehmen</span>
             </button>
