@@ -4,15 +4,18 @@
 {% block head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-  .plakate-map-wrap { margin-bottom: 1rem; }
+  .plakate-map-wrap {
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+  }
   #plakate-map {
     height: min(55vh, 420px);
     width: 100%;
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
+    border: none;
+    border-radius: 0;
     z-index: 1;
   }
-  .plakate-map-actions { margin-top: 0.75rem; }
+  .plakate-map-actions { margin: 0 0 1rem; }
   .plakate-form .row-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; justify-content: flex-end; margin-top: 1rem; }
   .plakate-coords { font-size: 0.85rem; color: var(--muted); margin: 0 0 0.75rem; }
   .plakate-table-wrap { overflow-x: auto; margin-top: 0.5rem; }
@@ -41,11 +44,11 @@
 {% block body %}
 {{ app_header('Plakate') }}
 
-<div class="card plakate-map-wrap">
+<div class="card card--flush plakate-map-wrap">
   <div id="plakate-map" role="application" aria-label="Karte Plakat-Standorte"></div>
-  <div class="plakate-map-actions">
-    <button type="button" class="btn btn-sm" id="plakate-locate">Mein Standort</button>
-  </div>
+</div>
+<div class="plakate-map-actions">
+  <button type="button" class="btn btn-sm" id="plakate-locate">Mein Standort</button>
 </div>
 
 <dialog id="plakate-add-dialog" class="popup-dialog" aria-labelledby="plakate-dialog-title" aria-modal="true">
@@ -160,7 +163,6 @@
         var lat = pos.coords.latitude;
         var lng = pos.coords.longitude;
         map.setView([lat, lng], 16);
-        setPreview(lat, lng);
       },
       function () {
         alert("Standort konnte nicht ermittelt werden (Berechtigung prüfen).");
