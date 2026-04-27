@@ -633,6 +633,14 @@ def _termin_list_rows(db: Session, user: models.User) -> list[dict]:
     return out
 
 
+def _split_termine_upcoming_past(rows: list[dict]) -> tuple[list[dict], list[dict]]:
+    now = datetime.utcnow()
+    upcoming = [r for r in rows if r["termin"].starts_at >= now]
+    past = [r for r in rows if r["termin"].starts_at < now]
+    past.sort(key=lambda r: r["termin"].starts_at, reverse=True)
+    return upcoming, past
+
+
 @app.get("/termine", response_class=HTMLResponse)
 def termine_list(
     request: Request,
@@ -640,6 +648,7 @@ def termine_list(
     user: CurrentUser,
 ):
     termin_rows = _termin_list_rows(db, user)
+    termin_upcoming, termin_past = _split_termine_upcoming_past(termin_rows)
     token = ensure_ics_token_for_ui(db, ICS_TOKEN)
     base = str(request.base_url).rstrip("/")
     feed_url = f"{base}/calendar.ics?t={token}"
@@ -648,7 +657,8 @@ def termine_list(
         "termine_list.html",
         {
             "user": user,
-            "termin_rows": termin_rows,
+            "termin_upcoming": termin_upcoming,
+            "termin_past": termin_past,
             "feed_url": feed_url,
         },
     )

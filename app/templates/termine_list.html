@@ -2,6 +2,108 @@
 {% from '_ui_macros.html' import app_header %}
 {% import '_icons.html' as ico %}
 {% block title %}Termine — Wahlkampf{% endblock %}
+
+{% macro termin_karte(row, vergangen=False) %}
+{% set t = row.termin %}
+<article class="card">
+  <div style="display:flex; gap:1rem; align-items:flex-start; flex-wrap:wrap;">
+    {% if t.image_path %}
+    <div style="flex-shrink:0;">
+      <img src="/media/{{ t.image_path }}" alt="" style="width:140px; max-width:100%; height:auto; border-radius:8px; border:1px solid var(--border);">
+    </div>
+    {% endif %}
+    <div style="flex:1; min-width:200px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:.75rem; flex-wrap:wrap; margin-bottom:.35rem;">
+        <h2 style="margin:0; font-size:1.15rem; flex:1; min-width:8rem;">{{ t.title }}</h2>
+        {% if row.kann_verwalten %}
+        <div style="display:flex; gap:.5rem; flex-shrink:0; align-items:center;">
+          <a href="/termine/{{ t.id }}/bearbeiten" class="btn btn-ghost btn-xs btn-ico" aria-label="Termin bearbeiten">
+            {{ ico.svg_pencil() }}<span class="btn-text">Bearbeiten</span>
+          </a>
+          <a href="/termine/{{ t.id }}/loeschen" class="btn btn-danger btn-xs btn-ico" aria-label="Termin löschen">
+            {{ ico.svg_trash() }}<span class="btn-text">Löschen</span>
+          </a>
+        </div>
+        {% endif %}
+      </div>
+      <p class="muted" style="margin:0 0 .5rem;">
+        {{ t.starts_at.strftime('%d.%m.%Y') }} · {{ t.starts_at.strftime('%H:%M') }}
+        {% if t.ends_at %}– {{ t.ends_at.strftime('%H:%M') }}{% endif %}
+        {% if t.location %} · {{ t.location }}{% endif %}
+      </p>
+      {% if t.description %}
+      <p style="margin:0 0 .75rem; white-space:pre-wrap;">{{ t.description }}</p>
+      {% endif %}
+
+      <div style="margin-top:.5rem; padding-top:.75rem; border-top:1px solid var(--border);">
+        <p style="margin:0 0 .5rem; font-size:.9rem;">
+          <strong>Teilnehmer{% if row.teilnehmer %} ({{ row.teilnehmer|length }}){% endif %}:</strong>
+          {% if row.teilnehmer %}
+          <span>{{ row.teilnehmer|join(', ') }}</span>
+          {% else %}
+          <span class="muted">noch niemand</span>
+          {% endif %}
+        </p>
+        {% if not vergangen %}
+        <div style="display:flex; flex-wrap:wrap; gap:.5rem; align-items:center;">
+          {% if row.ich_teilnehme %}
+          <span class="muted" style="font-size:.85rem;">Du nimmst teil.</span>
+          <form method="post" action="/termine/{{ t.id }}/abmelden" style="margin:0;">
+            <button type="submit" class="btn btn-ghost btn-sm btn-ico" aria-label="Vom Termin abmelden">
+              {{ ico.svg_logout() }}<span class="btn-text">Vom Termin abmelden</span>
+            </button>
+          </form>
+          {% else %}
+          <form method="post" action="/termine/{{ t.id }}/teilnehmen" style="margin:0;">
+            <button type="submit" class="btn btn-sm btn-ico" aria-label="Am Termin teilnehmen">
+              {{ ico.svg_check() }}<span class="btn-text">Teilnehmen</span>
+            </button>
+          </form>
+          {% endif %}
+        </div>
+        {% else %}
+        <p class="muted" style="margin:0; font-size:.82rem;">Termin vorbei — Anmeldung nicht mehr möglich.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</article>
+{% endmacro %}
+
+{% block head %}
+<style>
+  .termin-tablist {
+    display: flex;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+    margin: 1rem 0 0.85rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .termin-tab {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    padding: 0.55rem 0.85rem;
+    font: inherit;
+    cursor: pointer;
+    color: var(--muted);
+  }
+  .termin-tab:hover {
+    color: var(--text);
+  }
+  .termin-tab[aria-selected="true"] {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+    font-weight: 600;
+  }
+  .termin-tab-panel:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+</style>
+{% endblock %}
+
 {% block body %}
 {{ app_header('Termine') }}
 
@@ -51,70 +153,62 @@
   });
 </script>
 
-{% if not termin_rows %}
+{% if not termin_upcoming and not termin_past %}
 <p class="muted">Noch keine Termine — <a href="/termine/neu">ersten Termin anlegen</a>.</p>
+{% else %}
+<div class="termin-tablist" role="tablist" aria-label="Terminansicht">
+  <button type="button" class="termin-tab" id="tab-kommend" role="tab" aria-selected="true" aria-controls="termin-panel-kommend" data-tab="kommend">Kommende Termine</button>
+  <button type="button" class="termin-tab" id="tab-vergangen" role="tab" aria-selected="false" aria-controls="termin-panel-vergangen" data-tab="vergangen">Vergangene Termine{% if termin_past|length %} ({{ termin_past|length }}){% endif %}</button>
+</div>
+
+<div id="termin-panel-kommend" class="termin-tab-panel" role="tabpanel" aria-labelledby="tab-kommend" tabindex="0">
+  {% if not termin_upcoming %}
+  <p class="muted">Keine kommenden Termine — <a href="/termine/neu">Termin anlegen</a> oder unter „Vergangene Termine“ nachsehen.</p>
+  {% endif %}
+  {% for row in termin_upcoming %}
+  {{ termin_karte(row, vergangen=False) }}
+  {% endfor %}
+</div>
+
+<div id="termin-panel-vergangen" class="termin-tab-panel" role="tabpanel" aria-labelledby="tab-vergangen" tabindex="0" hidden>
+  {% if not termin_past %}
+  <p class="muted">Keine vergangenen Termine.</p>
+  {% endif %}
+  {% for row in termin_past %}
+  {{ termin_karte(row, vergangen=True) }}
+  {% endfor %}
+</div>
+
+<script>
+  (function () {
+    var tablist = document.querySelector(".termin-tablist");
+    if (!tablist) return;
+    var tabs = tablist.querySelectorAll(".termin-tab");
+    var panels = {
+      kommend: document.getElementById("termin-panel-kommend"),
+      vergangen: document.getElementById("termin-panel-vergangen"),
+    };
+    function activate(id) {
+      tabs.forEach(function (t) {
+        var sel = t.getAttribute("data-tab") === id;
+        t.setAttribute("aria-selected", sel ? "true" : "false");
+      });
+      Object.keys(panels).forEach(function (key) {
+        var p = panels[key];
+        if (!p) return;
+        if (key === id) {
+          p.removeAttribute("hidden");
+        } else {
+          p.setAttribute("hidden", "");
+        }
+      });
+    }
+    tabs.forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        activate(tab.getAttribute("data-tab"));
+      });
+    });
+  })();
+</script>
 {% endif %}
-
-{% for row in termin_rows %}
-{% set t = row.termin %}
-<article class="card">
-  <div style="display:flex; gap:1rem; align-items:flex-start; flex-wrap:wrap;">
-    {% if t.image_path %}
-    <div style="flex-shrink:0;">
-      <img src="/media/{{ t.image_path }}" alt="" style="width:140px; max-width:100%; height:auto; border-radius:8px; border:1px solid var(--border);">
-    </div>
-    {% endif %}
-    <div style="flex:1; min-width:200px;">
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:.75rem; flex-wrap:wrap; margin-bottom:.35rem;">
-        <h2 style="margin:0; font-size:1.15rem; flex:1; min-width:8rem;">{{ t.title }}</h2>
-        {% if row.kann_verwalten %}
-        <div style="display:flex; gap:.5rem; flex-shrink:0; align-items:center;">
-          <a href="/termine/{{ t.id }}/bearbeiten" class="btn btn-ghost btn-xs btn-ico" aria-label="Termin bearbeiten">
-            {{ ico.svg_pencil() }}<span class="btn-text">Bearbeiten</span>
-          </a>
-          <a href="/termine/{{ t.id }}/loeschen" class="btn btn-danger btn-xs btn-ico" aria-label="Termin löschen">
-            {{ ico.svg_trash() }}<span class="btn-text">Löschen</span>
-          </a>
-        </div>
-        {% endif %}
-      </div>
-      <p class="muted" style="margin:0 0 .5rem;">
-        {{ t.starts_at.strftime('%d.%m.%Y') }} · {{ t.starts_at.strftime('%H:%M') }}
-        {% if t.ends_at %}– {{ t.ends_at.strftime('%H:%M') }}{% endif %}
-        {% if t.location %} · {{ t.location }}{% endif %}
-      </p>
-      {% if t.description %}
-      <p style="margin:0 0 .75rem; white-space:pre-wrap;">{{ t.description }}</p>
-      {% endif %}
-
-      <div style="margin-top:.5rem; padding-top:.75rem; border-top:1px solid var(--border);">
-        <p style="margin:0 0 .5rem; font-size:.9rem;">
-          <strong>Teilnehmer{% if row.teilnehmer %} ({{ row.teilnehmer|length }}){% endif %}:</strong>
-          {% if row.teilnehmer %}
-          <span>{{ row.teilnehmer|join(', ') }}</span>
-          {% else %}
-          <span class="muted">noch niemand</span>
-          {% endif %}
-        </p>
-        <div style="display:flex; flex-wrap:wrap; gap:.5rem; align-items:center;">
-          {% if row.ich_teilnehme %}
-          <span class="muted" style="font-size:.85rem;">Du nimmst teil.</span>
-          <form method="post" action="/termine/{{ t.id }}/abmelden" style="margin:0;">
-            <button type="submit" class="btn btn-ghost btn-sm btn-ico" aria-label="Vom Termin abmelden">
-              {{ ico.svg_logout() }}<span class="btn-text">Vom Termin abmelden</span>
-            </button>
-          </form>
-          {% else %}
-          <form method="post" action="/termine/{{ t.id }}/teilnehmen" style="margin:0;">
-            <button type="submit" class="btn btn-sm btn-ico" aria-label="Am Termin teilnehmen">
-              {{ ico.svg_check() }}<span class="btn-text">Teilnehmen</span>
-            </button>
-          </form>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
-</article>
-{% endfor %}
 {% endblock %}
