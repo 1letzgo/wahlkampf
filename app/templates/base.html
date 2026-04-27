@@ -76,6 +76,8 @@
       gap: 0.5rem;
       width: 100%;
       box-sizing: border-box;
+      /* Gleiche Zeilenhöhe wie mit Menü-Button (Menü-Seite blendet Toolbar aus) */
+      min-height: 2.65rem;
     }
     .header-inner > h1 {
       flex: 1 1 10rem;
@@ -123,6 +125,11 @@
       background: transparent;
       color: var(--accent) !important;
       border: 1px solid var(--border);
+    }
+    .btn-ghost:hover {
+      background: var(--accent-dim);
+      color: #fff !important;
+      border-color: var(--accent-dim);
     }
     .btn-danger {
       background: #7a1e2e;
