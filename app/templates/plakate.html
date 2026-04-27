@@ -12,8 +12,9 @@
     border: 1px solid var(--border);
     z-index: 1;
   }
-  .plakate-form .row-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.75rem; }
-  .plakate-coords { font-size: 0.85rem; color: var(--muted); margin: 0.35rem 0 0; }
+  .plakate-map-actions { margin-top: 0.75rem; }
+  .plakate-form .row-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; justify-content: flex-end; margin-top: 1rem; }
+  .plakate-coords { font-size: 0.85rem; color: var(--muted); margin: 0 0 0.75rem; }
   .plakate-table-wrap { overflow-x: auto; margin-top: 0.5rem; }
   .plakate-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
   .plakate-table th, .plakate-table td { padding: 0.5rem 0.6rem; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
@@ -22,37 +23,48 @@
   .badge-active { color: #1e4d2e; font-weight: 650; }
   .badge-done { color: var(--muted); }
   .leaflet-control-attribution { font-size: 10px; }
+  button.plakate-focus-map {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: var(--accent);
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    text-align: left;
+  }
+  button.plakate-focus-map:hover { color: var(--accent-dim); }
+  #plakate-add-dialog { z-index: 10000; }
 </style>
 {% endblock %}
 {% block body %}
 {{ app_header('Plakate') }}
 
-<p class="muted" style="margin-top:0;">Gemeinsame Übersicht: Wo hängen Plakate, wer hat sie gemeldet, wer hat sie abgehängt. Klicke auf die Karte, um einen neuen Standort zu setzen (dann Foto optional hochladen).</p>
-
 <div class="card plakate-map-wrap">
-  <div style="display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; margin-bottom:.65rem;">
-    <button type="button" class="btn btn-sm" id="plakate-locate">Mein Standort</button>
-    <span class="muted" style="font-size:.82rem;">Karte: Klick setzt Position für neues Plakat · © <a href="https://www.openstreetmap.org/copyright" rel="noopener noreferrer">OpenStreetMap</a></span>
-  </div>
   <div id="plakate-map" role="application" aria-label="Karte Plakat-Standorte"></div>
+  <div class="plakate-map-actions">
+    <button type="button" class="btn btn-sm" id="plakate-locate">Mein Standort</button>
+  </div>
 </div>
 
-<div class="card plakate-form">
-  <h2 style="margin:0 0 .75rem; font-size:1.05rem;">Neues Plakat melden</h2>
-  <form id="plakate-add-form" enctype="multipart/form-data">
+<dialog id="plakate-add-dialog" class="popup-dialog" aria-labelledby="plakate-dialog-title" aria-modal="true">
+  <h2 id="plakate-dialog-title" style="margin-top:0; font-size:1.05rem;">Neues Plakat melden</h2>
+  <form id="plakate-add-form" class="plakate-form" enctype="multipart/form-data">
     <input type="hidden" name="lat" id="plakate-lat" value="">
     <input type="hidden" name="lng" id="plakate-lng" value="">
-    <p class="plakate-coords" id="plakate-coords-hint">Bitte Position auf der Karte wählen.</p>
+    <p class="plakate-coords" id="plakate-coords-hint">Position wird gesetzt …</p>
     <label for="plakate-note">Notiz (optional)</label>
     <input id="plakate-note" name="note" type="text" maxlength="500" placeholder="z. B. Litfaßsäule, Hauswand …">
     <label for="plakate-foto">Foto (optional, JPEG/PNG/WebP, max. {{ max_mb }} MB)</label>
     <input id="plakate-foto" name="foto" type="file" accept="image/jpeg,image/png,image/webp" capture="environment">
     <div class="row-actions">
-      <button type="submit" class="btn" id="plakate-submit" disabled>Plakat hängt hier</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="plakate-dialog-cancel">Abbrechen</button>
+      <button type="submit" class="btn" id="plakate-submit">Plakat hängt hier</button>
     </div>
   </form>
   <p class="muted" id="plakate-form-msg" style="margin:.75rem 0 0; font-size:.85rem;"></p>
-</div>
+</dialog>
 
 <div class="card">
   <h2 style="margin:0 0 .75rem; font-size:1.05rem;">Alle Plakate</h2>
@@ -77,6 +89,7 @@
 <script>
 (function () {
   var initial = {{ plakate_initial | tojson }};
+  var dialog = document.getElementById("plakate-add-dialog");
 
   function deDt(iso) {
     if (!iso) return "—";
@@ -95,12 +108,29 @@
   var previewMarker = null;
   var markerById = {};
 
+  function openAddDialog() {
+    if (dialog && typeof dialog.showModal === "function" && !dialog.open) {
+      dialog.showModal();
+    }
+  }
+
+  function clearPreviewOnly() {
+    if (previewMarker) {
+      map.removeLayer(previewMarker);
+      previewMarker = null;
+    }
+    document.getElementById("plakate-lat").value = "";
+    document.getElementById("plakate-lng").value = "";
+    document.getElementById("plakate-add-form").reset();
+    document.getElementById("plakate-coords-hint").textContent = "Position wird gesetzt …";
+    document.getElementById("plakate-form-msg").textContent = "";
+  }
+
   function setPreview(lat, lng) {
     document.getElementById("plakate-lat").value = String(lat);
     document.getElementById("plakate-lng").value = String(lng);
     document.getElementById("plakate-coords-hint").textContent =
       "Position: " + lat.toFixed(5) + ", " + lng.toFixed(5);
-    document.getElementById("plakate-submit").disabled = false;
     if (previewMarker) map.removeLayer(previewMarker);
     previewMarker = L.marker([lat, lng], {
       draggable: true,
@@ -108,8 +138,12 @@
     }).addTo(map);
     previewMarker.on("dragend", function () {
       var p = previewMarker.getLatLng();
-      setPreview(p.lat, p.lng);
+      document.getElementById("plakate-lat").value = String(p.lat);
+      document.getElementById("plakate-lng").value = String(p.lng);
+      document.getElementById("plakate-coords-hint").textContent =
+        "Position: " + p.lat.toFixed(5) + ", " + p.lng.toFixed(5);
     });
+    openAddDialog();
   }
 
   map.on("click", function (e) {
@@ -133,6 +167,15 @@
       },
       { enableHighAccuracy: true, timeout: 12000 }
     );
+  });
+
+  document.getElementById("plakate-dialog-cancel").addEventListener("click", function () {
+    if (dialog.open) dialog.close();
+    clearPreviewOnly();
+  });
+
+  dialog.addEventListener("cancel", function () {
+    clearPreviewOnly();
   });
 
   function clearMarkers() {
@@ -202,15 +245,17 @@
         ? '<a href="' + r.image_url + '"><img class="plakate-thumb" src="' + r.image_url + '" alt=""></a>'
         : "—";
       var pos =
-        '<a href="https://www.openstreetmap.org/?mlat=' +
+        '<button type="button" class="plakate-focus-map" data-id="' +
+        r.id +
+        '" data-lat="' +
         r.lat +
-        "&mlon=" +
+        '" data-lng="' +
         r.lng +
-        '&zoom=17" rel="noopener noreferrer">' +
+        '" title="Auf Karte anzeigen">' +
         r.lat.toFixed(5) +
         ", " +
         r.lng.toFixed(5) +
-        "</a>";
+        "</button>";
       var status = r.active
         ? '<span class="badge-active">hängt</span>'
         : '<span class="badge-done">abgehängt</span>';
@@ -254,11 +299,29 @@
   applyData(initial);
 
   document.body.addEventListener("click", function (e) {
+    var focusBtn = e.target.closest(".plakate-focus-map");
+    if (focusBtn) {
+      e.preventDefault();
+      var id = parseInt(focusBtn.getAttribute("data-id"), 10);
+      var lat = parseFloat(focusBtn.getAttribute("data-lat"));
+      var lng = parseFloat(focusBtn.getAttribute("data-lng"));
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        map.setView([lat, lng], 17);
+        var m = markerById[id];
+        if (m) {
+          setTimeout(function () {
+            m.openPopup();
+          }, 300);
+        }
+      }
+      return;
+    }
+
     var btn = e.target.closest(".plakate-pop-remove, .plakate-row-remove");
     if (!btn) return;
-    var id = btn.getAttribute("data-id");
-    if (!id || !confirm("Dieses Plakat als abgehängt melden?")) return;
-    fetch("/plakate/api/abhaengen/" + id, {
+    var rid = btn.getAttribute("data-id");
+    if (!rid || !confirm("Dieses Plakat als abgehängt melden?")) return;
+    fetch("/plakate/api/abhaengen/" + rid, {
       method: "POST",
       credentials: "same-origin",
       headers: { Accept: "application/json" },
@@ -315,17 +378,9 @@
       })
       .then(function (j) {
         applyData(j.plakate);
-        msg.textContent = "Gespeichert.";
-        e.target.reset();
-        document.getElementById("plakate-lat").value = "";
-        document.getElementById("plakate-lng").value = "";
-        document.getElementById("plakate-submit").disabled = true;
-        document.getElementById("plakate-coords-hint").textContent =
-          "Bitte Position auf der Karte wählen.";
-        if (previewMarker) {
-          map.removeLayer(previewMarker);
-          previewMarker = null;
-        }
+        msg.textContent = "";
+        if (dialog.open) dialog.close();
+        clearPreviewOnly();
       })
       .catch(function (err) {
         msg.textContent = "";
