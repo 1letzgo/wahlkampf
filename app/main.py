@@ -654,7 +654,27 @@ def logout(request: Request):
     return RedirectResponse("/login", status_code=302)
 
 
-def _termin_row_from_instance(t: models.Termin, user: models.User) -> dict:
+def _termin_kommentar_counts_by_termin(db: Session, termin_ids: list[int]) -> dict[int, int]:
+    if not termin_ids:
+        return {}
+    q = (
+        db.query(
+            models.TerminKommentar.termin_id,
+            func.count(models.TerminKommentar.id),
+        )
+        .filter(models.TerminKommentar.termin_id.in_(termin_ids))
+        .group_by(models.TerminKommentar.termin_id)
+        .all()
+    )
+    return {int(tid): int(c) for tid, c in q}
+
+
+def _termin_row_from_instance(
+    t: models.Termin,
+    user: models.User,
+    *,
+    kommentar_count: int = 0,
+) -> dict:
     names = sorted(
         {
             (tn.user.display_name or tn.user.username).strip()
@@ -674,6 +694,7 @@ def _termin_row_from_instance(t: models.Termin, user: models.User) -> dict:
         "teilnehmer_extern": teilnehmer_extern,
         "ich_teilnehme": ich,
         "kann_verwalten": kann,
+        "kommentar_count": kommentar_count,
     }
 
 
@@ -717,7 +738,12 @@ def _termin_list_rows(db: Session, user: models.User) -> list[dict]:
         .order_by(models.Termin.starts_at.asc())
         .all()
     )
-    return [_termin_row_from_instance(t, user) for t in rows]
+    ids = [t.id for t in rows]
+    counts = _termin_kommentar_counts_by_termin(db, ids)
+    return [
+        _termin_row_from_instance(t, user, kommentar_count=counts.get(t.id, 0))
+        for t in rows
+    ]
 
 
 def _termin_detail_row(db: Session, user: models.User, termin_id: int) -> dict | None:
@@ -733,7 +759,12 @@ def _termin_detail_row(db: Session, user: models.User, termin_id: int) -> dict |
     )
     if not t:
         return None
-    return _termin_row_from_instance(t, user)
+    counts = _termin_kommentar_counts_by_termin(db, [t.id])
+    return _termin_row_from_instance(
+        t,
+        user,
+        kommentar_count=counts.get(t.id, 0),
+    )
 
 
 def _split_termine_upcoming_past(rows: list[dict]) -> tuple[list[dict], list[dict]]:

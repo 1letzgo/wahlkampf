@@ -23,6 +23,17 @@
         {% if t.ends_at %}– {{ t.ends_at.strftime('%H:%M') }}{% endif %}
         {% if t.location %} · {{ t.location }}{% endif %}
       </p>
+      <p class="muted termin-card-list__komment-hint" style="margin:0 0 .5rem;">
+        {{ ico.svg_chat() }}
+        {% set nk = row.kommentar_count|default(0) %}
+        {% if nk == 0 %}
+        <span>Keine Kommentare</span>
+        {% elif nk == 1 %}
+        <span>1 Kommentar</span>
+        {% else %}
+        <span>{{ nk }} Kommentare</span>
+        {% endif %}
+      </p>
       {% if t.description %}
       <p style="margin:0 0 .75rem; white-space:pre-wrap;">{{ t.description }}</p>
       {% endif %}
@@ -91,6 +102,19 @@
   }
   .termin-card-list__body {
     padding: 1.25rem;
+  }
+  .termin-card-list__komment-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.88rem;
+    line-height: 1.35;
+  }
+  .termin-card-list__komment-hint .ico {
+    width: 1.08em;
+    height: 1.08em;
+    flex-shrink: 0;
+    opacity: 0.88;
   }
   .termin-card-list__footer.card-footer {
     margin: 0;

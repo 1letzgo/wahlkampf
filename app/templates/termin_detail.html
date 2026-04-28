@@ -169,8 +169,31 @@
     width: 100%;
     max-width: 100%;
   }
-  .termin-kommentar-dialog {
+  .termin-kommentar-dialog.popup-dialog {
     z-index: 10000;
+    box-sizing: border-box;
+    width: min(100vw - 2rem, 640px);
+    max-width: min(100vw - 2rem, 640px);
+  }
+  .termin-kommentar-dialog.popup-dialog textarea#termin-kommentar-text {
+    min-height: 160px;
+    resize: vertical;
+  }
+  @media (max-width: 540px) {
+    .termin-kommentar-dialog.popup-dialog {
+      width: 100vw;
+      max-width: 100vw;
+      min-height: min(58vh, 640px);
+      max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+      margin: auto;
+      border-radius: 0;
+      padding: 1rem max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom))
+        max(1rem, env(safe-area-inset-left));
+      padding-top: max(1rem, env(safe-area-inset-top));
+    }
+    .termin-kommentar-dialog.popup-dialog textarea#termin-kommentar-text {
+      min-height: min(42vh, 360px);
+    }
   }
   .termin-kommentar-dialog-actions {
     display: flex;
