@@ -29,31 +29,29 @@
       </div>
     </div>
   </div>
-  <footer class="card-footer" aria-label="Aktionen zum Termin">
-    <div style="display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; justify-content:space-between;">
-      <div style="display:flex; flex-wrap:wrap; gap:.5rem; align-items:center;">
-        {% if not vergangen %}
-        {% if row.ich_teilnehme %}
-        <form method="post" action="/termine/{{ t.id }}/abmelden" style="margin:0;">
-          <input type="hidden" name="return_to" value="list">
-          <button type="submit" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Abmelden">
-              {{ ico.svg_logout() }}<span class="btn-text">Abmelden</span>
-          </button>
-        </form>
-        {% else %}
-        <form method="post" action="/termine/{{ t.id }}/teilnehmen" style="margin:0;">
-          <input type="hidden" name="return_to" value="list">
-          <button type="submit" class="btn btn-sm btn-ico btn-with-label" aria-label="Am Termin teilnehmen">
-            {{ ico.svg_check() }}<span class="btn-text">Teilnehmen</span>
-          </button>
-        </form>
-        {% endif %}
-        {% else %}
-        <span class="muted" style="font-size:.82rem;">Termin vorbei — Anmeldung nicht mehr möglich.</span>
-        {% endif %}
-      </div>
+  <footer class="card-footer termin-card-footer-actions" aria-label="Aktionen zum Termin">
+    <div class="termin-footer-actions">
+      {% if not vergangen %}
+      {% if row.ich_teilnehme %}
+      <form method="post" action="/termine/{{ t.id }}/abmelden" style="margin:0;">
+        <input type="hidden" name="return_to" value="list">
+        <button type="submit" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Abmelden">
+          {{ ico.svg_logout() }}<span class="btn-text">Abmelden</span>
+        </button>
+      </form>
+      {% else %}
+      <form method="post" action="/termine/{{ t.id }}/teilnehmen" style="margin:0;">
+        <input type="hidden" name="return_to" value="list">
+        <button type="submit" class="btn btn-sm btn-ico btn-with-label" aria-label="Am Termin teilnehmen">
+          {{ ico.svg_check() }}<span class="btn-text">Teilnehmen</span>
+        </button>
+      </form>
+      {% endif %}
+      {% else %}
+      <span class="termin-footer-actions__hint muted">Termin vorbei — Anmeldung nicht mehr möglich.</span>
+      {% endif %}
       {% if row.kann_verwalten %}
-      <div style="display:flex; flex-wrap:wrap; gap:.5rem; align-items:center;">
+      <div class="termin-footer-actions__admin">
         <a href="/termine/{{ t.id }}/bearbeiten" class="btn btn-sm btn-ghost btn-ico btn-with-label" aria-label="Termin bearbeiten">
           {{ ico.svg_pencil() }}<span class="btn-text">Bearbeiten</span>
         </a>
@@ -69,6 +67,41 @@
 
 {% block head %}
 <style>
+  /* Termin-Karten-Footer: alle Aktionen in einer Zeile (kein Umbruch zwischen Gruppen) */
+  .termin-card-footer-actions .termin-footer-actions {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .termin-card-footer-actions .termin-footer-actions__hint {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.82rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .termin-card-footer-actions .termin-footer-actions__admin {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .termin-card-footer-actions .termin-footer-actions > form {
+    flex-shrink: 0;
+  }
+  .termin-card-footer-actions .termin-footer-actions .btn {
+    white-space: nowrap;
+  }
   .termin-tablist {
     display: flex;
     gap: 0.25rem;
