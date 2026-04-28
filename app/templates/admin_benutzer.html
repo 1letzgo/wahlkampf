@@ -51,8 +51,19 @@
   .admin-users-table-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    margin: 0 -0.15rem;
-    padding: 0 0.15rem;
+  }
+  @media (min-width: 640px) {
+    .admin-users-table-wrap {
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.65),
+        0 0 0 1px rgba(196, 30, 58, 0.04);
+    }
   }
   .admin-users-table {
     width: 100%;
@@ -61,19 +72,43 @@
   }
   @media (min-width: 640px) {
     .admin-users-table {
-      min-width: 520px;
+      table-layout: fixed;
+    }
+    .admin-users-col-name {
+      width: 34%;
+    }
+    .admin-users-col-status {
+      width: 20%;
+    }
+    .admin-users-col-date {
+      width: 13%;
+    }
+    .admin-users-col-actions {
+      width: 33%;
+    }
+    .admin-users-table thead th {
+      background: rgba(255, 255, 255, 0.5);
     }
   }
   .admin-users-table th,
   .admin-users-table td {
     padding: 0.65rem 0.85rem;
     text-align: left;
-    vertical-align: top;
+    vertical-align: middle;
     border-bottom: 1px solid var(--border);
   }
-  .admin-users-table th {
-    background: var(--bg);
-    font-weight: 650;
+  .admin-users-table .admin-users-td-date {
+    white-space: nowrap;
+  }
+  .admin-users-table thead th {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.045em;
+    color: var(--muted);
+    padding-top: 0.75rem;
+    padding-bottom: 0.65rem;
+    border-bottom-width: 2px;
   }
   .admin-users-th-actions,
   .admin-users-td-actions {
@@ -89,6 +124,13 @@
     justify-content: flex-end;
   }
   @media (max-width: 639px) {
+    .admin-users-table th,
+    .admin-users-table td {
+      vertical-align: top;
+    }
+    .admin-users-table .admin-users-td-date {
+      white-space: normal;
+    }
     .admin-users-table-wrap {
       overflow-x: visible;
       margin: 0;
@@ -96,6 +138,7 @@
     }
     .admin-users-table {
       min-width: 0;
+      table-layout: auto;
     }
     .admin-users-table thead {
       position: absolute;
@@ -179,6 +222,12 @@
 
       <div class="admin-users-table-wrap">
         <table class="admin-users-table">
+          <colgroup>
+            <col class="admin-users-col-name">
+            <col class="admin-users-col-status">
+            <col class="admin-users-col-date">
+            <col class="admin-users-col-actions">
+          </colgroup>
           <thead>
             <tr>
               <th scope="col">Name</th>
@@ -190,7 +239,7 @@
           <tbody>
             {% for u in users %}
             <tr>
-              <td data-label="Name">
+              <td data-label="Name" class="admin-users-td-name">
                 <strong>{{ u.display_name or u.username }}</strong>
                 {% if u.username != u.display_name and u.display_name %}
                 <br><span class="muted" style="font-size:0.8rem;">{{ u.username }}</span>
@@ -206,7 +255,7 @@
                 <br><span class="muted" style="font-size:0.8rem;">Administrator</span>
                 {% endif %}
               </td>
-              <td data-label="Seit" class="muted">{{ u.created_at.strftime('%d.%m.%Y') }}</td>
+              <td data-label="Seit" class="muted admin-users-td-date">{{ u.created_at.strftime('%d.%m.%Y') }}</td>
               <td data-label="Aktionen" class="admin-users-td-actions">
                 <div>
                   {% if not u.is_approved %}
