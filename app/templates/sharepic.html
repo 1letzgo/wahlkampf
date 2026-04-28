@@ -69,12 +69,14 @@
     <label for="sharepic-text2">Text unten (max. 2 Zeilen)</label>
     <textarea id="sharepic-text2" name="text2" rows="2" maxlength="500" placeholder="z. B. Termin und Ort"></textarea>
     <p class="sharepic-hint">Open Sans, 50 px, fett — Zeilenumbruch mit Enter oder automatisch.</p>
-    <p style="margin-top:1rem; display:flex; flex-wrap:wrap; gap:.5rem;">
+  </div>
+  <footer class="card-footer" aria-label="Sharepic exportieren">
+    <div style="display:flex; flex-wrap:wrap; gap:.5rem;">
       <button type="button" class="btn btn-sm btn-ico btn-with-label" id="sharepic-download" aria-label="JPG herunterladen">
         {{ ico.svg_check() }}<span class="btn-text">JPG herunterladen</span>
       </button>
-    </p>
-  </div>
+    </div>
+  </footer>
 </div>
 
 <script>
