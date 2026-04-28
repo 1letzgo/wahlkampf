@@ -26,42 +26,44 @@
 
       <div style="margin-top:.5rem; padding-top:.75rem; border-top:1px solid var(--border);">
         {{ teilnehmer_liste(row) }}
-        <div style="margin-top:.75rem; display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; justify-content:space-between;">
-          <div style="display:flex; flex-wrap:wrap; gap:.5rem; align-items:center;">
-            {% if not vergangen %}
-            {% if row.ich_teilnehme %}
-            <form method="post" action="/termine/{{ t.id }}/abmelden" style="margin:0;">
-              <input type="hidden" name="return_to" value="list">
-              <button type="submit" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Vom Termin abmelden">
-                {{ ico.svg_logout() }}<span class="btn-text">Vom Termin abmelden</span>
-              </button>
-            </form>
-            {% else %}
-            <form method="post" action="/termine/{{ t.id }}/teilnehmen" style="margin:0;">
-              <input type="hidden" name="return_to" value="list">
-              <button type="submit" class="btn btn-sm btn-ico btn-with-label" aria-label="Am Termin teilnehmen">
-                {{ ico.svg_check() }}<span class="btn-text">Teilnehmen</span>
-              </button>
-            </form>
-            {% endif %}
-            {% else %}
-            <span class="muted" style="font-size:.82rem;">Termin vorbei — Anmeldung nicht mehr möglich.</span>
-            {% endif %}
-          </div>
-          {% if row.kann_verwalten %}
-          <div style="display:flex; flex-wrap:wrap; gap:.5rem; align-items:center;">
-            <a href="/termine/{{ t.id }}/bearbeiten" class="btn btn-sm btn-ghost btn-ico btn-with-label" aria-label="Termin bearbeiten">
-              {{ ico.svg_pencil() }}<span class="btn-text">Bearbeiten</span>
-            </a>
-            <a href="/termine/{{ t.id }}/loeschen" class="btn btn-sm btn-danger btn-ico btn-with-label" aria-label="Termin löschen">
-              {{ ico.svg_trash() }}<span class="btn-text">Löschen</span>
-            </a>
-          </div>
-          {% endif %}
-        </div>
       </div>
     </div>
   </div>
+  <footer class="card-footer" aria-label="Aktionen zum Termin">
+    <div style="display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; justify-content:space-between;">
+      <div style="display:flex; flex-wrap:wrap; gap:.5rem; align-items:center;">
+        {% if not vergangen %}
+        {% if row.ich_teilnehme %}
+        <form method="post" action="/termine/{{ t.id }}/abmelden" style="margin:0;">
+          <input type="hidden" name="return_to" value="list">
+          <button type="submit" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Vom Termin abmelden">
+            {{ ico.svg_logout() }}<span class="btn-text">Vom Termin abmelden</span>
+          </button>
+        </form>
+        {% else %}
+        <form method="post" action="/termine/{{ t.id }}/teilnehmen" style="margin:0;">
+          <input type="hidden" name="return_to" value="list">
+          <button type="submit" class="btn btn-sm btn-ico btn-with-label" aria-label="Am Termin teilnehmen">
+            {{ ico.svg_check() }}<span class="btn-text">Teilnehmen</span>
+          </button>
+        </form>
+        {% endif %}
+        {% else %}
+        <span class="muted" style="font-size:.82rem;">Termin vorbei — Anmeldung nicht mehr möglich.</span>
+        {% endif %}
+      </div>
+      {% if row.kann_verwalten %}
+      <div style="display:flex; flex-wrap:wrap; gap:.5rem; align-items:center;">
+        <a href="/termine/{{ t.id }}/bearbeiten" class="btn btn-sm btn-ghost btn-ico btn-with-label" aria-label="Termin bearbeiten">
+          {{ ico.svg_pencil() }}<span class="btn-text">Bearbeiten</span>
+        </a>
+        <a href="/termine/{{ t.id }}/loeschen" class="btn btn-sm btn-danger btn-ico btn-with-label" aria-label="Termin löschen">
+          {{ ico.svg_trash() }}<span class="btn-text">Löschen</span>
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </footer>
 </article>
 {% endmacro %}
 
