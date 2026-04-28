@@ -260,6 +260,21 @@
     .menu-list a.menu-link-logout {
       color: var(--accent) !important;
     }
+    .menu-list__main {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      min-width: 0;
+    }
+    .menu-list__main .ico {
+      width: 1.35rem;
+      height: 1.35rem;
+      flex-shrink: 0;
+      opacity: 0.88;
+    }
+    .menu-list a:hover .menu-list__main .ico {
+      opacity: 1;
+    }
     .menu-pending-badge {
       flex-shrink: 0;
       min-width: 1.15rem;

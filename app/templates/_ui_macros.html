@@ -6,8 +6,8 @@
     <h1>{{ title }}</h1>
     {% if show_menu %}
     <nav class="header-toolbar">
-      <a href="/menu" class="btn btn-ghost btn-ico" aria-label="Menü">
-        {{ ico.svg_menu() }}<span class="btn-text">Menü</span>
+      <a href="/menu" class="btn btn-ghost btn-ico btn-with-label" aria-label="SPD vor Ort — Hauptmenü">
+        {{ ico.svg_menu() }}<span class="btn-text">SPD vor Ort</span>
       </a>
     </nav>
     {% endif %}
@@ -21,8 +21,8 @@
     <h1>{{ title }}</h1>
     <nav class="header-toolbar">
       {{ caller() }}
-      <a href="/menu" class="btn btn-ghost btn-ico" aria-label="Menü">
-        {{ ico.svg_menu() }}<span class="btn-text">Menü</span>
+      <a href="/menu" class="btn btn-ghost btn-ico btn-with-label" aria-label="SPD vor Ort — Hauptmenü">
+        {{ ico.svg_menu() }}<span class="btn-text">SPD vor Ort</span>
       </a>
     </nav>
   </div>
