@@ -7,33 +7,41 @@
 {% macro termin_karte(row, vergangen=False) %}
 {% set t = row.termin %}
 <article class="card card--flush termin-card-list">
-  <header class="termin-card-list__header">
-    <h2 class="termin-card-list__title"><a href="/termine/{{ t.id }}">{{ t.title }}</a></h2>
-  </header>
-  <div class="termin-card-list__body">
-  <div style="display:flex; gap:1rem; align-items:flex-start; flex-wrap:wrap;">
-    {% if t.image_path %}
-    <div style="flex-shrink:0;">
-      <img src="/media/{{ t.image_path }}" alt="" style="width:140px; max-width:100%; height:auto; border-radius:8px; border:1px solid var(--border);">
-    </div>
-    {% endif %}
-    <div style="flex:1; min-width:200px;">
-      <p class="muted" style="margin:0 0 .5rem;">
-        {{ t.starts_at.strftime('%d.%m.%Y') }} · {{ t.starts_at.strftime('%H:%M') }}
-        {% if t.ends_at %}– {{ t.ends_at.strftime('%H:%M') }}{% endif %}
-        {% if t.location %} · {{ t.location }}{% endif %}
-      </p>
-      {% if t.description %}
-      <p style="margin:0 0 .75rem; white-space:pre-wrap;">{{ t.description }}</p>
-      {% endif %}
+  <div class="termin-card-list__shell">
+    <header class="ics-popup__head termin-card-list__head">
+      <div class="ics-popup__head-icon" aria-hidden="true">{{ ico.svg_calendar() }}</div>
+      <div class="termin-card-list__head-main">
+        <h2 class="ics-popup__h termin-card-list__title"><a href="/termine/{{ t.id }}">{{ t.title }}</a></h2>
+        <p class="ics-popup__lead termin-card-list__meta">
+          {{ t.starts_at.strftime('%d.%m.%Y') }} · {{ t.starts_at.strftime('%H:%M') }}
+          {% if t.ends_at %}– {{ t.ends_at.strftime('%H:%M') }}{% endif %}
+          {% if t.location %} · {{ t.location }}{% endif %}
+        </p>
+      </div>
+    </header>
 
-      <div style="margin-top:.5rem; padding-top:.75rem; border-top:1px solid var(--border);">
-        {{ teilnehmer_liste(row) }}
+    <div class="termin-card-list__body">
+      <div class="termin-card-list__media-row">
+        {% if t.image_path %}
+        <div class="termin-card-list__thumb">
+          <img src="/media/{{ t.image_path }}" alt="">
+        </div>
+        {% endif %}
+        <div class="termin-card-list__columns">
+          {% if t.description %}
+          <section class="ics-popup__panel ics-popup__panel--accent termin-card-list__panel-desc" aria-label="Beschreibung">
+            <p class="termin-card-list__desc">{{ t.description }}</p>
+          </section>
+          {% endif %}
+          <section class="ics-popup__panel termin-card-list__panel-teilnehmer{% if not t.description %} ics-popup__panel--accent{% endif %}" aria-label="Teilnehmer">
+            <h3 class="ics-popup__label">Teilnehmer{% set _n = row.teilnehmer|length + row.teilnehmer_extern|length %}{% if _n %} ({{ _n }}){% endif %}</h3>
+            {{ teilnehmer_liste(row, with_heading=False) }}
+          </section>
+        </div>
       </div>
     </div>
-  </div>
-  </div>
-  <footer class="card-footer termin-card-footer-actions termin-card-list__footer" aria-label="Aktionen zum Termin">
+
+    <footer class="termin-card-list__footer termin-card-footer-actions" aria-label="Aktionen zum Termin">
     <div class="termin-footer-actions">
       {% if not vergangen %}
       {% if row.ich_teilnehme %}
@@ -73,31 +81,58 @@
       </div>
     </div>
   </footer>
+  </div>
 </article>
 {% endmacro %}
 
 {% block head %}
 <style>
-  .termin-card-list__header {
-    background: var(--accent);
-    color: #fff;
-    padding: 0.85rem 1.25rem;
+  .termin-card-list__shell {
+    padding: 1.15rem 1.2rem 1.1rem;
   }
-  .termin-card-list__title {
-    margin: 0;
-    font-size: 1.12rem;
-    font-weight: 650;
-    line-height: 1.3;
+  .termin-card-list .termin-card-list__body {
+    padding: 0;
   }
   .termin-card-list__title a {
-    color: #fff !important;
+    color: var(--text) !important;
     text-decoration: none !important;
   }
   .termin-card-list__title a:hover {
+    color: var(--accent) !important;
     text-decoration: underline !important;
   }
-  .termin-card-list__body {
-    padding: 1.25rem;
+  .termin-card-list__meta {
+    margin: 0.35rem 0 0;
+  }
+  .termin-card-list__media-row {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .termin-card-list__thumb {
+    flex-shrink: 0;
+  }
+  .termin-card-list__thumb img {
+    width: 140px;
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .termin-card-list__columns {
+    flex: 1;
+    min-width: min(100%, 200px);
+  }
+  .termin-card-list__columns > .ics-popup__panel:first-of-type {
+    margin-top: 0;
+  }
+  .termin-card-list__desc {
+    margin: 0;
+    white-space: pre-wrap;
+    font-size: 0.95rem;
+    line-height: 1.45;
   }
   .termin-footer-actions__tail {
     display: flex;
@@ -111,9 +146,10 @@
     font-variant-numeric: tabular-nums;
     font-weight: 600;
   }
-  .termin-card-list__footer.card-footer {
-    margin: 0;
-    border-radius: 0 0 calc(var(--radius) - 1px) calc(var(--radius) - 1px);
+  .termin-card-list__footer {
+    margin-top: 1.1rem;
+    padding-top: 0.95rem;
+    border-top: 1px solid var(--border);
   }
   /* Termin-Karten-Footer: alle Aktionen in einer Zeile (kein Umbruch zwischen Gruppen) */
   .termin-card-footer-actions .termin-footer-actions {
@@ -153,8 +189,14 @@
     display: flex;
     gap: 0.25rem;
     flex-wrap: wrap;
-    margin: 1rem 0 0.85rem;
-    border-bottom: 1px solid var(--border);
+    margin: 0 0 1rem;
+    padding: 0.35rem 0.65rem 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.65),
+      0 0 0 1px rgba(196, 30, 58, 0.04);
   }
   .termin-tab {
     background: transparent;

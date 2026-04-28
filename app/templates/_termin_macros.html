@@ -1,8 +1,10 @@
-{% macro teilnehmer_liste(row) %}
+{% macro teilnehmer_liste(row, with_heading=True) %}
 {%- set n = row.teilnehmer|length + row.teilnehmer_extern|length -%}
+{% if with_heading %}
         <p style="margin:0 0 .35rem; font-size:.9rem;">
           <strong>Teilnehmer{% if n %} ({{ n }}){% endif %}:</strong>
         </p>
+{% endif %}
 {%- if n %}
         {%- if row.teilnehmer|length %}
         <p style="margin:0 0 {% if row.teilnehmer_extern|length %}.15rem{% else %}.35rem{% endif %}; font-size:.9rem; line-height:1.3;">
