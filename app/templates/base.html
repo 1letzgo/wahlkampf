@@ -63,7 +63,18 @@
       background: var(--bg);
       box-shadow: 0 6px 14px rgba(0, 0, 0, 0.05);
     }
-    header.site-header h1 { font-size: 1.25rem; margin: 0; font-weight: 650; }
+    header.site-header--menu {
+      background: var(--accent);
+      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+    }
+    header.site-header--menu .header-brand,
+    header.site-header--menu .header-page-title {
+      color: #fff !important;
+    }
+    header.site-header--menu .header-brand:hover {
+      color: #fff !important;
+      opacity: 0.9;
+    }
     .header-inner {
       max-width: 720px;
       margin-left: auto;
@@ -73,15 +84,26 @@
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.65rem;
       width: 100%;
       box-sizing: border-box;
-      /* Gleiche Zeilenhöhe mit/ohne Header-Toolbar (SPD-vor-Ort-Seite blendet Toolbar aus) */
       min-height: 2.65rem;
     }
-    .header-inner > h1 {
-      flex: 1 1 10rem;
-      min-width: 0;
+    .header-brand {
+      flex: 0 0 auto;
+      font-size: 1.05rem;
+      font-weight: 650;
+      color: var(--text);
+      text-decoration: none !important;
+      line-height: 1.25;
+    }
+    .header-brand:hover {
+      text-decoration: underline !important;
+      color: var(--accent);
+    }
+    .header-toolbar-spacer {
+      flex: 1 1 auto;
+      min-width: 0.5rem;
     }
     .nav,
     .header-toolbar {
@@ -94,9 +116,15 @@
       flex: 1 1 auto;
       min-width: 0;
     }
-    /* „SPD vor Ort“ im Header immer anzeigen (nicht wie reine Icon-Buttons ausblenden) */
-    .header-nav-spd .btn-text {
-      display: inline !important;
+    .header-page-title {
+      flex: 0 1 auto;
+      margin: 0;
+      font-size: 1.12rem;
+      font-weight: 650;
+      line-height: 1.25;
+      text-align: right;
+      min-width: 0;
+      max-width: 100%;
     }
     .btn {
       display: inline-flex;

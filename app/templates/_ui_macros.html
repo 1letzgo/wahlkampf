@@ -1,30 +1,21 @@
-{% import '_icons.html' as ico %}
-
-{% macro app_header(title, show_menu=True) %}
-<header class="site-header">
+{% macro app_header(title, menu=False) %}
+<header class="site-header{% if menu %} site-header--menu{% endif %}">
   <div class="header-inner">
-    <h1>{{ title }}</h1>
-    {% if show_menu %}
-    <nav class="header-toolbar">
-      <a href="/menu" class="btn btn-ghost btn-ico btn-with-label header-nav-spd" aria-label="SPD vor Ort öffnen">
-        {{ ico.svg_menu() }}<span class="btn-text">SPD vor Ort</span>
-      </a>
-    </nav>
-    {% endif %}
+    <a href="/menu" class="header-brand">SPD vor Ort</a>
+    <div class="header-toolbar-spacer" aria-hidden="true"></div>
+    <h1 class="header-page-title">{{ title }}</h1>
   </div>
 </header>
 {% endmacro %}
 
-{% macro app_header_toolbar(title) %}
-<header class="site-header">
+{% macro app_header_toolbar(title, menu=False) %}
+<header class="site-header{% if menu %} site-header--menu{% endif %}">
   <div class="header-inner">
-    <h1>{{ title }}</h1>
-    <nav class="header-toolbar">
+    <a href="/menu" class="header-brand">SPD vor Ort</a>
+    <nav class="header-toolbar" aria-label="Seitenaktionen">
       {{ caller() }}
-      <a href="/menu" class="btn btn-ghost btn-ico btn-with-label header-nav-spd" aria-label="SPD vor Ort öffnen">
-        {{ ico.svg_menu() }}<span class="btn-text">SPD vor Ort</span>
-      </a>
     </nav>
+    <h1 class="header-page-title">{{ title }}</h1>
   </div>
 </header>
 {% endmacro %}
