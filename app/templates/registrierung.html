@@ -1,12 +1,9 @@
 {% extends "base.html" %}
+{% from '_ui_macros.html' import app_header %}
 {% import '_icons.html' as ico %}
 {% block title %}Registrieren — Wahlkampf{% endblock %}
 {% block body %}
-<header class="site-header">
-  <div class="header-inner">
-    <h1>Wahlkampf</h1>
-  </div>
-</header>
+{{ app_header('Registrieren') }}
 <div class="card" style="max-width: 400px; margin: 0 auto;">
   <h2 style="margin-top:0;">Registrieren</h2>
   <p class="muted" style="margin-top:0;"><strong>Name</strong> ist dein Anzeigename (z. B. bei Terminen). <strong>Benutzername</strong> nutzt du nur zum Anmelden — ohne Leerzeichen. Keine E-Mail nötig. <strong>Der erste Nutzer</strong> wird automatisch freigeschaltet und Administrator.</p>

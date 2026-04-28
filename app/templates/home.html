@@ -1,12 +1,9 @@
 {% extends "base.html" %}
+{% from '_ui_macros.html' import app_header %}
 {% import '_icons.html' as ico %}
 {% block title %}Wahlkampf — Start{% endblock %}
 {% block body %}
-<header class="site-header">
-  <div class="header-inner">
-    <h1>Wahlkampf</h1>
-  </div>
-</header>
+{{ app_header('Start') }}
 <div class="card" style="max-width: 520px; margin: 0 auto;">
   <h2 style="margin-top:0;">Willkommen</h2>
   <p class="muted" style="margin-top:0;">Termine und Kalender für den Ortsverein.</p>

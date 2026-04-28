@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#e8e4dc" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#c41e3a" media="(prefers-color-scheme: light)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="SPD vor Ort">
@@ -60,20 +60,27 @@
       padding-bottom: 0.65rem;
       padding-top: calc(0.65rem + constant(safe-area-inset-top));
       padding-top: calc(0.65rem + env(safe-area-inset-top, 0px));
-      background: var(--bg);
-      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.05);
-    }
-    header.site-header--menu {
       background: var(--accent);
       box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
     }
-    header.site-header--menu .header-brand,
-    header.site-header--menu .header-page-title {
+    header.site-header .header-brand,
+    header.site-header .header-page-title {
       color: #fff !important;
     }
-    header.site-header--menu .header-brand:hover {
+    header.site-header .header-brand:hover {
       color: #fff !important;
-      opacity: 0.9;
+      opacity: 0.88;
+      text-decoration: underline !important;
+    }
+    .site-header .header-toolbar .btn-ghost {
+      color: #fff !important;
+      border-color: rgba(255, 255, 255, 0.45);
+      background: rgba(255, 255, 255, 0.08);
+    }
+    .site-header .header-toolbar .btn-ghost:hover {
+      background: rgba(255, 255, 255, 0.22);
+      color: #fff !important;
+      border-color: rgba(255, 255, 255, 0.85);
     }
     .header-inner {
       max-width: 720px;
@@ -93,13 +100,8 @@
       flex: 0 0 auto;
       font-size: 1.05rem;
       font-weight: 650;
-      color: var(--text);
       text-decoration: none !important;
       line-height: 1.25;
-    }
-    .header-brand:hover {
-      text-decoration: underline !important;
-      color: var(--accent);
     }
     .header-toolbar-spacer {
       flex: 1 1 auto;

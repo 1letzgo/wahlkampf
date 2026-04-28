@@ -1,5 +1,5 @@
-{% macro app_header(title, menu=False) %}
-<header class="site-header{% if menu %} site-header--menu{% endif %}">
+{% macro app_header(title) %}
+<header class="site-header">
   <div class="header-inner">
     <a href="/menu" class="header-brand">SPD vor Ort</a>
     <div class="header-toolbar-spacer" aria-hidden="true"></div>
@@ -8,8 +8,8 @@
 </header>
 {% endmacro %}
 
-{% macro app_header_toolbar(title, menu=False) %}
-<header class="site-header{% if menu %} site-header--menu{% endif %}">
+{% macro app_header_toolbar(title) %}
+<header class="site-header">
   <div class="header-inner">
     <a href="/menu" class="header-brand">SPD vor Ort</a>
     <nav class="header-toolbar" aria-label="Seitenaktionen">

@@ -1,12 +1,9 @@
 {% extends "base.html" %}
+{% from '_ui_macros.html' import app_header %}
 {% import '_icons.html' as ico %}
 {% block title %}Anmelden — Wahlkampf{% endblock %}
 {% block body %}
-<header class="site-header">
-  <div class="header-inner">
-    <h1>Wahlkampf</h1>
-  </div>
-</header>
+{{ app_header('Anmelden') }}
 <div class="card" style="max-width: 400px; margin: 0 auto;">
   <h2 style="margin-top:0;">Anmelden</h2>
   {% if error %}<div class="error">{{ error }}</div>{% endif %}
