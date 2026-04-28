@@ -6,7 +6,11 @@
 
 {% macro termin_karte(row, vergangen=False) %}
 {% set t = row.termin %}
-<article class="card">
+<article class="card card--flush termin-card-list">
+  <header class="termin-card-list__header">
+    <h2 class="termin-card-list__title"><a href="/termine/{{ t.id }}">{{ t.title }}</a></h2>
+  </header>
+  <div class="termin-card-list__body">
   <div style="display:flex; gap:1rem; align-items:flex-start; flex-wrap:wrap;">
     {% if t.image_path %}
     <div style="flex-shrink:0;">
@@ -14,7 +18,6 @@
     </div>
     {% endif %}
     <div style="flex:1; min-width:200px;">
-      <h2 style="margin:0 0 .35rem; font-size:1.15rem;"><a href="/termine/{{ t.id }}">{{ t.title }}</a></h2>
       <p class="muted" style="margin:0 0 .5rem;">
         {{ t.starts_at.strftime('%d.%m.%Y') }} · {{ t.starts_at.strftime('%H:%M') }}
         {% if t.ends_at %}– {{ t.ends_at.strftime('%H:%M') }}{% endif %}
@@ -29,7 +32,8 @@
       </div>
     </div>
   </div>
-  <footer class="card-footer termin-card-footer-actions" aria-label="Aktionen zum Termin">
+  </div>
+  <footer class="card-footer termin-card-footer-actions termin-card-list__footer" aria-label="Aktionen zum Termin">
     <div class="termin-footer-actions">
       {% if not vergangen %}
       {% if row.ich_teilnehme %}
@@ -67,6 +71,31 @@
 
 {% block head %}
 <style>
+  .termin-card-list__header {
+    background: var(--accent);
+    color: #fff;
+    padding: 0.85rem 1.25rem;
+  }
+  .termin-card-list__title {
+    margin: 0;
+    font-size: 1.12rem;
+    font-weight: 650;
+    line-height: 1.3;
+  }
+  .termin-card-list__title a {
+    color: #fff !important;
+    text-decoration: none !important;
+  }
+  .termin-card-list__title a:hover {
+    text-decoration: underline !important;
+  }
+  .termin-card-list__body {
+    padding: 1.25rem;
+  }
+  .termin-card-list__footer.card-footer {
+    margin: 0;
+    border-radius: 0 0 calc(var(--radius) - 1px) calc(var(--radius) - 1px);
+  }
   /* Termin-Karten-Footer: alle Aktionen in einer Zeile (kein Umbruch zwischen Gruppen) */
   .termin-card-footer-actions .termin-footer-actions {
     display: flex;
