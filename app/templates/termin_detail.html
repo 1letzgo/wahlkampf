@@ -64,7 +64,6 @@
         {% if not termin_vergangen %}
         <div style="display:flex; flex-wrap:wrap; gap:.5rem; align-items:center;">
           {% if row.ich_teilnehme %}
-          <span class="muted" style="font-size:.85rem;">Du nimmst teil.</span>
           <form method="post" action="/termine/{{ t.id }}/abmelden" style="margin:0;">
             <button type="submit" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Vom Termin abmelden">
               {{ ico.svg_logout() }}<span class="btn-text">Vom Termin abmelden</span>
