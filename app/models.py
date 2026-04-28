@@ -71,6 +71,25 @@ class Termin(Base):
         back_populates="termin",
         cascade="all, delete-orphan",
     )
+    kommentare: Mapped[List["TerminKommentar"]] = relationship(
+        back_populates="termin",
+        cascade="all, delete-orphan",
+    )
+
+
+class TerminKommentar(Base):
+    __tablename__ = "termin_kommentare"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    termin_id: Mapped[int] = mapped_column(
+        ForeignKey("termine.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    body: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    termin: Mapped["Termin"] = relationship(back_populates="kommentare")
+    user: Mapped["User"] = relationship()
 
 
 class Plakat(Base):

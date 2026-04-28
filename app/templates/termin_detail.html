@@ -3,6 +3,7 @@
 {% from '_termin_macros.html' import teilnehmer_liste %}
 {% import '_icons.html' as ico %}
 {% set t = row.termin %}
+{% set path_prefix = request.scope.get('root_path') or '' %}
 {% block title %}{{ t.title }} — Termin — Wahlkampf{% endblock %}
 {% block head %}
 <style>
@@ -57,6 +58,59 @@
   }
   .termin-card-footer-actions .termin-footer-actions .btn {
     white-space: nowrap;
+  }
+  .termin-kommentare-block {
+    margin-top: 1.15rem;
+  }
+  .termin-kommentare-list .termin-comment-card {
+    margin-bottom: 0.75rem;
+  }
+  .termin-kommentare-list .termin-comment-card:last-child {
+    margin-bottom: 0;
+  }
+  .termin-comment-card__hdr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.35rem 0.85rem;
+    padding: 0.72rem 1rem;
+    background: linear-gradient(to bottom, rgba(196, 30, 58, 0.07), transparent);
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+  }
+  .termin-comment-card__author {
+    font-weight: 650;
+    color: var(--text);
+    min-width: 0;
+  }
+  .termin-comment-card__meta {
+    font-size: 0.82rem;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+  .termin-comment-card__body {
+    padding: 0.85rem 1rem;
+  }
+  .termin-comment-card__text {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  button.termin-kommentar-open {
+    margin-top: 0.75rem;
+    width: 100%;
+    max-width: 100%;
+  }
+  .termin-kommentar-dialog {
+    z-index: 10000;
+  }
+  .termin-kommentar-dialog-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 1rem;
   }
 </style>
 {% endblock %}
@@ -149,4 +203,129 @@
     </div>
   </footer>
 </article>
+
+<section class="termin-kommentare-block" aria-label="Kommentare zum Termin">
+  <div id="termin-kommentare-list" class="termin-kommentare-list">
+    {% for k in termin_kommentare %}
+    <article class="card card--flush termin-comment-card">
+      <header class="termin-comment-card__hdr">
+        <span class="termin-comment-card__author">{{ k.author_name }}</span>
+        <span class="termin-comment-card__meta muted">{{ k.created_display }}</span>
+      </header>
+      <div class="termin-comment-card__body">
+        <p class="termin-comment-card__text">{{ k.body }}</p>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  <button type="button" class="btn btn-sm btn-with-label termin-kommentar-open btn-ghost" id="termin-kommentar-open" aria-expanded="false" aria-haspopup="dialog">
+    Kommentieren
+  </button>
+</section>
+
+<dialog id="termin-kommentar-dialog" class="popup-dialog termin-kommentar-dialog" aria-labelledby="termin-kommentar-dialog-title" aria-modal="true">
+  <h2 id="termin-kommentar-dialog-title" style="margin-top:0; font-size:1.05rem;">Kommentar schreiben</h2>
+  <form id="termin-kommentar-form">
+    <label for="termin-kommentar-text">Text</label>
+    <textarea id="termin-kommentar-text" name="body" rows="5" maxlength="4000" required placeholder="Dein Kommentar …"></textarea>
+    <div class="termin-kommentar-dialog-actions">
+      <button type="button" class="btn btn-ghost btn-sm" id="termin-kommentar-cancel">Abbrechen</button>
+      <button type="submit" class="btn btn-sm" id="termin-kommentar-submit">Absenden</button>
+    </div>
+  </form>
+  <p class="muted" id="termin-kommentar-msg" style="margin:.65rem 0 0; font-size:.85rem;"></p>
+</dialog>
+
+<script>
+(function () {
+  var pathPrefix = {{ path_prefix | tojson }};
+  var terminId = {{ t.id }};
+  var listEl = document.getElementById("termin-kommentare-list");
+  var dlg = document.getElementById("termin-kommentar-dialog");
+  var form = document.getElementById("termin-kommentar-form");
+  var textarea = document.getElementById("termin-kommentar-text");
+  var msgEl = document.getElementById("termin-kommentar-msg");
+  var openBtn = document.getElementById("termin-kommentar-open");
+  function escapeHtml(text) {
+    var d = document.createElement("div");
+    d.textContent = text;
+    return d.innerHTML;
+  }
+  function renderKommentare(items) {
+    listEl.innerHTML = (items || []).map(function (k) {
+      return (
+        '<article class="card card--flush termin-comment-card">' +
+        '<header class="termin-comment-card__hdr">' +
+        '<span class="termin-comment-card__author">' + escapeHtml(k.author_name) + '</span>' +
+        '<span class="termin-comment-card__meta muted">' + escapeHtml(k.created_display) + '</span>' +
+        '</header><div class="termin-comment-card__body">' +
+        '<p class="termin-comment-card__text">' +
+        escapeHtml(k.body || '') +
+        '</p></div></article>'
+      );
+    }).join("");
+  }
+  function showMsg(t) {
+    if (msgEl) msgEl.textContent = t || '';
+  }
+  function openDlg() {
+    showMsg('');
+    dlg.showModal();
+    openBtn.setAttribute('aria-expanded', 'true');
+    textarea.focus();
+  }
+  function closeDlg() {
+    dlg.close();
+    openBtn.setAttribute('aria-expanded', 'false');
+  }
+  if (openBtn && dlg && form && textarea && listEl) {
+    openBtn.addEventListener("click", function () {
+      textarea.value = "";
+      openDlg();
+    });
+    document.getElementById("termin-kommentar-cancel").addEventListener("click", closeDlg);
+    dlg.addEventListener("cancel", function (ev) {
+      ev.preventDefault();
+      closeDlg();
+    });
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      showMsg('');
+      var body = (textarea.value || '').trim();
+      if (!body) {
+        showMsg('Bitte Text eingeben.');
+        textarea.focus();
+        return;
+      }
+      var btn = document.getElementById("termin-kommentar-submit");
+      btn.disabled = true;
+      fetch((pathPrefix || "") + "/termine/" + terminId + "/kommentare", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ body: textarea.value.trim() }),
+      })
+        .then(function (res) {
+          return res.json().then(function (j) {
+            if (!res.ok) {
+              throw new Error(typeof j.detail === 'string' ? j.detail : (res.status === 422 ? 'Eingabe ungültig.' : 'Kommentar konnte nicht gespeichert werden.'));
+            }
+            return j;
+          });
+        })
+        .then(function (j) {
+          renderKommentare(j.kommentare);
+          textarea.value = '';
+          closeDlg();
+        })
+        .catch(function (err) {
+          showMsg(err.message || 'Fehler beim Speichern.');
+        })
+        .finally(function () {
+          btn.disabled = false;
+        });
+    });
+  }
+})();
+</script>
 {% endblock %}

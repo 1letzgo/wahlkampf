@@ -15,6 +15,7 @@ from starlette.templating import Jinja2Templates
 from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 from starlette.middleware.sessions import SessionMiddleware
+from pydantic import BaseModel, Field
 
 from app import models
 from app.auth import hash_password, verify_password
@@ -56,6 +57,11 @@ STATIC_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_IMAGE = {"image/jpeg", "image/png", "image/webp"}
 EXT_MAP = {".jpg": ".jpg", ".jpeg": ".jpg", ".png": ".png", ".webp": ".webp"}
 USERNAME_PATTERN = re.compile(r"^[\w.-]+$", re.UNICODE)
+
+
+class TerminKommentarPayload(BaseModel):
+    body: str = Field("", max_length=4000)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -184,7 +190,28 @@ def _user_display_names(db: Session, user_ids: set[int]) -> dict[int, str]:
     }
 
 
-def _plakate_list_payload(db: Session) -> list[dict]:
+def _termin_kommentare_public(db: Session, termin_id: int) -> list[dict]:
+    rows = (
+        db.query(models.TerminKommentar)
+        .filter(models.TerminKommentar.termin_id == termin_id)
+        .order_by(models.TerminKommentar.created_at.asc())
+        .all()
+    )
+    ids = {r.user_id for r in rows}
+    names = _user_display_names(db, ids)
+    out: list[dict] = []
+    for r in rows:
+        dt = r.created_at
+        au = names.get(r.user_id, "Unbekannt")
+        out.append(
+            {
+                "id": r.id,
+                "author_name": au,
+                "body": r.body or "",
+                "created_display": dt.strftime("%d.%m.%Y · %H:%M"),
+            },
+        )
+    return out
     rows = (
         db.query(models.Plakat)
         .order_by(models.Plakat.hung_at.desc())
@@ -836,6 +863,7 @@ def termin_detail(
     if not row:
         raise HTTPException(status_code=404, detail="Termin nicht gefunden")
     termin_vergangen = row["termin"].starts_at < datetime.utcnow()
+    kommentare = _termin_kommentare_public(db, termin_id)
     return templates.TemplateResponse(
         request,
         "termin_detail.html",
@@ -843,6 +871,35 @@ def termin_detail(
             "user": user,
             "row": row,
             "termin_vergangen": termin_vergangen,
+            "termin_kommentare": kommentare,
+        },
+    )
+
+
+@app.post("/termine/{termin_id}/kommentare")
+def termin_kommentar_create(
+    termin_id: int,
+    payload: TerminKommentarPayload,
+    db: Annotated[Session, Depends(get_db)],
+    user: CurrentUser,
+):
+    text = payload.body.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Kommentar darf nicht leer sein.")
+    t = db.get(models.Termin, termin_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Termin nicht gefunden.")
+    km = models.TerminKommentar(
+        termin_id=termin_id,
+        user_id=user.id,
+        body=text[:4000],
+    )
+    db.add(km)
+    db.commit()
+    return JSONResponse(
+        {
+            "ok": True,
+            "kommentare": _termin_kommentare_public(db, termin_id),
         },
     )
 
