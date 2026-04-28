@@ -56,9 +56,9 @@
       {% endif %}
       <div class="termin-footer-actions__tail">
         {% set nk = row.kommentar_count|default(0) %}
-        <a href="/termine/{{ t.id }}" class="termin-footer-komment-bubble" title="Kommentare" aria-label="Kommentare: {{ nk }}">
+        <a href="/termine/{{ t.id }}" class="btn btn-sm btn-ghost btn-ico termin-footer-komment-bubble" title="Kommentare" aria-label="Kommentare: {{ nk }}">
           {{ ico.svg_chat() }}
-          <span class="termin-footer-komment-bubble__n" aria-hidden="true">{{ nk }}</span>
+          <span class="termin-footer-komment-bubble__n">{{ nk }}</span>
         </a>
         {% if row.kann_verwalten %}
         <div class="termin-footer-actions__admin">
@@ -107,35 +107,9 @@
     margin-left: auto;
     flex-shrink: 0;
   }
-  a.termin-footer-komment-bubble {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.28rem;
-    padding: 0.32rem 0.5rem 0.32rem 0.4rem;
-    border-radius: 999px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text) !important;
-    text-decoration: none !important;
-    font-size: 0.78rem;
-    font-weight: 650;
-    line-height: 1;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  }
-  a.termin-footer-komment-bubble:hover {
-    border-color: var(--accent);
-    color: var(--accent) !important;
-  }
-  a.termin-footer-komment-bubble .ico {
-    width: 1.05em;
-    height: 1.05em;
-    flex-shrink: 0;
-    opacity: 0.9;
-  }
   .termin-footer-komment-bubble__n {
-    min-width: 1ch;
-    text-align: center;
     font-variant-numeric: tabular-nums;
+    font-weight: 600;
   }
   .termin-card-list__footer.card-footer {
     margin: 0;
