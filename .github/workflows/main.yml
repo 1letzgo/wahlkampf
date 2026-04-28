@@ -1,0 +1,14 @@
+# .github/workflows/deploy.yml
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger deploy
+        run: curl -X POST http://194.36.147.156:3000/api/deploy/e3dbe3eb67ad2370792c50b012f598e47318fb4fca095f3c
