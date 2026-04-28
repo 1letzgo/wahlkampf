@@ -81,27 +81,44 @@
     font-size: 0.9rem;
     border-radius: calc(var(--radius) - 1px) calc(var(--radius) - 1px) 0 0;
   }
-  .termin-comment-card__author {
+  .termin-comment-card__lead {
     flex: 1 1 auto;
     min-width: 0;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: baseline;
+    gap: 0;
+    overflow: hidden;
+  }
+  .termin-comment-card__lead .termin-comment-card__author {
     font-weight: 650;
     color: #fff !important;
+    flex: 0 1 auto;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .termin-comment-card__sep {
+    flex-shrink: 0;
+    padding: 0 0.2rem;
+    color: rgba(255, 255, 255, 0.65);
+    font-weight: 500;
+  }
+  .termin-comment-card__lead .termin-comment-card__meta {
+    flex-shrink: 0;
+    font-size: 0.82rem;
+    white-space: nowrap;
+    color: rgba(255, 255, 255, 0.88) !important;
+    font-weight: 450;
   }
   .termin-comment-card__hdr-tools {
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.25rem;
     flex-shrink: 0;
-    max-width: 100%;
-  }
-  .termin-comment-card__meta {
-    font-size: 0.82rem;
-    white-space: nowrap;
-    color: rgba(255, 255, 255, 0.88) !important;
   }
   .termin-comment-card__toolbar {
     display: flex;
@@ -259,16 +276,19 @@
     {% for k in termin_kommentare %}
     <article class="card card--flush termin-comment-card">
       <header class="termin-comment-card__hdr">
-        <span class="termin-comment-card__author">{{ k.author_name }}</span>
-        <div class="termin-comment-card__hdr-tools">
+        <div class="termin-comment-card__lead">
+          <span class="termin-comment-card__author">{{ k.author_name }}</span>
+          <span class="termin-comment-card__sep" aria-hidden="true"> – </span>
           <span class="termin-comment-card__meta muted">{{ k.created_display }}</span>
-          {% if k.can_edit %}
+        </div>
+        {% if k.can_edit %}
+        <div class="termin-comment-card__hdr-tools">
           <div class="termin-comment-card__toolbar" role="toolbar" aria-label="Kommentar bearbeiten oder löschen">
             <button type="button" class="btn btn-sm btn-ghost btn-ico termin-komm-edit" data-id="{{ k.id }}" aria-label="Bearbeiten" title="Bearbeiten">{{ ico.svg_pencil() }}</button>
             <button type="button" class="btn btn-sm btn-danger btn-ico termin-komm-del" data-id="{{ k.id }}" aria-label="Löschen" title="Löschen">{{ ico.svg_trash() }}</button>
           </div>
-          {% endif %}
         </div>
+        {% endif %}
       </header>
       <div class="termin-comment-card__body">
         <p class="termin-comment-card__text">{{ k.body }}</p>
@@ -323,13 +343,19 @@
 
   function renderKommentare(items) {
     listEl.innerHTML = (items || []).map(function (k) {
-      var hdrTools =
-        '<div class="termin-comment-card__hdr-tools">' +
+      var lead =
+        '<div class="termin-comment-card__lead">' +
+        '<span class="termin-comment-card__author">' +
+        escapeHtml(k.author_name) +
+        '</span>' +
+        '<span class="termin-comment-card__sep" aria-hidden="true"> – </span>' +
         '<span class="termin-comment-card__meta muted">' +
         escapeHtml(k.created_display) +
-        '</span>';
+        '</span></div>';
+      var tools = "";
       if (k.can_edit) {
-        hdrTools +=
+        tools =
+          '<div class="termin-comment-card__hdr-tools">' +
           '<div class="termin-comment-card__toolbar" role="toolbar">' +
           '<button type="button" class="btn btn-sm btn-ghost btn-ico termin-komm-edit" data-id="' +
           k.id +
@@ -341,16 +367,13 @@
           '" aria-label="Löschen" title="Löschen">' +
           ICON_TRASH +
           '</button>' +
-          '</div>';
+          "</div></div>";
       }
-      hdrTools += '</div>';
       return (
         '<article class="card card--flush termin-comment-card">' +
         '<header class="termin-comment-card__hdr">' +
-        '<span class="termin-comment-card__author">' +
-        escapeHtml(k.author_name) +
-        '</span>' +
-        hdrTools +
+        lead +
+        tools +
         '</header><div class="termin-comment-card__body">' +
         '<p class="termin-comment-card__text">' +
         escapeHtml(k.body || "") +
