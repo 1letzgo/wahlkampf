@@ -37,3 +37,22 @@ def verify_ics_token(db: Session, env_token: str, provided: Optional[str]) -> bo
     if not expected:
         return False
     return secrets.compare_digest(provided, expected)
+
+
+def ensure_user_calendar_token(db: Session, user: models.User) -> str:
+    """Geheimer Token für den persönlichen Kalender-Feed (nur zugesagte Termine)."""
+    if user.calendar_token:
+        return user.calendar_token
+    for _ in range(24):
+        token = secrets.token_urlsafe(18)
+        clash = (
+            db.query(models.User)
+            .filter(models.User.calendar_token == token)
+            .first()
+        )
+        if not clash:
+            user.calendar_token = token
+            db.commit()
+            db.refresh(user)
+            return token
+    raise RuntimeError("Kalender-Token konnte nicht erzeugt werden.")

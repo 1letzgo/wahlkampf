@@ -25,6 +25,8 @@ def run_sqlite_migrations(engine: Engine) -> None:
                     "ALTER TABLE users ADD COLUMN is_approved INTEGER NOT NULL DEFAULT 1"
                 ),
             )
+        if "calendar_token" not in cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN calendar_token VARCHAR(64)"))
 
     if insp.has_table("app_settings") and insp.has_table("users"):
         with engine.begin() as conn:

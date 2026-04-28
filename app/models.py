@@ -26,6 +26,10 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     is_approved: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    # Geheimer Token für /calendar/me.ics (nur zugesagte Termine)
+    calendar_token: Mapped[Optional[str]] = mapped_column(
+        String(64), unique=True, nullable=True, index=True
+    )
 
     termine: Mapped[List["Termin"]] = relationship(back_populates="creator")
     teilnahmen: Mapped[List["TerminTeilnahme"]] = relationship(back_populates="user")

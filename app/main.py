@@ -28,10 +28,18 @@ from app.config import (
 from app.database import engine, get_db
 from app.db_migrate import run_sqlite_migrations
 from app.deps import AdminUser, CurrentUser
-from app.ics_service import all_termine_for_feed, build_ics_calendar
+from app.ics_service import (
+    all_termine_for_feed,
+    build_ics_calendar,
+    termine_for_user_teilnahmen,
+)
 from app.plakate_db import PlakatBase, get_plakate_db, plakate_engine
 from app.plakate_models import Plakat
-from app.settings_store import ensure_ics_token_for_ui, verify_ics_token
+from app.settings_store import (
+    ensure_ics_token_for_ui,
+    ensure_user_calendar_token,
+    verify_ics_token,
+)
 from app.termin_extern import (
     EXTERNE_TEILNEHMER_KEYS,
     EXTERNE_TEILNEHMER_OPTIONS,
@@ -716,7 +724,9 @@ def termine_list(
     termin_upcoming, termin_past = _split_termine_upcoming_past(termin_rows)
     token = ensure_ics_token_for_ui(db, ICS_TOKEN)
     base = str(request.base_url).rstrip("/")
-    feed_url = f"{base}/calendar.ics?t={token}"
+    my_token = ensure_user_calendar_token(db, user)
+    feed_url_my = f"{base}/calendar/me.ics?t={my_token}"
+    feed_url_all = f"{base}/calendar.ics?t={token}"
     return templates.TemplateResponse(
         request,
         "termine_list.html",
@@ -724,7 +734,8 @@ def termine_list(
             "user": user,
             "termin_upcoming": termin_upcoming,
             "termin_past": termin_past,
-            "feed_url": feed_url,
+            "feed_url_my": feed_url_my,
+            "feed_url_all": feed_url_all,
         },
     )
 
@@ -1078,6 +1089,33 @@ def calendar_ics(
         media_type="text/calendar; charset=utf-8",
         headers={
             "Content-Disposition": 'attachment; filename="wahlkampf.ics"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@app.get("/calendar/me.ics")
+def calendar_ics_me(
+    db: Annotated[Session, Depends(get_db)],
+    t: Optional[str] = None,
+):
+    """Persönlicher Feed: nur Termine mit Zusage (Teilnahme) für den zugehörigen Account."""
+    if not t:
+        raise HTTPException(status_code=404, detail="Not found")
+    owner = (
+        db.query(models.User)
+        .filter(models.User.calendar_token == t)
+        .first()
+    )
+    if not owner:
+        raise HTTPException(status_code=404, detail="Not found")
+    termine = termine_for_user_teilnahmen(db, owner.id)
+    body = build_ics_calendar(termine, cal_name="Meine Zusagen — Wahlkampf")
+    return Response(
+        content=body,
+        media_type="text/calendar; charset=utf-8",
+        headers={
+            "Content-Disposition": 'attachment; filename="meine-termine.ics"',
             "Cache-Control": "no-store",
         },
     )

@@ -112,9 +112,18 @@
     padding: 0.48rem 0.55rem;
     font-size: 0.9rem;
   }
-  .ics-dialog-actions #ics-copy-link {
+  .ics-dialog-actions .ics-copy-btn {
     flex: 1.15 1 0;
     min-width: 5.25rem;
+  }
+  .ics-dialog-row-label {
+    margin: 0.65rem 0 0;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .ics-dialog-row-label:first-of-type {
+    margin-top: 0.5rem;
   }
 </style>
 {% endblock %}
@@ -131,26 +140,47 @@
   </a>
 </div>
 
-{% if feed_url.startswith('https://') %}
-{% set webcal_url = 'webcal://' ~ feed_url[8:] %}
-{% elif feed_url.startswith('http://') %}
-{% set webcal_url = 'webcal://' ~ feed_url[7:] %}
+{% if feed_url_my.startswith('https://') %}
+{% set webcal_my = 'webcal://' ~ feed_url_my[8:] %}
+{% elif feed_url_my.startswith('http://') %}
+{% set webcal_my = 'webcal://' ~ feed_url_my[7:] %}
 {% else %}
-{% set webcal_url = feed_url %}
+{% set webcal_my = feed_url_my %}
 {% endif %}
-{% set google_cal_url = 'https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=' ~ (feed_url|urlencode) %}
+{% set google_my = 'https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=' ~ (feed_url_my|urlencode) %}
+{% if feed_url_all.startswith('https://') %}
+{% set webcal_all = 'webcal://' ~ feed_url_all[8:] %}
+{% elif feed_url_all.startswith('http://') %}
+{% set webcal_all = 'webcal://' ~ feed_url_all[7:] %}
+{% else %}
+{% set webcal_all = feed_url_all %}
+{% endif %}
+{% set google_all = 'https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=' ~ (feed_url_all|urlencode) %}
 
 <dialog id="ics-dialog" class="popup-dialog" aria-labelledby="ics-dialog-title">
   <form method="dialog">
     <h2 id="ics-dialog-title" style="margin-top:0; font-size:1.05rem;">Kalender abonnieren</h2>
+    <p class="ics-dialog-row-label">Meine Zusagen</p>
     <div class="ics-dialog-actions">
-      <a class="btn btn-sm btn-ico btn-with-label" href="{{ webcal_url }}" aria-label="In Apple Kalender abonnieren">
+      <a class="btn btn-sm btn-ico btn-with-label" href="{{ webcal_my }}" aria-label="Meine Zusagen: In Apple Kalender abonnieren">
         {{ ico.svg_calendar() }}<span class="btn-text">Apple</span>
       </a>
-      <a class="btn btn-sm btn-ico btn-with-label" href="{{ google_cal_url }}" rel="noopener noreferrer" aria-label="In Google Kalender abonnieren">
+      <a class="btn btn-sm btn-ico btn-with-label" href="{{ google_my }}" rel="noopener noreferrer" aria-label="Meine Zusagen: In Google Kalender abonnieren">
         {{ ico.svg_calendar() }}<span class="btn-text">Google</span>
       </a>
-      <button type="button" class="btn btn-sm btn-ico btn-with-label" id="ics-copy-link" aria-label="Kalender-URL in die Zwischenablage kopieren">
+      <button type="button" class="btn btn-sm btn-ico btn-with-label ics-copy-btn" data-feed-url="{{ feed_url_my }}" aria-label="Link Kalender „Meine Zusagen“ kopieren">
+        {{ ico.svg_copy() }}<span class="btn-text">Kopieren</span>
+      </button>
+    </div>
+    <p class="ics-dialog-row-label">Alle Termine</p>
+    <div class="ics-dialog-actions">
+      <a class="btn btn-sm btn-ico btn-with-label" href="{{ webcal_all }}" aria-label="Alle Termine: In Apple Kalender abonnieren">
+        {{ ico.svg_calendar() }}<span class="btn-text">Apple</span>
+      </a>
+      <a class="btn btn-sm btn-ico btn-with-label" href="{{ google_all }}" rel="noopener noreferrer" aria-label="Alle Termine: In Google Kalender abonnieren">
+        {{ ico.svg_calendar() }}<span class="btn-text">Google</span>
+      </a>
+      <button type="button" class="btn btn-sm btn-ico btn-with-label ics-copy-btn" data-feed-url="{{ feed_url_all }}" aria-label="Link Kalender „Alle Termine“ kopieren">
         {{ ico.svg_copy() }}<span class="btn-text">Kopieren</span>
       </button>
     </div>
@@ -163,12 +193,9 @@
 </dialog>
 <script>
   (function () {
-    var feedUrl = {{ feed_url | tojson }};
     document.getElementById("ics-open").addEventListener("click", function () {
       document.getElementById("ics-dialog").showModal();
     });
-    var copyBtn = document.getElementById("ics-copy-link");
-    if (!copyBtn) return;
     function fallbackCopy(text, done) {
       var ta = document.createElement("textarea");
       ta.value = text;
@@ -183,25 +210,28 @@
       } catch (e) {}
       document.body.removeChild(ta);
     }
-    copyBtn.addEventListener("click", function () {
-      function ok() {
-        var t = copyBtn.querySelector(".btn-text");
-        if (!t) return;
-        var prev = t.textContent;
-        t.textContent = "Kopiert";
-        copyBtn.disabled = true;
-        window.setTimeout(function () {
-          t.textContent = prev;
-          copyBtn.disabled = false;
-        }, 1600);
-      }
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(feedUrl).then(ok).catch(function () {
+    document.querySelectorAll("#ics-dialog .ics-copy-btn").forEach(function (copyBtn) {
+      copyBtn.addEventListener("click", function () {
+        var feedUrl = copyBtn.getAttribute("data-feed-url") || "";
+        function ok() {
+          var t = copyBtn.querySelector(".btn-text");
+          if (!t) return;
+          var prev = t.textContent;
+          t.textContent = "Kopiert";
+          copyBtn.disabled = true;
+          window.setTimeout(function () {
+            t.textContent = prev;
+            copyBtn.disabled = false;
+          }, 1600);
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(feedUrl).then(ok).catch(function () {
+            fallbackCopy(feedUrl, ok);
+          });
+        } else {
           fallbackCopy(feedUrl, ok);
-        });
-      } else {
-        fallbackCopy(feedUrl, ok);
-      }
+        }
+      });
     });
   })();
 </script>
