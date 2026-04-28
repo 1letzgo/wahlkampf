@@ -7,35 +7,86 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@700&display=swap" rel="stylesheet">
 <style>
-  .sharepic-section-card__header {
-    background: var(--accent);
-    color: #fff;
-    padding: 0.85rem 1.25rem;
-  }
-  .sharepic-section-card__title {
-    margin: 0;
-    font-size: 1.05rem;
-    font-weight: 650;
-    line-height: 1.3;
-  }
-  .sharepic-section-card__body--preview {
-    overflow: hidden;
-  }
-  .sharepic-section-card__body--form {
-    padding: 1.25rem;
-  }
-  .sharepic-card-footer.card-footer {
-    margin: 0;
-    border-radius: 0 0 calc(var(--radius) - 1px) calc(var(--radius) - 1px);
+  .sharepic-page .ics-popup__head {
     display: flex;
-    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.85rem;
+    margin: 0 0 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .sharepic-page .ics-popup__head-icon {
+    flex-shrink: 0;
+    width: 2.85rem;
+    height: 2.85rem;
+    border-radius: 12px;
+    background: linear-gradient(
+      145deg,
+      rgba(196, 30, 58, 0.14),
+      rgba(196, 30, 58, 0.06)
+    );
+    color: var(--accent);
+    display: flex;
     align-items: center;
-    gap: 0.5rem;
+    justify-content: center;
+  }
+  .sharepic-page .ics-popup__head-icon .ico {
+    width: 1.4rem;
+    height: 1.4rem;
+  }
+  .sharepic-page .ics-popup__h {
+    margin: 0;
+    font-size: 1.14rem;
+    font-weight: 650;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .sharepic-page .ics-popup__lead {
+    margin: 0.35rem 0 0;
+    font-size: 0.84rem;
+    color: var(--muted);
+    line-height: 1.45;
+  }
+  .sharepic-page .ics-popup__panel {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.8rem 0.85rem 0.85rem;
+    margin-top: 0.65rem;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  }
+  .sharepic-page .ics-popup__panel:first-of-type {
+    margin-top: 0;
+  }
+  .sharepic-page .ics-popup__panel--accent {
+    border-color: rgba(196, 30, 58, 0.22);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.65),
+      0 0 0 1px rgba(196, 30, 58, 0.06);
+  }
+  .sharepic-page .ics-popup__label {
+    margin: 0 0 0.55rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.055em;
+    color: var(--muted);
+  }
+  .sharepic-preview-card__shell,
+  .sharepic-bild-text__shell {
+    padding: 1.15rem 1.2rem 1.1rem;
+  }
+  .sharepic-preview-card__body {
+    overflow: hidden;
+    margin-top: 0;
   }
   .sharepic-preview-inner {
-    background: var(--card);
+    background: var(--bg);
     padding: 0.75rem;
     text-align: center;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
   }
   #sharepic-canvas {
     max-width: 100%;
@@ -46,16 +97,31 @@
   }
   #sharepic-canvas.sharepic-canvas--has-photo { cursor: grab; }
   #sharepic-canvas.sharepic-canvas--drag { cursor: grabbing; }
-  .sharepic-fields label:first-of-type { margin-top: 0; }
-  .sharepic-fields label { margin-top: 0.5rem; }
-  .sharepic-fields textarea {
+  .sharepic-page .sharepic-bild-text-card textarea {
     min-height: 4.5rem;
-    /* mind. 16px: sonst zoomt iOS Safari beim Fokus ins Feld */
     font-size: 16px;
     line-height: 1.35;
   }
-  .sharepic-fields textarea#sharepic-text2 { min-height: 3.2rem; }
-  .sharepic-hint { font-size: 0.82rem; color: var(--muted); margin: 0.25rem 0 0; }
+  .sharepic-page .sharepic-bild-text-card textarea#sharepic-text2 {
+    min-height: 3.2rem;
+  }
+  .sharepic-page .sharepic-bild-text-card .sharepic-label-spaced {
+    margin-top: 0.85rem;
+  }
+  .sharepic-hint {
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin: 0.35rem 0 0;
+  }
+  .sharepic-page .ics-popup__foot {
+    margin-top: 1.1rem;
+    padding-top: 0.95rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
   .sharepic-zoom-row {
     display: flex;
     flex-wrap: wrap;
@@ -70,42 +136,62 @@
 {% set path_prefix = request.scope.get('root_path') or '' %}
 {{ app_header('Sharepic') }}
 
-<div class="card card--flush sharepic-section-card">
-  <div class="sharepic-section-card__header">
-    <h2 class="sharepic-section-card__title">Vorschau</h2>
-  </div>
-  <div class="sharepic-section-card__body sharepic-section-card__body--preview">
-    <div class="sharepic-preview-inner">
-      <canvas id="sharepic-canvas" width="768" height="1024" aria-label="Sharepic-Vorschau"></canvas>
+<div class="sharepic-page">
+<div class="card card--flush sharepic-preview-card">
+  <div class="sharepic-preview-card__shell">
+    <header class="ics-popup__head">
+      <div class="ics-popup__head-icon" aria-hidden="true">{{ ico.svg_image() }}</div>
+      <div>
+        <h2 class="ics-popup__h">Vorschau</h2>
+        <p class="ics-popup__lead">Live-Ansicht mit Maske — Foto auf der Fläche verschieben oder zoomen.</p>
+      </div>
+    </header>
+    <div class="sharepic-preview-card__body">
+      <div class="sharepic-preview-inner">
+        <canvas id="sharepic-canvas" width="768" height="1024" aria-label="Sharepic-Vorschau"></canvas>
+      </div>
     </div>
   </div>
 </div>
 
-<div class="card card--flush sharepic-section-card">
-  <div class="sharepic-section-card__header">
-    <h2 class="sharepic-section-card__title">Bild &amp; Text</h2>
-  </div>
-  <div class="sharepic-section-card__body sharepic-section-card__body--form">
-    <div class="sharepic-fields">
-      <label for="sharepic-photo">Foto</label>
+<div class="card card--flush sharepic-bild-text-card">
+  <div class="sharepic-bild-text__shell">
+    <header class="ics-popup__head">
+      <div class="ics-popup__head-icon" aria-hidden="true">{{ ico.svg_image() }}</div>
+      <div>
+        <h2 class="ics-popup__h">Bild &amp; Text</h2>
+        <p class="ics-popup__lead">Eigenes Foto wählen, Ausschnitt anpassen und Texte für Banner und Fußzeile setzen.</p>
+      </div>
+    </header>
+
+    <section class="ics-popup__panel ics-popup__panel--accent" aria-label="Foto">
+      <label for="sharepic-photo" class="ics-popup__label">Foto</label>
       <input id="sharepic-photo" type="file" accept="image/jpeg,image/png,image/webp">
       <div class="sharepic-zoom-row">
         <label for="sharepic-zoom" style="margin:0; font-weight:600;">Zoom</label>
         <input type="range" id="sharepic-zoom" min="100" max="300" value="100" step="5" aria-valuemin="100" aria-valuemax="300" aria-valuenow="100">
         <button type="button" class="btn btn-ghost btn-sm" id="sharepic-reset-view" aria-label="Bildausschnitt zurücksetzen">Zurücksetzen</button>
       </div>
-      <label for="sharepic-text1">Text Banner (max. 1 Zeile)</label>
+    </section>
+
+    <section class="ics-popup__panel" aria-label="Texte">
+      <label for="sharepic-text1" class="ics-popup__label">Text Banner</label>
+      <p class="muted sharepic-hint" style="margin:-0.35rem 0 0.45rem;">Max. 1 Zeile</p>
       <textarea id="sharepic-text1" name="text1" rows="2" maxlength="500" placeholder="z. B. Olaf in WST"></textarea>
-      <label for="sharepic-text2">Text unten (max. 2 Zeilen)</label>
+
+      <label for="sharepic-text2" class="ics-popup__label sharepic-label-spaced">Text unten</label>
+      <p class="muted sharepic-hint" style="margin:-0.35rem 0 0.45rem;">Max. 2 Zeilen</p>
       <textarea id="sharepic-text2" name="text2" rows="2" maxlength="500" placeholder="z. B. Termin und Ort"></textarea>
       <p class="sharepic-hint">Open Sans, 50 px, fett — Zeilenumbruch mit Enter oder automatisch.</p>
-    </div>
+    </section>
+
+    <footer class="ics-popup__foot" aria-label="Sharepic exportieren">
+      <button type="button" class="btn btn-sm btn-ico btn-with-label" id="sharepic-download" aria-label="JPG herunterladen">
+        {{ ico.svg_check() }}<span class="btn-text">JPG herunterladen</span>
+      </button>
+    </footer>
   </div>
-  <footer class="card-footer sharepic-card-footer" aria-label="Sharepic exportieren">
-    <button type="button" class="btn btn-sm btn-ico btn-with-label" id="sharepic-download" aria-label="JPG herunterladen">
-      {{ ico.svg_check() }}<span class="btn-text">JPG herunterladen</span>
-    </button>
-  </footer>
+</div>
 </div>
 
 <script>
