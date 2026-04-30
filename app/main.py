@@ -1543,7 +1543,6 @@ async def termin_create(
     request: Request,
     pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
-    von_alle_termine: Annotated[str, Form()] = "",
     title: Annotated[str, Form()],
     datum: Annotated[date, Form()],
     start_uhrzeit: Annotated[str, Form()],
@@ -1554,6 +1553,7 @@ async def termin_create(
     end_uhrzeit: Annotated[str, Form()] = "",
     extern_gast: Annotated[Optional[List[str]], Form()] = None,
     bild: Annotated[Optional[UploadFile], File()] = None,
+    von_alle_termine: Annotated[str, Form()] = "",
 ):
     from_alle = von_alle_termine.strip() == "1"
     err = _parse_times(start_uhrzeit, end_uhrzeit)
