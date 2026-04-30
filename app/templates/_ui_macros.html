@@ -8,9 +8,6 @@
     {% endif %}
     <a href="{{ bh }}" class="header-brand">SPD vor Ort</a>
     <div class="header-toolbar-spacer" aria-hidden="true"></div>
-    {% if request.state.ortsverband_name %}
-    <span class="header-ov-name" title="Ortsverband">{{ request.state.ortsverband_name }}</span>
-    {% endif %}
     <h1 class="header-page-title">{{ title }}</h1>
   </div>
 </header>
@@ -28,9 +25,6 @@
     <nav class="header-toolbar" aria-label="Seitenaktionen">
       {{ caller() }}
     </nav>
-    {% if request.state.ortsverband_name %}
-    <span class="header-ov-name" title="Ortsverband">{{ request.state.ortsverband_name }}</span>
-    {% endif %}
     <h1 class="header-page-title">{{ title }}</h1>
   </div>
 </header>

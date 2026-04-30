@@ -23,7 +23,8 @@
 </style>
 {% endblock %}
 {% block body %}
-{{ app_header('Westerstede') }}
+{% set menu_title = (request.state.ortsverband_name or request.state.mandant_slug or 'Menü') %}
+{{ app_header(menu_title) }}
 
 <div class="card card--flush">
   <ul class="menu-list" role="list">

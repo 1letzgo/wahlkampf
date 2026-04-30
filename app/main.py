@@ -73,6 +73,7 @@ app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, session_cookie=SESS
 @app.middleware("http")
 async def mandanten_kontext(request: Request, call_next):
     request.state.mandanten_prefix = ""
+    request.state.mandant_slug = ""
     request.state.ortsverband_name = ""
     path = request.url.path
     rp = (request.scope.get("root_path") or "").rstrip("/")
@@ -81,6 +82,7 @@ async def mandanten_kontext(request: Request, call_next):
     parts = [p for p in path.strip("/").split("/") if p]
     if len(parts) >= 2 and parts[0] == "m":
         slug = parts[1].lower()
+        request.state.mandant_slug = slug
         request.state.mandanten_prefix = f"/m/{slug}"
         from sqlalchemy.orm import sessionmaker
 
