@@ -1,3 +1,9 @@
+{# Öffentlicher URL-Pfad: Reverse-Proxy root_path + Mandanten-Prefix (/m/slug oder leer). #}
+{% macro public_tenant_prefix(request, mandanten_prefix=None) -%}
+  {%- set mp = mandanten_prefix if mandanten_prefix is not none else (request.state.mandanten_prefix | default('', true)) -%}
+  {{- (request.scope.get('root_path') or '').rstrip('/') ~ mp -}}
+{%- endmacro %}
+
 {# Hauptmenü: Tenant aus URL, sonst Session-Slug, sonst Kurz-URL /menu, sonst Start. #}
 {% macro brand_menu_href() -%}
   {%- set mp = request.state.mandanten_prefix | default('', true) -%}

@@ -1282,7 +1282,7 @@ def _termin_teilnahme_live_payload(
     counts = _termin_kommentar_counts_by_termin(pdb, [termin_id])
     row = _termin_row_from_instance(pdb, t, user, kommentar_count=counts.get(termin_id, 0))
     termin_vergangen = t.starts_at < datetime.utcnow()
-    mp = request.state.mandanten_prefix or ""
+    mp = f"{_app_path_prefix(request)}{request.state.mandanten_prefix or ''}"
     ctx = {
         "request": request,
         "mp": mp,
