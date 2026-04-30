@@ -82,9 +82,9 @@
 {% set menu_title = (request.state.ortsverband_name or request.state.mandant_slug or 'Menü') %}
 {{ app_header(menu_title) }}
 
+{% if my_ovs | length %}
 <div class="card card--flush">
   <ul class="menu-list" role="list">
-    {% if my_ovs | length %}
     <li class="menu-list-section">
       <h2 class="menu-list-section__label" id="menu-my-ovs-heading">Meine Verbände</h2>
     </li>
@@ -105,7 +105,15 @@
       </a>
     </li>
     {% endfor %}
-    {% endif %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="card card--flush">
+  <ul class="menu-list" role="list">
+    <li class="menu-list-section">
+      <h2 class="menu-list-section__label" id="menu-wahlkampf-heading">Termine · Plakate · Sharepic</h2>
+    </li>
     <li><a href="{{ request.state.mandanten_prefix }}/termine"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Termine</span></span></a></li>
     <li><a href="{{ request.state.mandanten_prefix }}/plakate"><span class="menu-list__main">{{ ico.svg_map_pin() }}<span>Plakate</span></span></a></li>
     <li><a href="{{ request.state.mandanten_prefix }}/sharepic"><span class="menu-list__main">{{ ico.svg_image() }}<span>Sharepic</span></span></a></li>
