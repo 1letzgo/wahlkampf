@@ -69,6 +69,24 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.65),
       0 0 0 1px rgba(196, 30, 58, 0.06);
   }
+  .termin-form-card .termin-form-card__ov-panel {
+    background: linear-gradient(
+      165deg,
+      rgba(196, 30, 58, 0.18),
+      rgba(196, 30, 58, 0.09)
+    );
+    border-color: rgba(196, 30, 58, 0.28);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.45),
+      0 0 0 1px rgba(196, 30, 58, 0.07);
+  }
+  .termin-form-card .termin-form-card__ov-panel .ics-popup__label {
+    color: rgba(120, 24, 38, 0.95);
+  }
+  .termin-form-card .termin-form-card__ov-panel select {
+    background: var(--card);
+    border-color: rgba(196, 30, 58, 0.35);
+  }
   .termin-form-card .ics-popup__panel .ics-popup__label {
     margin: 0 0 0.55rem;
     font-size: 0.72rem;
@@ -125,6 +143,9 @@
 
 <div class="card card--flush termin-form-card">
   <form method="post" class="ics-popup__form termin-form-card__form" id="termin-main-form" action="{% if termin %}{{ mp }}/termine/{{ termin.id }}/bearbeiten{% elif termin_neu_ov_options %}/m/{{ request.state.mandant_slug }}/termine/neu{% else %}{{ mp }}/termine/neu{% endif %}" enctype="multipart/form-data">
+    {% if not termin and from_alle_termine %}
+    <input type="hidden" name="von_alle_termine" value="1">
+    {% endif %}
     <header class="ics-popup__head">
       <div class="ics-popup__head-icon" aria-hidden="true">
         {% if termin %}{{ ico.svg_pencil() }}{% else %}{{ ico.svg_plus() }}{% endif %}
@@ -140,7 +161,7 @@
     {% if error %}<div class="error">{{ error }}</div>{% endif %}
 
     {% if not termin and termin_neu_ov_options %}
-    <section class="ics-popup__panel ics-popup__panel--accent" aria-label="Ortsverband">
+    <section class="ics-popup__panel termin-form-card__ov-panel" aria-label="Ortsverband">
       <h3 class="ics-popup__label">Ortsverband</h3>
       <label for="termin-neu-ov-select">Für welchen Ortsverband ist der Termin?</label>
       <select id="termin-neu-ov-select" autocomplete="off" aria-label="Ortsverband für neuen Termin">

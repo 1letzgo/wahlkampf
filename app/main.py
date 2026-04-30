@@ -9,7 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -83,6 +83,9 @@ EXT_MAP = {".jpg": ".jpg", ".jpeg": ".jpg", ".png": ".png", ".webp": ".webp"}
 USERNAME_PATTERN = re.compile(r"^[\w.-]+$", re.UNICODE)
 
 tenant_router = APIRouter(prefix="/m/{mandant_slug}")
+
+# Termin-neu-Maske: OV-Dropdown nur bei Aufruf von „Alle Termine“ (?von=alle-termine), nicht bei „Termine“ des OV.
+TERMIN_NEU_FROM_ALLE_QUERY = "von=alle-termine"
 
 
 class TerminKommentarPayload(BaseModel):
@@ -1254,6 +1257,7 @@ def _termin_form_context(
     extern_gast: Optional[List[str]] = None,
     pdb: Optional[Session] = None,
     mandant_slug: Optional[str] = None,
+    from_alle_termine: bool = False,
 ) -> dict:
     if extern_gast is not None:
         auswahl = _filter_extern_gast_keys(extern_gast)
@@ -1262,7 +1266,12 @@ def _termin_form_context(
     else:
         auswahl = []
     termin_neu_ov_options: list[dict[str, str]] = []
-    if termin is None and pdb is not None and mandant_slug is not None:
+    if (
+        termin is None
+        and from_alle_termine
+        and pdb is not None
+        and mandant_slug is not None
+    ):
         ov_slugs = _approved_ov_slugs_for_user_feeds(pdb, user)
         if len(ov_slugs) > 1:
             termin_neu_ov_options = _termin_neu_ov_options_for_form(
@@ -1276,6 +1285,7 @@ def _termin_form_context(
         "externe_optionen": EXTERNE_TEILNEHMER_OPTIONS,
         "externe_auswahl": auswahl,
         "termin_neu_ov_options": termin_neu_ov_options,
+        "from_alle_termine": from_alle_termine,
     }
 
 
@@ -1447,6 +1457,7 @@ def termine_list(
     mp = _mp(request)
     feed_url_my = f"{base}{mp}/calendar/me.ics?t={my_token}"
     feed_url_all = f"{base}{mp}/calendar.ics?t={token}"
+    neuer_termin_href = f"{mp}/termine/neu"
     return templates.TemplateResponse(
         request,
         "termine_list.html",
@@ -1461,6 +1472,7 @@ def termine_list(
             "ics_my_label": "Meine Zusagen",
             "ics_all_label": "Alle Termine",
             "neuer_termin_button_label": "Neuer Termin",
+            "neuer_termin_href": neuer_termin_href,
         },
     )
 
@@ -1482,6 +1494,7 @@ def termine_list_alle(
     mp = _mp(request)
     feed_url_my = f"{base}{mp}/calendar/zusagen-alle.ics?t={my_token}"
     feed_url_all = f"{base}{mp}/calendar/termine-alle.ics?t={my_token}"
+    neuer_termin_href = f"{mp}/termine/neu?{TERMIN_NEU_FROM_ALLE_QUERY}"
     return templates.TemplateResponse(
         request,
         "termine_list.html",
@@ -1496,6 +1509,7 @@ def termine_list_alle(
             "neuer_termin_button_label": "Termin hinzufügen",
             "ics_my_label": "Meine Zusagen (alle Verbände)",
             "ics_all_label": "Alle Termine (alle Verbände)",
+            "neuer_termin_href": neuer_termin_href,
         },
     )
 
@@ -1506,7 +1520,9 @@ def termin_new_form(
     request: Request,
     pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
+    von: Annotated[str | None, Query()] = None,
 ):
+    from_alle = (von or "").strip().lower().replace("_", "-") == "alle-termine"
     return templates.TemplateResponse(
         request,
         "termin_form.html",
@@ -1516,6 +1532,7 @@ def termin_new_form(
             error=None,
             pdb=pdb,
             mandant_slug=mandant_slug,
+            from_alle_termine=from_alle,
         ),
     )
 
@@ -1526,6 +1543,7 @@ async def termin_create(
     request: Request,
     pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
+    von_alle_termine: Annotated[str, Form()] = "",
     title: Annotated[str, Form()],
     datum: Annotated[date, Form()],
     start_uhrzeit: Annotated[str, Form()],
@@ -1537,6 +1555,7 @@ async def termin_create(
     extern_gast: Annotated[Optional[List[str]], Form()] = None,
     bild: Annotated[Optional[UploadFile], File()] = None,
 ):
+    from_alle = von_alle_termine.strip() == "1"
     err = _parse_times(start_uhrzeit, end_uhrzeit)
     if err:
         return templates.TemplateResponse(
@@ -1549,6 +1568,7 @@ async def termin_create(
                 extern_gast=extern_gast,
                 pdb=pdb,
                 mandant_slug=mandant_slug,
+                from_alle_termine=from_alle,
             ),
             status_code=400,
         )
@@ -1596,6 +1616,7 @@ async def termin_create(
                                 extern_gast=extern_gast,
                                 pdb=pdb,
                                 mandant_slug=mandant_slug,
+                                from_alle_termine=from_alle,
                             ),
                             status_code=400,
                         )

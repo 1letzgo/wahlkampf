@@ -348,7 +348,7 @@
     {{ ico.svg_calendar() }}<span class="btn-text">Abonnieren</span>
   </button>
   {% if show_neuer_termin_button %}
-  <a href="{{ request.state.mandanten_prefix }}/termine/neu" class="btn btn-sm btn-ico btn-with-label" aria-label="{{ neuer_termin_button_label | default('Neuer Termin') }}">
+  <a href="{{ neuer_termin_href | default(request.state.mandanten_prefix ~ '/termine/neu') }}" class="btn btn-sm btn-ico btn-with-label" aria-label="{{ neuer_termin_button_label | default('Neuer Termin') }}">
     {{ ico.svg_plus() }}<span class="btn-text">{{ neuer_termin_button_label | default('Neuer Termin') }}</span>
   </a>
   {% endif %}
@@ -464,7 +464,7 @@
 </script>
 
 {% if not termin_upcoming and not termin_past %}
-<p class="muted">{% if show_neuer_termin_button %}Noch keine Termine — <a href="{{ request.state.mandanten_prefix }}/termine/neu">ersten Termin anlegen</a>.{% else %}Noch keine Termine in deinen Verbänden.{% endif %}</p>
+<p class="muted">{% if show_neuer_termin_button %}Noch keine Termine — <a href="{{ neuer_termin_href | default(request.state.mandanten_prefix ~ '/termine/neu') }}">ersten Termin anlegen</a>.{% else %}Noch keine Termine in deinen Verbänden.{% endif %}</p>
 {% else %}
 <div class="termin-tablist" role="tablist" aria-label="Terminansicht">
   <button type="button" class="termin-tab" id="tab-kommend" role="tab" aria-selected="true" aria-controls="termin-panel-kommend" data-tab="kommend">Aktuelle Termine</button>
@@ -473,7 +473,7 @@
 
 <div id="termin-panel-kommend" class="termin-tab-panel" role="tabpanel" aria-labelledby="tab-kommend" tabindex="0">
   {% if not termin_upcoming %}
-  <p class="muted">{% if show_neuer_termin_button %}Keine aktuellen Termine — <a href="{{ request.state.mandanten_prefix }}/termine/neu">Termin anlegen</a> oder unter „Archiv“ nachsehen.{% else %}Keine aktuellen Termine — unter „Archiv“ nachsehen.{% endif %}</p>
+  <p class="muted">{% if show_neuer_termin_button %}Keine aktuellen Termine — <a href="{{ neuer_termin_href | default(request.state.mandanten_prefix ~ '/termine/neu') }}">Termin anlegen</a> oder unter „Archiv“ nachsehen.{% else %}Keine aktuellen Termine — unter „Archiv“ nachsehen.{% endif %}</p>
   {% endif %}
   {% for row in termin_upcoming %}
   {{ termin_karte(row, vergangen=False) }}
