@@ -1864,7 +1864,7 @@ def termin_teilnehmen(
 
 @tenant_router.post("/termine/{termin_id}/abmelden")
 @tenant_router.post("/termine/{termin_id}/absagen")
-def termin_abmelden(
+def termin_teilnahme_absagen(
     mandant_slug: str,
     termin_id: int,
     request: Request,
@@ -1872,6 +1872,7 @@ def termin_abmelden(
     user: CurrentUser,
     return_to: Annotated[str | None, Form()] = None,
 ):
+    """Absage bzw. Zusage zurücknehmen — gleiche Logik für `/absagen` und `/abmelden` (Legacy)."""
     ms = mandant_slug.strip().lower()
     t = (
         pdb.query(Termin)

@@ -11,7 +11,7 @@
     var form = ev.target;
     if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-teilnahme-live')) return;
     var action = form.action || '';
-    if (action.indexOf('/teilnehmen') === -1 && action.indexOf('/abmelden') === -1 && action.indexOf('/absagen') === -1) return;
+    if (action.indexOf('/teilnehmen') === -1 && action.indexOf('/absagen') === -1) return;
     ev.preventDefault();
     fetch(form.action, {
       method: 'POST',

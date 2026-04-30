@@ -1,10 +1,10 @@
 {% import '_icons.html' as ico %}
 {% if not termin_vergangen %}
 {% if row.ich_teilnehme %}
-<form method="post" action="{{ mp }}/termine/{{ termin_id }}/abmelden" data-teilnahme-live style="margin:0;">
+<form method="post" action="{{ mp }}/termine/{{ termin_id }}/absagen" data-teilnahme-live style="margin:0;">
   {% if return_to_list %}<input type="hidden" name="return_to" value="list">{% endif %}
-  <button type="submit" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Abmelden">
-    {{ ico.svg_logout() }}<span class="btn-text">Abmelden</span>
+  <button type="submit" class="btn btn-admin btn-sm btn-ico btn-xs" aria-label="Zusage zurücknehmen" title="Zusage zurücknehmen">
+    {{ ico.svg_check() }}
   </button>
 </form>
 {% elif row.ich_abgesagt %}
