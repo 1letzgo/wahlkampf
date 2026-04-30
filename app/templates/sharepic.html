@@ -206,29 +206,60 @@
   var OV_DISPLAY_NAME = {{ sharepic_ov_display_name | tojson }};
   var W = 768;
   var H = 1024;
-  /* Maske: Kopf ~0–11 %, mittlerer Balken ~11–22 %, Foto ~22–82 %, Fuß ~82–100 % */
-  var HEADER_BOTTOM = Math.round(H * 0.11);
-  var MID_TOP = HEADER_BOTTOM;
-  var PHOTO_TOP = Math.round(H * 0.22);
-  var MID_BOTTOM = PHOTO_TOP;
-  var MID_H = MID_BOTTOM - MID_TOP;
-  var PHOTO_BOTTOM = Math.round(H * 0.82);
-  var PHOTO = { x: 0, y: PHOTO_TOP, w: W, h: PHOTO_BOTTOM - PHOTO_TOP };
-  var FOOTER_TOP = Math.round(H * 0.82);
-  var FOOTER_H = H - FOOTER_TOP;
+  var maskImg = new Image();
+  maskImg.crossOrigin = "anonymous";
+  /*
+   * Layout aus sharepic-mask.png (Referenz 1080×1350), skaliert auf Canvas W×H.
+   * Y: Kopf rot 0–187, Lücke 188–238, Mittelbalken 239–352, Foto 353–1161, Fuß 1162+
+   * X: Schwerpunkt Buchstabe „P“ im weißen SPD-Schriftzug ≈ 190 px (Maske).
+   */
+  var MASK_REF_W = 1080;
+  var MASK_REF_H = 1350;
+  var MASK_HEADER_END_Y = 188;
+  var MASK_MID_BAR_TOP_Y = 239;
+  var MASK_MID_BAR_LAST_RED_ROW = 352;
+  var MASK_PHOTO_START_Y = 353;
+  var MASK_FOOTER_TOP_Y = 1162;
+  var MASK_SPD_P_CENTER_X = 190.07;
+  var MASK_OV_TEXT_TOP_Y = 114;
+  var layoutCache = null;
+
+  function buildLayout() {
+    var nh = maskImg.naturalHeight || MASK_REF_H;
+    var nw = maskImg.naturalWidth || MASK_REF_W;
+    var sy = H / nh;
+    var sx = W / nw;
+    var headerBottom = Math.round(MASK_HEADER_END_Y * sy);
+    var photoTop = Math.round(MASK_PHOTO_START_Y * sy);
+    var photoBottom = Math.round(MASK_FOOTER_TOP_Y * sy);
+    var ovTextTop = Math.round(MASK_OV_TEXT_TOP_Y * sy);
+    var spdPCenterX = MASK_SPD_P_CENTER_X * sx;
+    var midBarCenterY = ((MASK_MID_BAR_TOP_Y + MASK_MID_BAR_LAST_RED_ROW) / 2) * sy;
+    return {
+      headerBottom: headerBottom,
+      midBarTop: Math.round(MASK_MID_BAR_TOP_Y * sy),
+      midBarCenterY: midBarCenterY,
+      ovTextTop: ovTextTop,
+      spdPCenterX: spdPCenterX,
+      footerTop: photoBottom,
+      footerH: H - photoBottom,
+      photoRect: { x: 0, y: photoTop, w: W, h: photoBottom - photoTop },
+    };
+  }
+
+  function layoutSharepic() {
+    if (!layoutCache) layoutCache = buildLayout();
+    return layoutCache;
+  }
+
+  function invalidateSharepicLayout() {
+    layoutCache = null;
+  }
   var SLOGAN_MAX_LINES = 3;
   var SLOGAN_RIGHT_PAD = 20;
   var SLOGAN_MAX_WIDTH_FRAC = 0.48;
   var MID_MAX_LINES = 1;
   var MID_CHAR_LIMIT = 60;
-  /* Mitte des mittleren Buchstabens „P“ im SPD-Wortmarken-Bereich der Maske (768 px Canvas) */
-  var SPD_MARK_LEFT = 28;
-  var SPD_MARK_WIDTH = 108;
-  var OV_NAME_ANCHOR_X = SPD_MARK_LEFT + SPD_MARK_WIDTH / 2;
-  /* OV-Name tiefer, damit er nicht in den SPD-Buchstaben klebt */
-  var OV_NAME_BAND_TOP_FRAC = 0.62;
-  /* Mitteltext: optisch etwas unter geometrischer Bandmitte (Maske) */
-  var MID_TEXT_VERTICAL_BIAS = 0.54;
   var TEXT2_LH = 50;
   var TEXT2 = {
     maxW: 680,
@@ -240,8 +271,6 @@
 
   var canvas = document.getElementById("sharepic-canvas");
   var ctx = canvas.getContext("2d");
-  var maskImg = new Image();
-  maskImg.crossOrigin = "anonymous";
   var userImg = null;
   var photoZoom = 1;
   var photoPanX = 0;
@@ -303,7 +332,8 @@
   }
 
   function inPhotoRect(x, y) {
-    return x >= PHOTO.x && x <= PHOTO.x + PHOTO.w && y >= PHOTO.y && y <= PHOTO.y + PHOTO.h;
+    var P = layoutSharepic().photoRect;
+    return x >= P.x && x <= P.x + P.w && y >= P.y && y <= P.y + P.h;
   }
 
   function clampPan() {
@@ -312,10 +342,11 @@
       photoPanY = 0;
       return;
     }
-    var dw = PHOTO.w * photoZoom;
-    var dh = PHOTO.h * photoZoom;
-    var maxPX = Math.max(0, (dw - PHOTO.w) / 2);
-    var maxPY = Math.max(0, (dh - PHOTO.h) / 2);
+    var P = layoutSharepic().photoRect;
+    var dw = P.w * photoZoom;
+    var dh = P.h * photoZoom;
+    var maxPX = Math.max(0, (dw - P.w) / 2);
+    var maxPY = Math.max(0, (dh - P.h) / 2);
     photoPanX = Math.max(-maxPX, Math.min(maxPX, photoPanX));
     photoPanY = Math.max(-maxPY, Math.min(maxPY, photoPanY));
   }
@@ -427,11 +458,11 @@
     ctx.restore();
   }
 
-  function drawOvNameUnderLogo(ctx) {
+  function drawOvNameUnderLogo(ctx, L) {
     var name = (OV_DISPLAY_NAME && String(OV_DISPLAY_NAME).trim()) || "";
     if (!name) return;
-    var anchorX = OV_NAME_ANCHOR_X;
-    var maxHalf = Math.min(anchorX - 14, W * 0.5 - anchorX - 8);
+    var anchorX = L.spdPCenterX;
+    var maxHalf = Math.min(anchorX - 14, W * 0.48 - anchorX - 6);
     var maxW = Math.max(100, maxHalf * 2);
     ctx.fillStyle = FILL;
     ctx.textAlign = "center";
@@ -439,13 +470,14 @@
     var fs = 26;
     var lh;
     var lines;
+    var y0 = L.ovTextTop;
+    var headerAvail = L.headerBottom - y0 - 8;
     for (; fs >= 15; fs -= 2) {
       lh = Math.round(fs * 1.14);
       ctx.font = '700 ' + fs + 'px "Open Sans", system-ui, sans-serif';
       lines = textToLines(ctx, name, maxW, 2);
       var blockH = lines.length * lh;
-      var headerAvail = HEADER_BOTTOM - Math.round(HEADER_BOTTOM * OV_NAME_BAND_TOP_FRAC) - 6;
-      var ok = blockH <= headerAvail && blockH <= HEADER_BOTTOM - 10;
+      var ok = blockH <= headerAvail && blockH <= L.headerBottom - y0 - 4;
       if (ok) {
         for (var w = 0; w < lines.length && ok; w++) {
           if (ctx.measureText(lines[w]).width > maxW) ok = false;
@@ -456,25 +488,21 @@
     lh = Math.round(fs * 1.14);
     ctx.font = '700 ' + fs + 'px "Open Sans", system-ui, sans-serif';
     lines = textToLines(ctx, name, maxW, 2);
-    var blockH = lines.length * lh;
-    var y0 = Math.round(HEADER_BOTTOM * OV_NAME_BAND_TOP_FRAC);
-    if (y0 + blockH > HEADER_BOTTOM - 5) {
-      y0 = Math.max(Math.round(HEADER_BOTTOM * 0.52), HEADER_BOTTOM - blockH - 5);
-    }
+    if (!lines.length) return;
     for (var i = 0; i < lines.length; i++) {
       ctx.fillText(lines[i], anchorX, y0 + i * lh);
     }
     ctx.textAlign = "left";
   }
 
-  function drawMiddleBanner(ctx) {
+  function drawMiddleBanner(ctx, L) {
     var raw = document.getElementById("sharepic-mid").value;
     if (raw.length > MID_CHAR_LIMIT) {
       raw = raw.slice(0, MID_CHAR_LIMIT);
     }
     var maxW = W - 48;
     var cx = W * 0.5;
-    var cy = MID_TOP + MID_H * MID_TEXT_VERTICAL_BIAS;
+    var cy = L.midBarCenterY;
     ctx.fillStyle = FILL;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -499,7 +527,7 @@
     ctx.textBaseline = "top";
   }
 
-  function drawHeaderSlogan(ctx) {
+  function drawHeaderSlogan(ctx, L) {
     var raw = document.getElementById("sharepic-slogan").value;
     var maxW = W * SLOGAN_MAX_WIDTH_FRAC;
     var xRight = W - SLOGAN_RIGHT_PAD;
@@ -514,7 +542,7 @@
       ctx.font = '700 ' + fs + 'px "Open Sans", system-ui, sans-serif';
       lines = textToLines(ctx, raw, maxW, SLOGAN_MAX_LINES);
       var blockH = lines.length * lh;
-      var ok = blockH <= HEADER_BOTTOM - 10;
+      var ok = blockH <= L.headerBottom - 10;
       if (ok) {
         for (var w = 0; w < lines.length && ok; w++) {
           if (ctx.measureText(lines[w]).width > maxW) ok = false;
@@ -526,7 +554,7 @@
     ctx.font = '700 ' + fs + 'px "Open Sans", system-ui, sans-serif';
     lines = textToLines(ctx, raw, maxW, SLOGAN_MAX_LINES);
     var blockH = lines.length * lh;
-    var y0 = Math.max(4, Math.round((HEADER_BOTTOM - blockH) / 2));
+    var y0 = Math.max(4, Math.round((L.headerBottom - blockH) / 2));
     for (var i = 0; i < lines.length; i++) {
       ctx.fillText(lines[i], xRight, y0 + i * lh);
     }
@@ -534,18 +562,20 @@
   }
 
   function redraw() {
+    var L = layoutSharepic();
     ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = "#e8e4dc";
     ctx.fillRect(0, 0, W, H);
     if (userImg && userImg.complete && userImg.naturalWidth) {
-      drawCoverPanZoom(userImg, PHOTO.x, PHOTO.y, PHOTO.w, PHOTO.h, photoZoom, photoPanX, photoPanY);
+      var P = L.photoRect;
+      drawCoverPanZoom(userImg, P.x, P.y, P.w, P.h, photoZoom, photoPanX, photoPanY);
     }
     if (maskImg.complete && maskImg.naturalWidth) {
       ctx.drawImage(maskImg, 0, 0, W, H);
     }
-    drawOvNameUnderLogo(ctx);
-    drawHeaderSlogan(ctx);
-    drawMiddleBanner(ctx);
+    drawOvNameUnderLogo(ctx, L);
+    drawHeaderSlogan(ctx, L);
+    drawMiddleBanner(ctx, L);
 
     ctx.font = FONT;
     ctx.fillStyle = FILL;
@@ -556,7 +586,7 @@
     ctx.textAlign = "center";
     var cx2 = W * 0.5;
     var block2 = lines2.length * TEXT2.lineHeight;
-    var y2 = FOOTER_TOP + Math.floor((FOOTER_H - block2) / 2);
+    var y2 = L.footerTop + Math.floor((L.footerH - block2) / 2);
     for (var j = 0; j < lines2.length; j++) {
       ctx.fillText(lines2[j], cx2, y2 + j * TEXT2.lineHeight);
     }
@@ -567,8 +597,12 @@
     requestAnimationFrame(redraw);
   }
 
-  maskImg.onload = scheduleRedraw;
+  maskImg.onload = function () {
+    invalidateSharepicLayout();
+    scheduleRedraw();
+  };
   maskImg.onerror = function () {
+    invalidateSharepicLayout();
     console.error("Maske konnte nicht geladen werden:", MASK_SRC);
   };
   maskImg.src = MASK_SRC;
