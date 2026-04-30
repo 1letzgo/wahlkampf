@@ -13,9 +13,9 @@ services:
       # Statt Subdomain (nur Tests): MANDANT_HOST_IS_RAW_SLUG=true → Hostname = Slug, z. B. http://westerstede:8000/
       # MANDANT_HOST_BASE_DOMAIN: ${MANDANT_HOST_BASE_DOMAIN:-}
       # MANDANT_HOST_IS_RAW_SLUG: ${MANDANT_HOST_IS_RAW_SLUG:-}
-      # Öffentliche URL ohne /m/… im Proxy (/, Host aus Browser oder X-Forwarded-Host):
-      # PUBLIC_SITE_HOSTS: wahlkampf.spd-wst.de,wahlkamp.spd-wst.de
-      # PUBLIC_SITE_MANDANT_SLUG: westerstede
+      # URLs ohne /m/<slug> im Browser (Host + Slug müssen gesetzt sein):
+      # PUBLIC_SITE_HOSTS=wahlkampf.spd-wst.de
+      # PUBLIC_SITE_MANDANT_SLUG=westerstede
       # Achtung: MANDANT_HOST_BASE_DOMAIN=spd-wst.de macht aus wahlkampf.spd-wst.de den Slug „wahlkampf“, nicht „westerstede“.
     volumes:
       - wahlkampf-data:/data

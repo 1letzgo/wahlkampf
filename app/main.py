@@ -22,7 +22,6 @@ from app.auth import hash_password, verify_password
 from app.config import (
     ICS_TOKEN,
     MAX_UPLOAD_MB,
-    PUBLIC_SITE_HOSTS,
     PUBLIC_SITE_MANDANT_SLUG,
     SECRET_KEY,
     SESSION_COOKIE,
@@ -36,7 +35,7 @@ from app.ics_service import (
     build_ics_calendar,
     termine_for_user_teilnahmen,
 )
-from app.mandant_host import apply_mandant_host_path_rewrite, incoming_hostname
+from app.mandant_host import apply_mandant_host_path_rewrite
 from app.platform_bootstrap import bootstrap_platform
 from app.settings_store import (
     ensure_ics_token_for_ui,
@@ -83,10 +82,23 @@ app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, session_cookie=SESS
 @app.middleware("http")
 async def mandanten_kontext(request: Request, call_next):
     apply_mandant_host_path_rewrite(request.scope)
+
+    from app.public_site_routing import (
+        hide_mandant_prefix_for_request,
+        redirect_strip_m_prefix_if_public,
+        rewrite_scope_to_internal_m_path,
+    )
+
+    request.state.hide_mandant_path_prefix = hide_mandant_prefix_for_request(request)
+    redir = redirect_strip_m_prefix_if_public(request)
+    if redir:
+        return redir
+    rewrite_scope_to_internal_m_path(request)
+
     request.state.mandanten_prefix = ""
     request.state.mandant_slug = ""
     request.state.ortsverband_name = ""
-    path = request.url.path
+    path = request.scope.get("path") or "/"
     rp = (request.scope.get("root_path") or "").rstrip("/")
     if rp and path.startswith(rp):
         path = path[len(rp) :] or "/"
@@ -94,7 +106,10 @@ async def mandanten_kontext(request: Request, call_next):
     if len(parts) >= 2 and parts[0] == "m":
         slug = parts[1].lower()
         request.state.mandant_slug = slug
-        request.state.mandanten_prefix = f"/m/{slug}"
+        if getattr(request.state, "hide_mandant_path_prefix", False):
+            request.state.mandanten_prefix = ""
+        else:
+            request.state.mandanten_prefix = f"/m/{slug}"
         from sqlalchemy.orm import sessionmaker
 
         from app.platform_database import platform_engine
@@ -112,6 +127,14 @@ async def mandanten_kontext(request: Request, call_next):
     return response
 
 
+def _browser_login_url(request: Request, slug: str, *, pending: bool = False) -> str:
+    q = "?pending=1" if pending else ""
+    s = slug.strip().lower()
+    if getattr(request.state, "hide_mandant_path_prefix", False):
+        return f"/login{q}"
+    return f"/m/{s}/login{q}"
+
+
 @app.exception_handler(HTTPException)
 async def http_exc(request: Request, exc: HTTPException):
     accept = request.headers.get("accept") or ""
@@ -124,22 +147,19 @@ async def http_exc(request: Request, exc: HTTPException):
         if path.startswith("/admin"):
             slug = request.session.get("mandant_slug")
             if slug:
-                return RedirectResponse(
-                    f"/m/{slug.strip().lower()}/login",
-                    status_code=302,
-                )
+                return RedirectResponse(_browser_login_url(request, slug), status_code=302)
             return RedirectResponse("/", status_code=302)
         if exc.detail == "Konto noch nicht freigegeben.":
             slug = request.session.get("mandant_slug")
             if slug:
                 return RedirectResponse(
-                    f"/m/{slug}/login?pending=1",
+                    _browser_login_url(request, slug, pending=True),
                     status_code=302,
                 )
             return RedirectResponse("/", status_code=302)
         slug = request.session.get("mandant_slug")
         if slug:
-            return RedirectResponse(f"/m/{slug}/login", status_code=302)
+            return RedirectResponse(_browser_login_url(request, slug), status_code=302)
         return RedirectResponse("/", status_code=302)
     if exc.status_code == 403 and wants_html:
         msg = exc.detail if isinstance(exc.detail, str) else "Keine Berechtigung."
@@ -156,6 +176,8 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 def _mp(request: Request) -> str:
+    if getattr(request.state, "hide_mandant_path_prefix", False):
+        return ""
     slug = request.path_params.get("mandant_slug")
     if slug:
         return f"/m/{slug.strip().lower()}"
@@ -342,8 +364,8 @@ def serve_tenant_media(mandant_slug: str, resource_path: str):
 def tenant_root(request: Request, mandant_slug: str):
     ms = mandant_slug.strip().lower()
     if request.session.get("user_id") and request.session.get("mandant_slug") == ms:
-        return RedirectResponse(f"/m/{ms}/menu", status_code=302)
-    return RedirectResponse(f"/m/{ms}/login", status_code=302)
+        return RedirectResponse(f"{_mp(request)}/menu", status_code=302)
+    return RedirectResponse(f"{_mp(request)}/login", status_code=302)
 
 
 @tenant_router.get("/login", response_class=HTMLResponse)
@@ -417,7 +439,7 @@ def login_submit(
     ms = mandant_slug.strip().lower()
     request.session["user_id"] = user.id
     request.session["mandant_slug"] = ms
-    return RedirectResponse(f"/m/{ms}/menu", status_code=302)
+    return RedirectResponse(f"{_mp(request)}/menu", status_code=302)
 
 
 @tenant_router.get("/menu", response_class=HTMLResponse)
@@ -747,8 +769,7 @@ def admin_benutzer_loeschen(
 def logout(request: Request):
     request.session.pop("user_id", None)
     request.session.pop("mandant_slug", None)
-    slug = request.path_params["mandant_slug"].strip().lower()
-    return RedirectResponse(f"/m/{slug}/login", status_code=302)
+    return RedirectResponse(f"{_mp(request)}/login", status_code=302)
 
 
 def _termin_kommentar_counts_by_termin(db: Session, termin_ids: list[int]) -> dict[int, int]:
@@ -1382,7 +1403,12 @@ app.include_router(superadmin_router)
 def mandant_redirect_add_slash(mandant_slug: str, request: Request):
     """Coolify/nginx liefern oft /m/westerstede ohne Slash — Tenant-Routen hängen an …/."""
     ms = mandant_slug.strip().lower()
-    dest = f"/m/{ms}/"
+    if getattr(request.state, "hide_mandant_path_prefix", False) and (
+        ms == PUBLIC_SITE_MANDANT_SLUG
+    ):
+        dest = "/"
+    else:
+        dest = f"/m/{ms}/"
     if request.url.query:
         dest = f"{dest}?{request.url.query}"
     return RedirectResponse(dest, status_code=307)
@@ -1392,13 +1418,9 @@ def mandant_redirect_add_slash(mandant_slug: str, request: Request):
 def root(request: Request):
     if request.session.get("user_id") and request.session.get("mandant_slug"):
         slug = request.session["mandant_slug"]
+        if getattr(request.state, "hide_mandant_path_prefix", False):
+            return RedirectResponse("/menu", status_code=302)
         return RedirectResponse(f"/m/{slug}/menu", status_code=302)
-    if PUBLIC_SITE_HOSTS and PUBLIC_SITE_MANDANT_SLUG:
-        if incoming_hostname(request) in PUBLIC_SITE_HOSTS:
-            dest = f"/m/{PUBLIC_SITE_MANDANT_SLUG}/"
-            if request.url.query:
-                dest = f"{dest}?{request.url.query}"
-            return RedirectResponse(dest, status_code=302)
     from sqlalchemy.orm import sessionmaker
 
     from app.platform_database import platform_engine

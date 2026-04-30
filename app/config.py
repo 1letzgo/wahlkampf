@@ -40,8 +40,8 @@ def _parse_public_site_hosts(raw: str) -> frozenset[str]:
     return frozenset(out)
 
 
-# Öffentliche Domain(n), die auf einen festen Mandanten zeigen (Pfad „/“ → /m/<slug>/).
-# Beispiel: PUBLIC_SITE_HOSTS=wahlkampf.spd-wst.de,wahlkamp.spd-wst.de PUBLIC_SITE_MANDANT_SLUG=westerstede
+# Öffentliche Domain(n): Host ist eingetragen → fester Mandanten-Slug, Kurz-URLs (/login statt /m/slug/login).
+# PUBLIC_SITE_HOSTS=wahlkampf.spd-wst.de,wahlkamp.spd-wst.de PUBLIC_SITE_MANDANT_SLUG=westerstede
 PUBLIC_SITE_HOSTS = _parse_public_site_hosts(
     os.environ.get("PUBLIC_SITE_HOSTS", ""),
 )
