@@ -62,15 +62,23 @@
 {% set menu_title = (request.state.ortsverband_name or request.state.mandant_slug or 'Menü') %}
 {{ app_header(menu_title) }}
 
+{% if my_ovs | length > 1 %}
+<div class="card card--flush">
+  <ul class="menu-list" role="list">
+    <li class="menu-list-section">
+      <h2 class="menu-list-section__label" id="menu-alle-verb-heading">Alle Verbände</h2>
+    </li>
+    <li><a href="{{ request.state.mandanten_prefix }}/termine/alle"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Alle Termine</span></span></a></li>
+  </ul>
+</div>
+{% endif %}
+
 <div class="card card--flush">
   <ul class="menu-list" role="list">
     <li class="menu-list-section">
       <h2 class="menu-list-section__label" id="menu-kategorien-heading">Kategorien</h2>
     </li>
     <li><a href="{{ request.state.mandanten_prefix }}/termine"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Termine</span></span></a></li>
-    {% if my_ovs | length > 1 %}
-    <li><a href="{{ request.state.mandanten_prefix }}/termine/alle"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Alle Termine</span></span></a></li>
-    {% endif %}
     <li><a href="{{ request.state.mandanten_prefix }}/plakate"><span class="menu-list__main">{{ ico.svg_map_pin() }}<span>Plakate</span></span></a></li>
     <li><a href="{{ request.state.mandanten_prefix }}/sharepic"><span class="menu-list__main">{{ ico.svg_image() }}<span>Sharepic</span></span></a></li>
   </ul>
