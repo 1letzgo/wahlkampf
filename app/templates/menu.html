@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from '_ui_macros.html' import app_header with context %}
+{% from '_ui_macros.html' import app_header, public_tenant_prefix with context %}
 {% import '_icons.html' as ico %}
 {% block title %}SPD vor Ort — Wahlkampf{% endblock %}
 {% block head %}
@@ -125,6 +125,11 @@
       </a>
     </li>
     {% endif %}
+    <li>
+      <a href="{{ public_tenant_prefix(request) }}/profil">
+        <span class="menu-list__main">{{ ico.svg_user() }}<span>Mein Konto</span></span>
+      </a>
+    </li>
     <li><a href="{{ request.state.mandanten_prefix }}/logout" class="menu-link-logout"><span class="menu-list__main">{{ ico.svg_logout() }}<span>Ausloggen</span></span></a></li>
   </ul>
 </div>

@@ -708,6 +708,109 @@ def app_menu(
     )
 
 
+def _profil_template_response(
+    request: Request,
+    *,
+    user: AuthenticatedUser,
+    pu: PlatformUser,
+    error: str | None,
+    saved: bool,
+    display_name_prefill: str,
+    status_code: int = 200,
+):
+    return templates.TemplateResponse(
+        request,
+        "profil.html",
+        {
+            "user": user,
+            "platform_user": pu,
+            "error": error,
+            "saved": saved,
+            "display_name_prefill": display_name_prefill,
+        },
+        status_code=status_code,
+    )
+
+
+@tenant_router.get("/profil", response_class=HTMLResponse)
+def profil_anzeigen(
+    mandant_slug: str,
+    request: Request,
+    pdb: Annotated[Session, Depends(get_platform_db)],
+    user: CurrentUser,
+    gespeichert: Annotated[int | None, Query()] = None,
+):
+    pu = pdb.get(PlatformUser, user.id)
+    if not pu:
+        raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    dn = (pu.display_name or "").strip()
+    return _profil_template_response(
+        request,
+        user=user,
+        pu=pu,
+        error=None,
+        saved=bool(gespeichert),
+        display_name_prefill=dn or user.display_name or user.username,
+    )
+
+
+@tenant_router.post("/profil", response_class=HTMLResponse)
+def profil_speichern(
+    mandant_slug: str,
+    request: Request,
+    pdb: Annotated[Session, Depends(get_platform_db)],
+    user: CurrentUser,
+    display_name: Annotated[str, Form()],
+    password_current: Annotated[str, Form()] = "",
+    password_new: Annotated[str, Form()] = "",
+    password_new2: Annotated[str, Form()] = "",
+):
+    pu = pdb.get(PlatformUser, user.id)
+    if not pu:
+        raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    dn = " ".join(display_name.split()).strip()
+    err: str | None = None
+    if len(dn) < 2:
+        err = "Anzeigename mindestens 2 Zeichen."
+    elif len(dn) > 120:
+        err = "Anzeigename höchstens 120 Zeichen."
+
+    pw_cur = (password_current or "").strip()
+    pw1 = (password_new or "").strip()
+    pw2 = (password_new2 or "").strip()
+    wants_pw_change = bool(pw_cur or pw1 or pw2)
+
+    if err is None and wants_pw_change:
+        if not pw1 or not pw2:
+            err = "Neues Passwort bitte zweimal eingeben."
+        elif len(pw1) < 8:
+            err = "Neues Passwort mindestens 8 Zeichen."
+        elif pw1 != pw2:
+            err = "Die neuen Passwörter stimmen nicht überein."
+        elif not pw_cur:
+            err = "Bitte das aktuelle Passwort eingeben."
+        elif not verify_password(pw_cur, pu.password_hash):
+            err = "Aktuelles Passwort ist falsch."
+
+    if err:
+        return _profil_template_response(
+            request,
+            user=user,
+            pu=pu,
+            error=err,
+            saved=False,
+            display_name_prefill=dn,
+            status_code=400,
+        )
+
+    pu.display_name = dn
+    if pw1:
+        pu.password_hash = hash_password(pw1)
+    pdb.add(pu)
+    pdb.commit()
+    return RedirectResponse(f"{_mp(request)}/profil?gespeichert=1", status_code=302)
+
+
 @tenant_router.get("/sharepic", response_class=HTMLResponse)
 def sharepic_creator(
     mandant_slug: str,

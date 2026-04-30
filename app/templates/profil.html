@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from '_ui_macros.html' import app_header, public_tenant_prefix with context %}
+{% import '_icons.html' as ico %}
+{% block title %}Mein Konto — Wahlkampf{% endblock %}
+{% block body %}
+{{ app_header('Mein Konto') }}
+
+<div class="page-toolbar" aria-label="Navigation">
+  <a href="{{ public_tenant_prefix(request) }}/menu" class="btn btn-sm btn-ico btn-with-label" aria-label="Zum Menü">
+    {{ ico.svg_arrow_left() }}<span class="btn-text">Menü</span>
+  </a>
+</div>
+
+<div class="card" style="max-width: 440px; margin: 0 auto;">
+  <h2 style="margin-top:0;">Profil</h2>
+  <p class="muted" style="margin-top:0;">Der Benutzername ist fest und nur für die Anmeldung. Der Anzeigename erscheint z.&nbsp;B. bei Terminen.</p>
+  {% if saved %}<div class="info">Änderungen wurden gespeichert.</div>{% endif %}
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+  <form method="post" action="{{ public_tenant_prefix(request) }}/profil">
+    <label for="profil-username">Benutzername</label>
+    <input id="profil-username" type="text" value="{{ platform_user.username }}" disabled autocomplete="username" style="opacity:0.88;">
+
+    <label for="profil-display-name" style="margin-top:0.85rem;">Anzeigename</label>
+    <input id="profil-display-name" name="display_name" type="text" required minlength="2" maxlength="120" autocomplete="name" value="{{ display_name_prefill }}">
+
+    <h3 style="margin:1.25rem 0 0.35rem; font-size:1rem;">Passwort ändern</h3>
+    <p class="muted" style="margin:0 0 0.65rem; font-size:0.88rem;">Felder leer lassen, wenn das Passwort unverändert bleiben soll.</p>
+
+    <label for="profil-pw-current">Aktuelles Passwort</label>
+    <input id="profil-pw-current" name="password_current" type="password" autocomplete="current-password">
+
+    <label for="profil-pw-new" style="margin-top:0.65rem;">Neues Passwort</label>
+    <input id="profil-pw-new" name="password_new" type="password" autocomplete="new-password" minlength="8">
+
+    <label for="profil-pw-new2" style="margin-top:0.65rem;">Neues Passwort wiederholen</label>
+    <input id="profil-pw-new2" name="password_new2" type="password" autocomplete="new-password" minlength="8">
+
+    <p style="margin-top:1.25rem;">
+      <button type="submit" class="btn btn-ico btn-with-label btn-block" aria-label="Speichern">
+        {{ ico.svg_check() }}<span class="btn-text">Speichern</span>
+      </button>
+    </p>
+  </form>
+</div>
+{% endblock %}
