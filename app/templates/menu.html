@@ -36,26 +36,6 @@
     color: var(--muted);
     background: color-mix(in srgb, var(--border) 35%, transparent);
   }
-  .menu-list__main.menu-list__main--stack {
-    align-items: flex-start;
-  }
-  .menu-list__main.menu-list__main--stack .menu-list-ov-text {
-    display: flex;
-    flex-direction: column;
-    gap: 0.12rem;
-    min-width: 0;
-    font-weight: 600;
-    line-height: 1.25;
-  }
-  .menu-list-ov-slug {
-    font-size: 0.78rem;
-    font-weight: 500;
-    color: var(--muted);
-    font-family: ui-monospace, monospace;
-  }
-  .menu-list a:hover .menu-list-ov-slug {
-    color: rgba(255, 255, 255, 0.88);
-  }
   .menu-list a.menu-list-ov-active {
     box-shadow: inset 3px 0 0 var(--accent);
   }
@@ -93,7 +73,7 @@
   </ul>
 </div>
 
-{% if my_ovs | length %}
+{% if my_ovs | length > 1 %}
 <div class="card card--flush">
   <ul class="menu-list" role="list">
     <li class="menu-list-section">
@@ -106,10 +86,7 @@
         class="{% if o.current %}menu-list-ov-active{% endif %}"
         {% if o.current %}aria-current="page"{% endif %}
       >
-        <span class="menu-list__main menu-list__main--stack">
-          {{ ico.svg_home() }}
-          <span class="menu-list-ov-text">{{ o.display_name }}<span class="menu-list-ov-slug">{{ o.slug }}</span></span>
-        </span>
+        <span class="menu-list__main">{{ ico.svg_home() }}<span>{{ o.display_name }}</span></span>
         {% if o.current or o.is_admin %}
         <span class="menu-ov-suffix">{% if o.current %}Aktiv{% endif %}{% if o.current and o.is_admin %} · {% endif %}{% if o.is_admin %}Admin{% endif %}</span>
         {% endif %}
