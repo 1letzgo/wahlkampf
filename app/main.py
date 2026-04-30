@@ -1378,6 +1378,16 @@ app.include_router(tenant_router)
 app.include_router(superadmin_router)
 
 
+@app.get("/m/{mandant_slug}", include_in_schema=False)
+def mandant_redirect_add_slash(mandant_slug: str, request: Request):
+    """Coolify/nginx liefern oft /m/westerstede ohne Slash — Tenant-Routen hängen an …/."""
+    ms = mandant_slug.strip().lower()
+    dest = f"/m/{ms}/"
+    if request.url.query:
+        dest = f"{dest}?{request.url.query}"
+    return RedirectResponse(dest, status_code=307)
+
+
 @app.get("/", response_class=HTMLResponse)
 def root(request: Request):
     if request.session.get("user_id") and request.session.get("mandant_slug"):

@@ -12,8 +12,26 @@ _RESERVED_SUBDOMAINS = frozenset(
 )
 
 
+def _first_forwarded_rfc7239(forwarded_header: str) -> str | None:
+    """Erster Forwarded-Eintrag, Feld host=… (ohne Port)."""
+    first = forwarded_header.split(",")[0].strip()
+    for part in first.split(";"):
+        part = part.strip()
+        if part.lower().startswith("host="):
+            val = part.split("=", 1)[1].strip()
+            if len(val) >= 2 and val[0] == val[-1] == '"':
+                val = val[1:-1]
+            return val.split(":")[0].strip().lower() or None
+    return None
+
+
 def incoming_hostname(request: Request) -> str:
-    """Host wie vom Browser (Proxy: erstes X-Forwarded-Host)."""
+    """Öffentlicher Hostname (Proxy: Forwarded, dann X-Forwarded-Host, dann Host)."""
+    fwd = (request.headers.get("forwarded") or "").strip()
+    if fwd:
+        h = _first_forwarded_rfc7239(fwd)
+        if h:
+            return h
     xfh = (request.headers.get("x-forwarded-host") or "").strip()
     if xfh:
         return xfh.split(",")[0].strip().split(":")[0].lower()
@@ -70,15 +88,22 @@ def _decode_header_value(v: bytes) -> str:
 
 
 def effective_forwarded_host(scope: dict) -> str | None:
-    """Öffentlicher Host: X-Forwarded-Host (erster Eintrag), sonst Host (für Reverse-Proxy)."""
+    """Öffentlicher Host: Forwarded (RFC 7239), dann X-Forwarded-Host, dann Host."""
+    fwd_val: str | None = None
     xfh: str | None = None
     host: str | None = None
     for k, v in scope.get("headers") or []:
         lk = k.lower()
-        if lk == b"x-forwarded-host":
+        if lk == b"forwarded":
+            fwd_val = _decode_header_value(v).strip()
+        elif lk == b"x-forwarded-host":
             xfh = _decode_header_value(v).strip()
         elif lk == b"host":
             host = _decode_header_value(v).strip()
+    if fwd_val:
+        h = _first_forwarded_rfc7239(fwd_val)
+        if h:
+            return h
     if xfh:
         return xfh.split(",")[0].strip()
     return host
