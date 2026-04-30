@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% from '_ui_macros.html' import app_header with context %}
+{% import '_icons.html' as ico %}
+{% block title %}Plattform — Nutzer{% endblock %}
+{% block head %}
+{% include '_admin_shell_styles.html' %}
+{% include '_admin_data_table_styles.html' %}
+{% endblock %}
+{% block body %}
+{{ app_header('Plattform · Nutzer') }}
+
+<div class="page-toolbar" aria-label="Aktionen Plattform" style="flex-wrap: wrap;">
+  <a href="/admin/ortsverbaende" class="btn btn-sm btn-ghost btn-ico btn-with-label" aria-label="Zu den Ortsverbänden">
+    {{ ico.svg_menu() }}<span class="btn-text">Ortsverbände</span>
+  </a>
+</div>
+
+<div class="admin-page">
+  <div class="card card--flush admin-users-card">
+    <div class="admin-users-shell">
+      <header class="ics-popup__head">
+        <div class="ics-popup__head-icon" aria-hidden="true">{{ ico.svg_user_plus() }}</div>
+        <div>
+          <h2 class="ics-popup__h">Globale Nutzerkonten</h2>
+          <p class="ics-popup__lead">
+            Passwort und OV-Zuordnungen. Über diese Oberfläche zugewiesene Verbände sind <strong>freigegeben</strong> — keine OV-Freigabe nötig.
+          </p>
+        </div>
+      </header>
+
+      {% if not rows %}
+      <p class="muted" style="margin: 0;">Keine Nutzer in der Plattformdatenbank.</p>
+      {% else %}
+      <div class="admin-users-table-wrap">
+        <table class="admin-users-table">
+          <colgroup>
+            <col class="admin-users-col-name">
+            <col class="admin-users-col-status">
+            <col class="admin-users-col-actions">
+          </colgroup>
+          <thead>
+            <tr>
+              <th scope="col">Benutzer</th>
+              <th scope="col">Verbände</th>
+              <th scope="col" class="admin-users-th-actions">Aktionen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+            {% set u = row.user %}
+            <tr>
+              <td data-label="Benutzer" class="admin-users-td-name">
+                <strong>{{ u.display_name or u.username }}</strong>
+                <br><span class="muted" style="font-size:0.8rem;"><code>{{ u.username }}</code></span>
+                {% if row.platform_superadmin %}
+                <br><span class="muted" style="font-size:0.8rem;">Plattform-Superadmin</span>
+                {% endif %}
+              </td>
+              <td data-label="Verbände">
+                {% if row.memberships %}
+                  {% for m in row.memberships %}
+                  <span style="white-space: nowrap;"><code>{{ m.ov_slug }}</code>{% if m.is_admin %} · Admin{% endif %}</span>{% if not loop.last %}<br>{% endif %}
+                  {% endfor %}
+                {% else %}
+                <span class="muted">—</span>
+                {% endif %}
+              </td>
+              <td data-label="Aktionen" class="admin-users-td-actions">
+                <a href="/admin/nutzer/{{ u.id }}/bearbeiten" class="btn btn-sm btn-ico btn-with-label" aria-label="Nutzer {{ u.username }} bearbeiten">
+                  {{ ico.svg_pencil() }}<span class="btn-text">Bearbeiten</span>
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-from typing import Annotated, Optional
+from typing import Annotated, List, Optional
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy.orm import Session
+from sqlalchemy import func
+from sqlalchemy.orm import Session, selectinload
 from starlette.templating import Jinja2Templates
 
 from app.deps import LetzgoSuperadmin
-from app.config import PUBLIC_SITE_MANDANT_SLUG
+from app.auth import hash_password
+from app.config import PUBLIC_SITE_MANDANT_SLUG, is_superadmin_username
 from app.ov_services import (
     delete_ortsverband_completely,
     register_ortsverband,
@@ -22,12 +24,70 @@ from app.mandant_features import (
     merge_mandant_feature,
 )
 from app.platform_database import get_platform_db
-from app.platform_models import Ortsverband
+from app.platform_models import Ortsverband, OvMembership, PlatformUser
 
 TEMPLATES_DIR = __import__("pathlib").Path(__file__).resolve().parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 router = APIRouter(tags=["superadmin"])
+
+PASSWORD_MIN_SUPERADMIN = 8
+
+
+def _form_ov_slug_list(raw: Optional[List[str] | str]) -> List[str]:
+    """Checkbox-Werte: bei einem Eintrag liefert Starlette teils str statt list."""
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        s = raw.strip().lower()
+        return [s] if s else []
+    out: List[str] = []
+    for x in raw:
+        if not x:
+            continue
+        s = str(x).strip().lower()
+        if s:
+            out.append(s)
+    return out
+
+
+def _sync_ov_memberships_superadmin(
+    db: Session,
+    user_id: int,
+    member_slugs: List[str],
+    admin_slugs: set[str],
+) -> None:
+    """OV-Zuordnungen aus Superadmin-Sicht: immer freigegeben (`is_approved=True`)."""
+    member_set = {s.strip().lower() for s in member_slugs if s and s.strip()}
+    if not member_set:
+        valid: set[str] = set()
+    else:
+        valid = {
+            r[0].strip().lower()
+            for r in db.query(Ortsverband.slug).filter(Ortsverband.slug.in_(member_set)).all()
+        }
+    member_set &= valid
+    admin_set = {s.strip().lower() for s in admin_slugs} & member_set
+
+    rows = db.query(OvMembership).filter(OvMembership.user_id == user_id).all()
+    by_slug = {m.ov_slug.strip().lower(): m for m in rows}
+    for slug in member_set:
+        m = by_slug.pop(slug, None)
+        if m:
+            m.is_approved = True
+            m.is_admin = slug in admin_set
+            db.add(m)
+        else:
+            db.add(
+                OvMembership(
+                    user_id=user_id,
+                    ov_slug=slug,
+                    is_admin=slug in admin_set,
+                    is_approved=True,
+                )
+            )
+    for m in by_slug.values():
+        db.delete(m)
 
 
 @router.get("/admin", include_in_schema=False)
@@ -190,3 +250,159 @@ def superadmin_ov_delete_submit(
             status_code=302,
         )
     return RedirectResponse("/admin/ortsverbaende?geloescht=1", status_code=302)
+
+
+@router.get("/admin/nutzer", response_class=HTMLResponse)
+def superadmin_user_list(
+    request: Request,
+    db: Annotated[Session, Depends(get_platform_db)],
+    _: LetzgoSuperadmin,
+):
+    users = (
+        db.query(PlatformUser)
+        .options(selectinload(PlatformUser.memberships))
+        .order_by(func.lower(PlatformUser.username))
+        .all()
+    )
+    rows = []
+    for u in users:
+        mems = sorted(u.memberships, key=lambda m: m.ov_slug.lower())
+        rows.append(
+            {
+                "user": u,
+                "platform_superadmin": is_superadmin_username(u.username),
+                "memberships": mems,
+            }
+        )
+    return templates.TemplateResponse(
+        request,
+        "superadmin_users.html",
+        {"rows": rows},
+    )
+
+
+@router.get("/admin/nutzer/{user_id}/bearbeiten", response_class=HTMLResponse)
+def superadmin_user_edit_form(
+    user_id: int,
+    request: Request,
+    db: Annotated[Session, Depends(get_platform_db)],
+    _: LetzgoSuperadmin,
+):
+    pu = (
+        db.query(PlatformUser)
+        .options(selectinload(PlatformUser.memberships))
+        .filter(PlatformUser.id == user_id)
+        .first()
+    )
+    if not pu:
+        raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    ovs = db.query(Ortsverband).order_by(Ortsverband.slug.asc()).all()
+    mem_by_slug = {m.ov_slug.strip().lower(): m for m in pu.memberships}
+    flash_ok = request.query_params.get("gespeichert") == "1"
+    return templates.TemplateResponse(
+        request,
+        "superadmin_user_form.html",
+        {
+            "edit_user": pu,
+            "ovs": ovs,
+            "mem_by_slug": mem_by_slug,
+            "error": None,
+            "platform_superadmin": is_superadmin_username(pu.username),
+            "flash_ok": flash_ok,
+        },
+    )
+
+
+@router.post("/admin/nutzer/{user_id}/bearbeiten", response_class=HTMLResponse)
+def superadmin_user_edit_submit(
+    user_id: int,
+    request: Request,
+    db: Annotated[Session, Depends(get_platform_db)],
+    _: LetzgoSuperadmin,
+    display_name: Annotated[str, Form()],
+    password_new: Annotated[str, Form()] = "",
+    password_new2: Annotated[str, Form()] = "",
+    ov_member: Annotated[Optional[List[str]], Form()] = None,
+    ov_admin: Annotated[Optional[List[str]], Form()] = None,
+):
+    pu = db.get(PlatformUser, user_id)
+    if not pu:
+        raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    ovs = db.query(Ortsverband).order_by(Ortsverband.slug.asc()).all()
+    mem_by_slug = {m.ov_slug.strip().lower(): m for m in pu.memberships}
+
+    dn = " ".join(display_name.split()).strip()
+    if len(dn) > 120:
+        return templates.TemplateResponse(
+            request,
+            "superadmin_user_form.html",
+            {
+                "edit_user": pu,
+                "ovs": ovs,
+                "mem_by_slug": mem_by_slug,
+                "error": "Anzeigename darf höchstens 120 Zeichen haben.",
+                "platform_superadmin": is_superadmin_username(pu.username),
+                "flash_ok": False,
+            },
+            status_code=400,
+        )
+
+    pw1 = (password_new or "").strip()
+    pw2 = (password_new2 or "").strip()
+    if pw1 or pw2:
+        if not pw1 or not pw2:
+            return templates.TemplateResponse(
+                request,
+                "superadmin_user_form.html",
+                {
+                    "edit_user": pu,
+                    "ovs": ovs,
+                    "mem_by_slug": mem_by_slug,
+                    "error": "Neues Passwort bitte zweimal eingeben.",
+                    "platform_superadmin": is_superadmin_username(pu.username),
+                    "flash_ok": False,
+                },
+                status_code=400,
+            )
+        if len(pw1) < PASSWORD_MIN_SUPERADMIN:
+            err = f"Neues Passwort mindestens {PASSWORD_MIN_SUPERADMIN} Zeichen."
+            return templates.TemplateResponse(
+                request,
+                "superadmin_user_form.html",
+                {
+                    "edit_user": pu,
+                    "ovs": ovs,
+                    "mem_by_slug": mem_by_slug,
+                    "error": err,
+                    "platform_superadmin": is_superadmin_username(pu.username),
+                    "flash_ok": False,
+                },
+                status_code=400,
+            )
+        if pw1 != pw2:
+            return templates.TemplateResponse(
+                request,
+                "superadmin_user_form.html",
+                {
+                    "edit_user": pu,
+                    "ovs": ovs,
+                    "mem_by_slug": mem_by_slug,
+                    "error": "Die beiden Passwortfelder stimmen nicht überein.",
+                    "platform_superadmin": is_superadmin_username(pu.username),
+                    "flash_ok": False,
+                },
+                status_code=400,
+            )
+
+    pu.display_name = dn
+    if pw1:
+        pu.password_hash = hash_password(pw1)
+
+    members = _form_ov_slug_list(ov_member)
+    admins_raw = _form_ov_slug_list(ov_admin)
+    admin_set = set(admins_raw)
+    _sync_ov_memberships_superadmin(db, pu.id, members, admin_set)
+
+    db.add(pu)
+    db.commit()
+    return RedirectResponse(f"/admin/nutzer/{user_id}/bearbeiten?gespeichert=1", status_code=302)

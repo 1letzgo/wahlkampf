@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% from '_ui_macros.html' import app_header with context %}
+{% import '_icons.html' as ico %}
+{% block title %}Nutzer bearbeiten — Plattform{% endblock %}
+{% block head %}
+{% include '_admin_shell_styles.html' %}
+{% include '_admin_data_table_styles.html' %}
+<style>
+  .superadmin-user-form .superadmin-ov-grid {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.5rem;
+    font-size: 0.92rem;
+  }
+  .superadmin-user-form .superadmin-ov-grid th,
+  .superadmin-user-form .superadmin-ov-grid td {
+    padding: 0.45rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: middle;
+  }
+  .superadmin-user-form .superadmin-ov-grid th { font-weight: 700; color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .superadmin-user-form .superadmin-ov-grid input[type="checkbox"] { width: 1.1rem; height: 1.1rem; }
+  .superadmin-user-form .superadmin-ov-grid .col-check { width: 2.75rem; text-align: center; }
+  .superadmin-user-form .superadmin-ov-grid .col-admin { width: 6rem; text-align: center; }
+</style>
+{% endblock %}
+{% block body %}
+{{ app_header('Nutzer bearbeiten') }}
+
+<div class="page-toolbar" aria-label="Navigation Plattform">
+  <a href="/admin/nutzer" class="btn btn-sm btn-ghost btn-ico btn-with-label" aria-label="Zur Nutzerliste">
+    {{ ico.svg_arrow_left() }}<span class="btn-text">Alle Nutzer</span>
+  </a>
+  <a href="/admin/ortsverbaende" class="btn btn-sm btn-ghost btn-ico btn-with-label" aria-label="Ortsverbände">
+    {{ ico.svg_menu() }}<span class="btn-text">Ortsverbände</span>
+  </a>
+</div>
+
+<div class="admin-page superadmin-user-form">
+  <div class="card card--flush admin-users-card">
+    <div class="admin-users-shell">
+      <header class="ics-popup__head">
+        <div class="ics-popup__head-icon" aria-hidden="true">{{ ico.svg_pencil() }}</div>
+        <div>
+          <h2 class="ics-popup__h"><code>{{ edit_user.username }}</code></h2>
+          <p class="ics-popup__lead">
+            {% if platform_superadmin %}
+            Plattform-Superadmin — OV-Zuordnung ist optional (Zugriff ohne Freigabe über Konfiguration).
+            {% else %}
+            Zuordnung zu Ortsverbänden gilt hier immer als <strong>freigegeben</strong>.
+            {% endif %}
+          </p>
+        </div>
+      </header>
+
+      {% if flash_ok %}
+      <div class="info" style="margin-bottom: 1rem;">Änderungen wurden gespeichert.</div>
+      {% endif %}
+      {% if error %}
+      <div class="error" style="margin-bottom: 1rem;">{{ error }}</div>
+      {% endif %}
+
+      <form method="post" action="/admin/nutzer/{{ edit_user.id }}/bearbeiten">
+        <section class="ics-popup__panel ics-popup__panel--accent" style="margin-bottom: 1rem;">
+          <h3 class="ics-popup__label">Profil</h3>
+          <label for="display_name">Anzeigename</label>
+          <input id="display_name" name="display_name" type="text" maxlength="120" value="{{ edit_user.display_name or '' }}" autocomplete="name">
+
+          <label for="password_new" style="margin-top:0.85rem;">Neues Passwort <span class="muted">(optional)</span></label>
+          <input id="password_new" name="password_new" type="password" autocomplete="new-password" minlength="8">
+
+          <label for="password_new2" style="margin-top:0.65rem;">Neues Passwort wiederholen</label>
+          <input id="password_new2" name="password_new2" type="password" autocomplete="new-password" minlength="8">
+          <p class="muted" style="margin:0.5rem 0 0;">Mindestens 8 Zeichen. Leer lassen, um das Passwort nicht zu ändern.</p>
+        </section>
+
+        <section class="ics-popup__panel" style="margin-bottom: 1rem;">
+          <h3 class="ics-popup__label">Ortsverbände</h3>
+          <p class="muted" style="margin:0 0 0.5rem;">Mitglied · beim Superadmin immer freigegeben · optional OV-Administrator</p>
+          {% if not ovs %}
+          <p class="muted">Keine Ortsverbände angelegt.</p>
+          {% else %}
+          <table class="superadmin-ov-grid" aria-label="Ortsverbände zuordnen">
+            <thead>
+              <tr>
+                <th scope="col">OV</th>
+                <th scope="col" class="col-check">Mitglied</th>
+                <th scope="col" class="col-admin">OV-Admin</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ov in ovs %}
+              {% set m = mem_by_slug.get(ov.slug.lower()) %}
+              <tr>
+                <td><strong>{{ ov.display_name or ov.slug }}</strong><br><code class="muted" style="font-size:0.8rem;">{{ ov.slug }}</code></td>
+                <td class="col-check">
+                  <input type="checkbox" name="ov_member" value="{{ ov.slug }}" class="js-sa-ov-member" data-slug="{{ ov.slug }}"{% if m %} checked{% endif %}>
+                </td>
+                <td class="col-admin">
+                  <input type="checkbox" name="ov_admin" value="{{ ov.slug }}" class="js-sa-ov-admin" data-slug="{{ ov.slug }}"{% if m and m.is_admin %} checked{% endif %}{% if not m %} disabled{% endif %}>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% endif %}
+        </section>
+
+        <div style="display:flex; flex-wrap:wrap; gap:0.5rem; justify-content:flex-end;">
+          <a href="/admin/nutzer" class="btn btn-ghost btn-sm btn-ico btn-with-label"><span class="btn-text">Abbrechen</span></a>
+          <button type="submit" class="btn btn-sm btn-ico btn-with-label">{{ ico.svg_check() }}<span class="btn-text">Speichern</span></button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    document.querySelectorAll(".js-sa-ov-member").forEach(function (mem) {
+      function sync() {
+        var row = mem.closest("tr");
+        if (!row) return;
+        var adm = row.querySelector(".js-sa-ov-admin");
+        if (!adm) return;
+        adm.disabled = !mem.checked;
+        if (!mem.checked) adm.checked = false;
+      }
+      mem.addEventListener("change", sync);
+      sync();
+    });
+  })();
+</script>
+{% endblock %}
