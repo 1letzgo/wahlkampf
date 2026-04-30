@@ -347,33 +347,9 @@
   <button type="button" class="btn btn-sm btn-ico btn-with-label" id="ics-open" aria-label="Kalender abonnieren">
     {{ ico.svg_calendar() }}<span class="btn-text">Abonnieren</span>
   </button>
-  {% if termin_neu_ov_options %}
-  <div class="termin-toolbar-neu-alle" style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center;">
-    <label for="termin-neu-ov-select" class="muted" style="margin:0; font-size:0.9rem;">Ortsverband</label>
-    <select id="termin-neu-ov-select" autocomplete="off" aria-label="Ortsverband für neuen Termin">
-      {% for o in termin_neu_ov_options %}
-      <option value="{{ o.neu_href }}">{{ o.display_name }}</option>
-      {% endfor %}
-    </select>
-    <a href="{{ termin_neu_ov_options[0].neu_href }}" id="termin-neu-alle-link" class="btn btn-sm btn-ico btn-with-label" aria-label="Termin hinzufügen">
-      {{ ico.svg_plus() }}<span class="btn-text">Termin hinzufügen</span>
-    </a>
-  </div>
-  <script>
-    (function () {
-      var sel = document.getElementById("termin-neu-ov-select");
-      var link = document.getElementById("termin-neu-alle-link");
-      if (!sel || !link) return;
-      function sync() {
-        link.href = sel.value || link.href;
-      }
-      sel.addEventListener("change", sync);
-      sync();
-    })();
-  </script>
-  {% elif show_neuer_termin_button %}
-  <a href="{{ request.state.mandanten_prefix }}/termine/neu" class="btn btn-sm btn-ico btn-with-label" aria-label="Neuer Termin">
-    {{ ico.svg_plus() }}<span class="btn-text">Neuer Termin</span>
+  {% if show_neuer_termin_button %}
+  <a href="{{ request.state.mandanten_prefix }}/termine/neu" class="btn btn-sm btn-ico btn-with-label" aria-label="{{ neuer_termin_button_label | default('Neuer Termin') }}">
+    {{ ico.svg_plus() }}<span class="btn-text">{{ neuer_termin_button_label | default('Neuer Termin') }}</span>
   </a>
   {% endif %}
 </div>
@@ -488,7 +464,7 @@
 </script>
 
 {% if not termin_upcoming and not termin_past %}
-<p class="muted">{% if show_neuer_termin_button %}Noch keine Termine — <a href="{{ request.state.mandanten_prefix }}/termine/neu">ersten Termin anlegen</a>.{% elif termin_neu_ov_options %}Noch keine Termine — oben Ortsverband wählen und „Termin hinzufügen“ nutzen.{% else %}Noch keine Termine in deinen Verbänden.{% endif %}</p>
+<p class="muted">{% if show_neuer_termin_button %}Noch keine Termine — <a href="{{ request.state.mandanten_prefix }}/termine/neu">ersten Termin anlegen</a>.{% else %}Noch keine Termine in deinen Verbänden.{% endif %}</p>
 {% else %}
 <div class="termin-tablist" role="tablist" aria-label="Terminansicht">
   <button type="button" class="termin-tab" id="tab-kommend" role="tab" aria-selected="true" aria-controls="termin-panel-kommend" data-tab="kommend">Aktuelle Termine</button>
@@ -497,7 +473,7 @@
 
 <div id="termin-panel-kommend" class="termin-tab-panel" role="tabpanel" aria-labelledby="tab-kommend" tabindex="0">
   {% if not termin_upcoming %}
-  <p class="muted">{% if show_neuer_termin_button %}Keine aktuellen Termine — <a href="{{ request.state.mandanten_prefix }}/termine/neu">Termin anlegen</a> oder unter „Archiv“ nachsehen.{% elif termin_neu_ov_options %}Keine aktuellen Termine — oben „Termin hinzufügen“ mit gewähltem Ortsverband nutzen oder unter „Archiv“ nachsehen.{% else %}Keine aktuellen Termine — unter „Archiv“ nachsehen.{% endif %}</p>
+  <p class="muted">{% if show_neuer_termin_button %}Keine aktuellen Termine — <a href="{{ request.state.mandanten_prefix }}/termine/neu">Termin anlegen</a> oder unter „Archiv“ nachsehen.{% else %}Keine aktuellen Termine — unter „Archiv“ nachsehen.{% endif %}</p>
   {% endif %}
   {% for row in termin_upcoming %}
   {{ termin_karte(row, vergangen=False) }}

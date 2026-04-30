@@ -1252,6 +1252,8 @@ def _termin_form_context(
     termin: Optional[Termin],
     error: Optional[str],
     extern_gast: Optional[List[str]] = None,
+    pdb: Optional[Session] = None,
+    mandant_slug: Optional[str] = None,
 ) -> dict:
     if extern_gast is not None:
         auswahl = _filter_extern_gast_keys(extern_gast)
@@ -1259,6 +1261,13 @@ def _termin_form_context(
         auswahl = externe_teilnehmer_decode(termin.externe_teilnehmer_json)
     else:
         auswahl = []
+    termin_neu_ov_options: list[dict[str, str]] = []
+    if termin is None and pdb is not None and mandant_slug is not None:
+        ov_slugs = _approved_ov_slugs_for_user_feeds(pdb, user)
+        if len(ov_slugs) > 1:
+            termin_neu_ov_options = _termin_neu_ov_options_for_form(
+                pdb, ov_slugs, mandant_slug
+            )
     return {
         "user": user,
         "termin": termin,
@@ -1266,6 +1275,7 @@ def _termin_form_context(
         "max_mb": MAX_UPLOAD_MB,
         "externe_optionen": EXTERNE_TEILNEHMER_OPTIONS,
         "externe_auswahl": auswahl,
+        "termin_neu_ov_options": termin_neu_ov_options,
     }
 
 
@@ -1313,7 +1323,7 @@ def _ov_display_labels_for_slugs(pdb: Session, slugs: list[str]) -> dict[str, st
     }
 
 
-def _termin_neu_ov_options_with_hrefs(
+def _termin_neu_ov_options_for_form(
     pdb: Session,
     slugs: list[str],
     current_mandant_slug: str,
@@ -1322,13 +1332,7 @@ def _termin_neu_ov_options_with_hrefs(
     opts: list[dict[str, str]] = []
     for s in slugs:
         sl = s.strip().lower()
-        opts.append(
-            {
-                "slug": sl,
-                "display_name": labels.get(sl, sl),
-                "neu_href": f"/m/{sl}/termine/neu",
-            }
-        )
+        opts.append({"slug": sl, "display_name": labels.get(sl, sl)})
     cur = current_mandant_slug.strip().lower()
     opts.sort(
         key=lambda o: (0 if o["slug"] == cur else 1, o["display_name"].lower(), o["slug"]),
@@ -1456,7 +1460,7 @@ def termine_list(
             "show_neuer_termin_button": True,
             "ics_my_label": "Meine Zusagen",
             "ics_all_label": "Alle Termine",
-            "termin_neu_ov_options": [],
+            "neuer_termin_button_label": "Neuer Termin",
         },
     )
 
@@ -1472,7 +1476,6 @@ def termine_list_alle(
     if len(slugs) <= 1:
         return RedirectResponse(f"{_mp(request)}/termine", status_code=302)
     termin_rows = _termin_list_rows_multi(pdb, slugs, user)
-    termin_neu_ov_options = _termin_neu_ov_options_with_hrefs(pdb, slugs, mandant_slug)
     termin_upcoming, termin_past = _split_termine_upcoming_past(termin_rows)
     my_token = ensure_user_calendar_token(pdb, user.platform_user)
     base = str(request.base_url).rstrip("/")
@@ -1489,20 +1492,31 @@ def termine_list_alle(
             "feed_url_my": feed_url_my,
             "feed_url_all": feed_url_all,
             "page_title": "Alle Termine",
-            "show_neuer_termin_button": False,
+            "show_neuer_termin_button": True,
+            "neuer_termin_button_label": "Termin hinzufügen",
             "ics_my_label": "Meine Zusagen (alle Verbände)",
             "ics_all_label": "Alle Termine (alle Verbände)",
-            "termin_neu_ov_options": termin_neu_ov_options,
         },
     )
 
 
 @tenant_router.get("/termine/neu", response_class=HTMLResponse)
-def termin_new_form(request: Request, user: CurrentUser):
+def termin_new_form(
+    mandant_slug: str,
+    request: Request,
+    pdb: Annotated[Session, Depends(get_platform_db)],
+    user: CurrentUser,
+):
     return templates.TemplateResponse(
         request,
         "termin_form.html",
-        _termin_form_context(user=user, termin=None, error=None),
+        _termin_form_context(
+            user=user,
+            termin=None,
+            error=None,
+            pdb=pdb,
+            mandant_slug=mandant_slug,
+        ),
     )
 
 
@@ -1533,6 +1547,8 @@ async def termin_create(
                 termin=None,
                 error=err,
                 extern_gast=extern_gast,
+                pdb=pdb,
+                mandant_slug=mandant_slug,
             ),
             status_code=400,
         )
@@ -1578,6 +1594,8 @@ async def termin_create(
                                 termin=None,
                                 error=f"Bild zu groß (max. {MAX_UPLOAD_MB} MB).",
                                 extern_gast=extern_gast,
+                                pdb=pdb,
+                                mandant_slug=mandant_slug,
                             ),
                             status_code=400,
                         )
