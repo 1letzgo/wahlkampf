@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 from fastapi.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 from starlette.middleware.sessions import SessionMiddleware
 from pydantic import BaseModel, Field
@@ -471,38 +472,74 @@ def login_submit(
     if is_superadmin_username(pu.username):
         pass
     elif mem is None:
-        return templates.TemplateResponse(
-            request,
-            "login.html",
-            {
-                "error": None,
-                "info": "Für diesen Ortsverband gibt es kein Konto. Bitte zuerst registrieren.",
-            },
+        pdb.add(
+            OvMembership(
+                user_id=pu.id,
+                ov_slug=ms,
+                is_admin=False,
+                is_approved=False,
+            ),
         )
-    elif not mem.is_approved:
-        has_active_admin = (
-            pdb.query(OvMembership)
-            .filter(
-                OvMembership.ov_slug == ms,
-                OvMembership.is_admin.is_(True),
-                OvMembership.is_approved.is_(True),
-            )
-            .first()
-        )
-        if not has_active_admin:
-            mem.is_approved = True
-            mem.is_admin = True
-            pdb.merge(MandantAppSetting(mandant_slug=ms, key="founder_done", value="1"))
+        try:
             pdb.commit()
+        except IntegrityError:
+            pdb.rollback()
         else:
             return templates.TemplateResponse(
                 request,
                 "login.html",
                 {
                     "error": None,
-                    "info": "Dein Konto ist noch nicht freigegeben. Bitte warte auf einen Administrator.",
+                    "info": (
+                        "Beitritt zu diesem Ortsverband wurde angefragt. Du nutzt bereits denselben "
+                        "Benutzernamen wie bei einem anderen OV — das ist vorgesehen. Sobald hier eine "
+                        "Administratorin oder ein Administrator dich freischaltet, meldest du dich "
+                        "wie gewohnt mit Benutzername und Passwort an."
+                    ),
                 },
             )
+        mem = (
+            pdb.query(OvMembership)
+            .filter(OvMembership.user_id == pu.id, OvMembership.ov_slug == ms)
+            .first()
+        )
+        if mem is None:
+            return templates.TemplateResponse(
+                request,
+                "login.html",
+                {
+                    "error": "Der Beitritt konnte nicht gespeichert werden. Bitte später erneut versuchen.",
+                    "info": None,
+                },
+                status_code=500,
+            )
+
+    if not is_superadmin_username(pu.username):
+        assert mem is not None
+        if not mem.is_approved:
+            has_active_admin = (
+                pdb.query(OvMembership)
+                .filter(
+                    OvMembership.ov_slug == ms,
+                    OvMembership.is_admin.is_(True),
+                    OvMembership.is_approved.is_(True),
+                )
+                .first()
+            )
+            if not has_active_admin:
+                mem.is_approved = True
+                mem.is_admin = True
+                pdb.merge(MandantAppSetting(mandant_slug=ms, key="founder_done", value="1"))
+                pdb.commit()
+            else:
+                return templates.TemplateResponse(
+                    request,
+                    "login.html",
+                    {
+                        "error": None,
+                        "info": "Dein Konto ist noch nicht freigegeben. Bitte warte auf einen Administrator.",
+                    },
+                )
 
     request.session["user_id"] = pu.id
     request.session["mandant_slug"] = ms
@@ -727,7 +764,13 @@ def registrierung_submit(
             request,
             "registrierung.html",
             {
-                "error": "Dieser Benutzername ist bereits vergeben.",
+                "error": (
+                    "Dieser Benutzername ist bereits auf der Plattform vergeben — ein zweites Konto "
+                    "gibt es nicht. Hast du dich schon woanders registriert und willst diesem "
+                    "Ortsverband beitreten? Dann hier nicht erneut registrieren, sondern mit "
+                    "Benutzername und Passwort anmelden; danach wird ein Beitritt beantragt oder "
+                    "du wirst freigeschaltet."
+                ),
                 **ctx,
             },
             status_code=400,
