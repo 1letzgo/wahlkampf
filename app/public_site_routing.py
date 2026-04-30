@@ -7,6 +7,7 @@ from starlette.responses import RedirectResponse
 
 from app.config import PUBLIC_SITE_HOSTS, PUBLIC_SITE_MANDANT_SLUG
 from app.mandant_host import incoming_hostname
+from app.platform_admin_paths import is_platform_superadmin_scope_path
 
 
 def strip_root_path(scope_path: str, root_path: str) -> str:
@@ -59,8 +60,10 @@ def rewrite_scope_to_internal_m_path(request: Request) -> None:
     if rel.startswith("/m/"):
         return
 
+    if is_platform_superadmin_scope_path(rel):
+        return
+
     exempt_prefixes = (
-        "/admin",
         "/static",
         "/docs",
         "/redoc",

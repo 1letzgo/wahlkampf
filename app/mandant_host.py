@@ -6,6 +6,7 @@ from starlette.requests import Request
 
 from app.config import MANDANT_HOST_BASE_DOMAIN, MANDANT_HOST_IS_RAW_SLUG
 from app.ov_services import validate_ov_slug
+from app.platform_admin_paths import is_platform_superadmin_scope_path
 
 _RESERVED_SUBDOMAINS = frozenset(
     {"www", "admin", "api", "static", "mail", "ftp", "cdn"},
@@ -117,7 +118,7 @@ def _rewrite_rel_path(rel: str, slug: str) -> str:
 def should_skip_host_rewrite(rel: str) -> bool:
     if rel.startswith("/m/"):
         return True
-    if rel.startswith("/admin"):
+    if is_platform_superadmin_scope_path(rel):
         return True
     if rel.startswith("/static"):
         return True

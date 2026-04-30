@@ -26,9 +26,6 @@
   <a href="/admin/ortsverbaende/neu" class="btn btn-sm btn-ico btn-with-label" aria-label="Neuer Ortsverband">
     {{ ico.svg_plus() }}<span class="btn-text">Neuer Ortsverband</span>
   </a>
-  <a href="{% if request.state.hide_mandant_path_prefix %}/menu{% elif request.session.get('mandant_slug') %}/m/{{ request.session['mandant_slug'] }}/menu{% else %}/{% endif %}" class="btn btn-sm btn-ghost btn-ico btn-with-label" aria-label="Zum OV-Menü">
-    {{ ico.svg_menu() }}<span class="btn-text">OV-Menü</span>
-  </a>
 </div>
 
 <div class="admin-page">
