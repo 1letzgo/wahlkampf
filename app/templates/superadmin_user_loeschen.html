@@ -35,7 +35,7 @@
       </p>
       {% else %}
       <div class="info" style="margin-bottom: 1rem;">
-        Das globale Konto wird aus der Datenbank entfernt. OV-Mitgliedschaften, Kommentare und Zusagen zu Terminen werden mitgelöscht (sofern die Datenbank dies vorsieht).
+        Das globale Konto wird aus der Datenbank entfernt. OV-Mitgliedschaften, Kommentare und Zusagen zu Terminen werden mitgelöscht. Bei Terminen, die dieser Nutzer angelegt hat, wird die Ersteller-Zuordnung entfernt (der Termin bleibt bestehen).
       </div>
 
       {% if error %}<div class="error" style="margin-bottom: 1rem;">{{ error }}</div>{% endif %}

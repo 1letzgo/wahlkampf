@@ -6,6 +6,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 from starlette.templating import Jinja2Templates
 
@@ -24,7 +25,7 @@ from app.mandant_features import (
     merge_mandant_feature,
 )
 from app.platform_database import get_platform_db
-from app.platform_models import Ortsverband, OvMembership, PlatformUser, Termin
+from app.platform_models import Ortsverband, OvMembership, PlatformUser
 
 TEMPLATES_DIR = __import__("pathlib").Path(__file__).resolve().parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -49,14 +50,6 @@ def _form_ov_slug_list(raw: Optional[List[str] | str]) -> List[str]:
         if s:
             out.append(s)
     return out
-
-
-def _termin_count_created_by(db: Session, user_id: int) -> int:
-    return (
-        db.query(Termin)
-        .filter(Termin.created_by_id == user_id)
-        .count()
-    )
 
 
 def _show_superadmin_delete_link(request: Request, pu: PlatformUser) -> bool:
@@ -85,12 +78,6 @@ def _superadmin_user_delete_blocked(
             return "Du kannst dein eigenes Konto hier nicht löschen."
     except (TypeError, ValueError):
         pass
-    n = _termin_count_created_by(db, user_id)
-    if n > 0:
-        return (
-            f"Dieser Nutzer ist noch als Ersteller von {n} Termin(en) eingetragen. "
-            "Löschen ist erst möglich, wenn keine Termine mehr auf dieses Konto verweisen."
-        )
     return None
 
 
@@ -500,7 +487,7 @@ def superadmin_user_delete_submit(
     request: Request,
     db: Annotated[Session, Depends(get_platform_db)],
     _: LetzgoSuperadmin,
-    confirm_username: Annotated[str, Form()],
+    confirm_username: Annotated[str, Form()] = "",
 ):
     pu = db.get(PlatformUser, user_id)
     if not pu:
@@ -526,6 +513,22 @@ def superadmin_user_delete_submit(
             },
             status_code=400,
         )
-    db.delete(pu)
-    db.commit()
+    try:
+        db.delete(pu)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return templates.TemplateResponse(
+            request,
+            "superadmin_user_loeschen.html",
+            {
+                "del_user": pu,
+                "blocked": None,
+                "error": (
+                    "Der Nutzer konnte nicht gelöscht werden (Datenbank-Einschränkung). "
+                    "Es verweisen vermutlich noch Einträge auf dieses Konto."
+                ),
+            },
+            status_code=409,
+        )
     return RedirectResponse("/admin/nutzer?geloescht=1", status_code=302)

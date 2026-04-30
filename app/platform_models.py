@@ -82,10 +82,13 @@ class Termin(PlatformBase):
     ends_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     image_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     externe_teilnehmer_json: Mapped[str] = mapped_column(Text, default="[]")
-    created_by_id: Mapped[int] = mapped_column(ForeignKey("platform_users.id"))
+    created_by_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("platform_users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    creator: Mapped["PlatformUser"] = relationship()
+    creator: Mapped[Optional["PlatformUser"]] = relationship()
     teilnahmen: Mapped[List["TerminTeilnahme"]] = relationship(
         back_populates="termin",
         cascade="all, delete-orphan",

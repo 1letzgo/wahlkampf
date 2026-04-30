@@ -13,6 +13,78 @@ from sqlalchemy.engine.url import make_url
 from app.config import BASE_DIR, mandant_dir, sqlite_database_path, upload_dir_for_slug
 
 
+def migrate_termine_created_by_nullable_sqlite(engine: Engine) -> None:
+    """Macht termine.created_by_id optional + ON DELETE SET NULL (SQLite-Tabellenumbau).
+
+    Ohne das schlägt das Löschen eines Nutzers mit FK-Prüfung fehl, sobald noch Termine
+    auf platform_users verweisen (ORM hatte NOT NULL ohne ON DELETE).
+    """
+    if engine.dialect.name != "sqlite":
+        return
+    insp = inspect(engine)
+    if not insp.has_table("termine"):
+        return
+    with engine.connect() as conn:
+        pragma_rows = conn.execute(text("PRAGMA table_info(termine)")).fetchall()
+    cb_row = next((r for r in pragma_rows if r[1] == "created_by_id"), None)
+    if cb_row is None:
+        return
+    # PRAGMA table_info: Spalte 3 = notnull (1 = NOT NULL)
+    if cb_row[3] == 0:
+        return
+
+    ddl_new = """
+            CREATE TABLE termine__wk_rebuild (
+              id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+              mandant_slug VARCHAR(80) NOT NULL,
+              title VARCHAR(200) NOT NULL,
+              description TEXT NOT NULL DEFAULT '',
+              vorbereitung TEXT NOT NULL DEFAULT '',
+              nachbereitung TEXT NOT NULL DEFAULT '',
+              location VARCHAR(300) NOT NULL DEFAULT '',
+              starts_at DATETIME NOT NULL,
+              ends_at DATETIME,
+              image_path VARCHAR(500),
+              externe_teilnehmer_json TEXT NOT NULL DEFAULT '[]',
+              created_by_id INTEGER,
+              created_at DATETIME NOT NULL,
+              FOREIGN KEY(mandant_slug) REFERENCES ortsverbaende(slug) ON DELETE CASCADE,
+              FOREIGN KEY(created_by_id) REFERENCES platform_users(id) ON DELETE SET NULL
+            )
+            """
+    copy_sql = """
+            INSERT INTO termine__wk_rebuild (
+              id, mandant_slug, title, description, vorbereitung, nachbereitung,
+              location, starts_at, ends_at, image_path, externe_teilnehmer_json,
+              created_by_id, created_at
+            )
+            SELECT
+              id, mandant_slug, title, description, vorbereitung, nachbereitung,
+              location, starts_at, ends_at, image_path, externe_teilnehmer_json,
+              created_by_id, created_at
+            FROM termine
+            """
+
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        conn.execute(text("PRAGMA foreign_keys=OFF"))
+        conn.execute(text(ddl_new))
+        conn.execute(text(copy_sql))
+        conn.execute(text("DROP TABLE termine"))
+        conn.execute(text("ALTER TABLE termine__wk_rebuild RENAME TO termine"))
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_termine_mandant_slug "
+                "ON termine (mandant_slug)"
+            ),
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_termine_starts_at ON termine (starts_at)"
+            ),
+        )
+        conn.execute(text("PRAGMA foreign_keys=ON"))
+
+
 def migrate_legacy_flat_into_mandant(slug: str) -> None:
     """Kopiert alt `./wahlkampf.db` und `./uploads` nach `mandanten/<slug>/`, falls Ziel noch leer."""
     slug = slug.strip().lower()
@@ -77,3 +149,4 @@ def run_platform_sqlite_migrations(engine: Engine) -> None:
                         "ALTER TABLE platform_users ADD COLUMN calendar_token VARCHAR(64)"
                     ),
                 )
+    migrate_termine_created_by_nullable_sqlite(engine)
