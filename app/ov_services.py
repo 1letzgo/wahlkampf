@@ -31,7 +31,8 @@ def validate_ov_slug(slug: str) -> str | None:
 
 
 def ensure_sharepic_mask(slug: str) -> None:
-    src = Path(__file__).resolve().parent / "static" / "sharepic-mask.png"
+    static_dir = Path(__file__).resolve().parent / "static"
+    src = static_dir / "sharepic-mask2.png"
     dest_dir = upload_dir_for_slug(slug)
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest = dest_dir / "sharepic-mask.png"

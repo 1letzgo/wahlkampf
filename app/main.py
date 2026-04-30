@@ -462,6 +462,9 @@ def app_menu(
 
 @tenant_router.get("/sharepic", response_class=HTMLResponse)
 def sharepic_creator(mandant_slug: str, request: Request, user: CurrentUser):
+    ov_display = (getattr(request.state, "ortsverband_name", None) or "").strip()
+    if not ov_display:
+        ov_display = mandant_slug.strip().lower()
     return templates.TemplateResponse(
         request,
         "sharepic.html",
@@ -469,6 +472,7 @@ def sharepic_creator(mandant_slug: str, request: Request, user: CurrentUser):
             "user": user,
             "path_prefix": _app_path_prefix(request),
             "mask_src_suffix": sharepic_mask_src_suffix(mandant_slug),
+            "sharepic_ov_display_name": ov_display,
         },
     )
 

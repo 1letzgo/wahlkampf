@@ -159,7 +159,7 @@
       <div class="ics-popup__head-icon" aria-hidden="true">{{ ico.svg_image() }}</div>
       <div>
         <h2 class="ics-popup__h">Bild &amp; Text</h2>
-        <p class="ics-popup__lead">Eigenes Foto wählen, Ausschnitt anpassen und Texte für Banner und Fußzeile setzen.</p>
+        <p class="ics-popup__lead">Eigenes Foto wählen, Ausschnitt anpassen — Slogan oben kommt automatisch vom Ortsverband.</p>
       </div>
     </header>
 
@@ -174,9 +174,10 @@
     </section>
 
     <section class="ics-popup__panel" aria-label="Texte">
-      <label for="sharepic-text1" class="ics-popup__label">Text Banner</label>
-      <p class="muted sharepic-hint" style="margin:-0.35rem 0 0.45rem;">Max. 1 Zeile</p>
-      <textarea id="sharepic-text1" name="text1" rows="2" maxlength="500" placeholder="z. B. Olaf in WST"></textarea>
+      <p class="ics-popup__label" style="margin-bottom:0.35rem;">Slogan (automatisch)</p>
+      <p class="muted sharepic-hint" style="margin:0 0 0.85rem;">
+        Im roten Balken unter dem Kopf: <strong>Für {{ sharepic_ov_display_name }}.</strong> und <strong>Für Dich.</strong>
+      </p>
 
       <label for="sharepic-text2" class="ics-popup__label sharepic-label-spaced">Text unten</label>
       <p class="muted sharepic-hint" style="margin:-0.35rem 0 0.45rem;">Max. 2 Zeilen</p>
@@ -197,21 +198,20 @@
 (function () {
   var pathPrefix = {{ path_prefix | tojson }};
   var MASK_SRC = pathPrefix + {{ mask_src_suffix | tojson }};
+  var OV_DISPLAY_NAME = {{ sharepic_ov_display_name | tojson }};
   var W = 768;
   var H = 1024;
-  var PHOTO = { x: 0, y: 144, w: 768, h: 735 };
-  /* Banner: nur im roten Schrägbalken (unterhalb festem Kopf), nicht in der Fotofläche */
-  var TEXT1 = { y: 188, maxW: 640, lineHeight: 48, maxLines: 1 };
-  /* Fußzeile: roter Block ca. y 882–1023 — zwei Zeilen vertikal zentriert, seitlicher Rand */
-  var FOOTER_TOP = 882;
-  var FOOTER_H = 1024 - FOOTER_TOP;
+  /* Maske sharepic-mask2.png (Anteile der Höhe): Slogan ~13–22 %, Foto ~22–82 %, Fuß ~82–100 % */
+  var SLOGAN_TOP = Math.round(H * 0.13);
+  var SLOGAN_BOTTOM = Math.round(H * 0.22);
+  var PHOTO_TOP = Math.round(H * 0.22);
+  var PHOTO_BOTTOM = Math.round(H * 0.82);
+  var PHOTO = { x: 0, y: PHOTO_TOP, w: W, h: PHOTO_BOTTOM - PHOTO_TOP };
+  var FOOTER_TOP = Math.round(H * 0.82);
+  var FOOTER_H = H - FOOTER_TOP;
   var TEXT2_LH = 50;
-  var TEXT2_LINES = 2;
-  var TEXT2_BLOCK = TEXT2_LH * TEXT2_LINES;
   var TEXT2 = {
-    x: 56,
-    y: FOOTER_TOP + Math.floor((FOOTER_H - TEXT2_BLOCK) / 2) - 16,
-    maxW: 656,
+    maxW: 680,
     lineHeight: TEXT2_LH,
     maxLines: 2,
   };
@@ -390,6 +390,33 @@
     ctx.restore();
   }
 
+  function drawAutoSlogan(ctx) {
+    var name = (OV_DISPLAY_NAME && String(OV_DISPLAY_NAME).trim()) || "";
+    var line1 = "Für " + name + ".";
+    var line2 = "Für Dich.";
+    var maxW = 680;
+    var cx = W * 0.5;
+    var bandMid = (SLOGAN_TOP + SLOGAN_BOTTOM) / 2;
+    var fs = 38;
+    var lh;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = FILL;
+    for (; fs >= 18; fs -= 2) {
+      lh = Math.round(fs * 1.12);
+      ctx.font = '700 ' + fs + 'px "Open Sans", system-ui, sans-serif';
+      if (ctx.measureText(line1).width <= maxW && ctx.measureText(line2).width <= maxW) {
+        break;
+      }
+    }
+    lh = Math.round(fs * 1.12);
+    ctx.font = '700 ' + fs + 'px "Open Sans", system-ui, sans-serif';
+    ctx.fillText(line1, cx, bandMid - lh * 0.5);
+    ctx.fillText(line2, cx, bandMid + lh * 0.5);
+    ctx.textBaseline = "top";
+    ctx.textAlign = "left";
+  }
+
   function redraw() {
     ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = "#e8e4dc";
@@ -400,26 +427,22 @@
     if (maskImg.complete && maskImg.naturalWidth) {
       ctx.drawImage(maskImg, 0, 0, W, H);
     }
+    drawAutoSlogan(ctx);
+
     ctx.font = FONT;
     ctx.fillStyle = FILL;
     ctx.textBaseline = "top";
 
-    var t1 = document.getElementById("sharepic-text1").value;
-    var lines1 = textToLines(ctx, t1, TEXT1.maxW, TEXT1.maxLines);
-    var y1 = TEXT1.y;
-    var cx = W * 0.5;
-    ctx.textAlign = "center";
-    for (var i = 0; i < lines1.length; i++) {
-      ctx.fillText(lines1[i], cx, y1 + i * TEXT1.lineHeight);
-    }
-    ctx.textAlign = "left";
-
     var t2 = document.getElementById("sharepic-text2").value;
     var lines2 = textToLines(ctx, t2, TEXT2.maxW, TEXT2.maxLines);
-    var y2 = TEXT2.y;
+    ctx.textAlign = "center";
+    var cx2 = W * 0.5;
+    var block2 = lines2.length * TEXT2.lineHeight;
+    var y2 = FOOTER_TOP + Math.floor((FOOTER_H - block2) / 2);
     for (var j = 0; j < lines2.length; j++) {
-      ctx.fillText(lines2[j], TEXT2.x, y2 + j * TEXT2.lineHeight);
+      ctx.fillText(lines2[j], cx2, y2 + j * TEXT2.lineHeight);
     }
+    ctx.textAlign = "left";
   }
 
   function scheduleRedraw() {
@@ -578,17 +601,11 @@
     touchPanActive = false;
   });
 
-  var ta1 = document.getElementById("sharepic-text1");
   var ta2 = document.getElementById("sharepic-text2");
-  ta1.addEventListener("input", function () {
-    limitLines(ta1, 1);
-    scheduleRedraw();
-  });
   ta2.addEventListener("input", function () {
     limitLines(ta2, 2);
     scheduleRedraw();
   });
-  limitLines(ta1, 1);
   limitLines(ta2, 2);
 
   document.getElementById("sharepic-download").addEventListener("click", function () {
