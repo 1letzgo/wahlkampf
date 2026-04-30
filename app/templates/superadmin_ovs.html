@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from '_ui_macros.html' import app_header with context %}
 {% import '_icons.html' as ico %}
-{% block title %}Superadmin — Ortsverbände{% endblock %}
+{% block title %}Plattform — Ortsverbände{% endblock %}
 {% block head %}
 {% include '_admin_shell_styles.html' %}
 {% include '_admin_data_table_styles.html' %}
@@ -22,7 +22,7 @@
 {% block body %}
 {{ app_header('Ortsverbände') }}
 
-<div class="page-toolbar" aria-label="Aktionen Superadmin">
+<div class="page-toolbar" aria-label="Aktionen Plattform">
   <a href="/admin/ortsverbaende/neu" class="btn btn-sm btn-ico btn-with-label" aria-label="Neuer Ortsverband">
     {{ ico.svg_plus() }}<span class="btn-text">Neuer Ortsverband</span>
   </a>
