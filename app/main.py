@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 import uuid
 from contextlib import asynccontextmanager
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 from datetime import date, datetime, time
 from pathlib import Path
 from types import SimpleNamespace
@@ -141,11 +141,14 @@ async def mandanten_kontext(request: Request, call_next):
 
 
 def _browser_login_url(request: Request, slug: str, *, pending: bool = False) -> str:
-    q = "?pending=1" if pending else ""
     s = slug.strip().lower()
     if getattr(request.state, "hide_mandant_path_prefix", False):
+        q = "?pending=1" if pending else ""
         return f"/login{q}"
-    return f"/m/{s}/login{q}"
+    params = [("ov", s)]
+    if pending:
+        params.append(("pending", "1"))
+    return f"/?{urlencode(params)}"
 
 
 @app.exception_handler(HTTPException)
@@ -339,6 +342,48 @@ def _my_ovs_menu_items(
     return out_members
 
 
+def _query_ortsverbaende_sorted(pdb: Session) -> list[Ortsverband]:
+    return (
+        pdb.query(Ortsverband)
+        .order_by(func.lower(Ortsverband.display_name), Ortsverband.slug.asc())
+        .all()
+    )
+
+
+def _login_shell_response(
+    request: Request,
+    pdb: Session,
+    *,
+    mandant_slug_for_select: str,
+    error: str | None,
+    info: str | None,
+    status_code: int = 200,
+):
+    """Login-Oberfläche: Startseite mit OV-Dropdown oder login.html auf Kurz-URL-/Ein-Mandanten-Host."""
+    if getattr(request.state, "hide_mandant_path_prefix", False):
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            {"error": error, "info": info},
+            status_code=status_code,
+        )
+    ovs = _query_ortsverbaende_sorted(pdb)
+    valid = {o.slug.strip().lower() for o in ovs}
+    ms = mandant_slug_for_select.strip().lower()
+    preselect = ms if ms in valid else ""
+    return templates.TemplateResponse(
+        request,
+        "home.html",
+        {
+            "ovs": ovs,
+            "preselect_ov_slug": preselect,
+            "login_error": error,
+            "login_info": info,
+        },
+        status_code=status_code,
+    )
+
+
 def _user_display_names(pdb: Session, user_ids: set[int]) -> dict[int, str]:
     if not user_ids:
         return {}
@@ -444,7 +489,14 @@ def tenant_root(request: Request, mandant_slug: str):
 
 
 @tenant_router.get("/login", response_class=HTMLResponse)
-def login_form(request: Request):
+def login_form(request: Request, mandant_slug: str):
+    ms = mandant_slug.strip().lower()
+    if not getattr(request.state, "hide_mandant_path_prefix", False):
+        params = [("ov", ms)]
+        for k, v in request.query_params.multi_items():
+            if k != "ov":
+                params.append((k, v))
+        return RedirectResponse(f"/?{urlencode(params)}", status_code=302)
     info = None
     if request.query_params.get("pending") == "1":
         info = "Dein Konto ist noch nicht freigegeben. Bitte warte auf einen Administrator."
@@ -474,10 +526,12 @@ def _login_submit_response(
 ):
     ms = mandant_slug.strip().lower()
     if pdb.get(Ortsverband, ms) is None:
-        return templates.TemplateResponse(
+        return _login_shell_response(
             request,
-            "login.html",
-            {"error": "Dieser Ortsverband ist nicht bekannt.", "info": None},
+            pdb,
+            mandant_slug_for_select=ms,
+            error="Dieser Ortsverband ist nicht bekannt.",
+            info=None,
             status_code=404,
         )
     uname = username_raw.strip().lower()
@@ -487,10 +541,12 @@ def _login_submit_response(
         .first()
     )
     if not pu or not verify_password(password, pu.password_hash):
-        return templates.TemplateResponse(
+        return _login_shell_response(
             request,
-            "login.html",
-            {"error": "Benutzername oder Passwort falsch.", "info": None},
+            pdb,
+            mandant_slug_for_select=ms,
+            error="Benutzername oder Passwort falsch.",
+            info=None,
             status_code=401,
         )
     mem = (
@@ -515,18 +571,17 @@ def _login_submit_response(
         except IntegrityError:
             pdb.rollback()
         else:
-            return templates.TemplateResponse(
+            return _login_shell_response(
                 request,
-                "login.html",
-                {
-                    "error": None,
-                    "info": (
-                        "Beitritt zu diesem Ortsverband wurde angefragt. Du nutzt bereits denselben "
-                        "Benutzernamen wie bei einem anderen OV — das ist vorgesehen. Sobald hier eine "
-                        "Administratorin oder ein Administrator dich freischaltet, meldest du dich "
-                        "wie gewohnt mit Benutzername und Passwort an."
-                    ),
-                },
+                pdb,
+                mandant_slug_for_select=ms,
+                error=None,
+                info=(
+                    "Beitritt zu diesem Ortsverband wurde angefragt. Du nutzt bereits denselben "
+                    "Benutzernamen wie bei einem anderen OV — das ist vorgesehen. Sobald hier eine "
+                    "Administratorin oder ein Administrator dich freischaltet, meldest du dich "
+                    "wie gewohnt mit Benutzername und Passwort an."
+                ),
             )
         mem = (
             pdb.query(OvMembership)
@@ -534,13 +589,12 @@ def _login_submit_response(
             .first()
         )
         if mem is None:
-            return templates.TemplateResponse(
+            return _login_shell_response(
                 request,
-                "login.html",
-                {
-                    "error": "Der Beitritt konnte nicht gespeichert werden. Bitte später erneut versuchen.",
-                    "info": None,
-                },
+                pdb,
+                mandant_slug_for_select=ms,
+                error="Der Beitritt konnte nicht gespeichert werden. Bitte später erneut versuchen.",
+                info=None,
                 status_code=500,
             )
 
@@ -562,13 +616,12 @@ def _login_submit_response(
                 pdb.merge(MandantAppSetting(mandant_slug=ms, key="founder_done", value="1"))
                 pdb.commit()
             else:
-                return templates.TemplateResponse(
+                return _login_shell_response(
                     request,
-                    "login.html",
-                    {
-                        "error": None,
-                        "info": "Dein Konto ist noch nicht freigegeben. Bitte warte auf einen Administrator.",
-                    },
+                    pdb,
+                    mandant_slug_for_select=ms,
+                    error=None,
+                    info="Dein Konto ist noch nicht freigegeben. Bitte warte auf einen Administrator.",
                 )
 
     request.session["user_id"] = pu.id
@@ -1051,10 +1104,13 @@ def admin_benutzer_loeschen_compat(
 
 
 @tenant_router.get("/logout")
-def logout(request: Request):
+def logout(request: Request, mandant_slug: str):
+    slug = mandant_slug.strip().lower()
     request.session.pop("user_id", None)
     request.session.pop("mandant_slug", None)
-    return RedirectResponse(f"{_mp(request)}/login", status_code=302)
+    if getattr(request.state, "hide_mandant_path_prefix", False):
+        return RedirectResponse(f"{_mp(request)}/login", status_code=302)
+    return RedirectResponse(f"/?{urlencode([('ov', slug)])}", status_code=302)
 
 
 def _termin_kommentar_counts_by_termin(pdb: Session, termin_ids: list[int]) -> dict[int, int]:
@@ -1759,18 +1815,32 @@ def root(request: Request):
     SessionP = sessionmaker(autocommit=False, autoflush=False, bind=platform_engine())
     pdb = SessionP()
     try:
-        ovs = (
-            pdb.query(Ortsverband)
-            .order_by(func.lower(Ortsverband.display_name), Ortsverband.slug.asc())
-            .all()
-        )
+        ovs = _query_ortsverbaende_sorted(pdb)
     finally:
         pdb.close()
     valid = {o.slug.strip().lower() for o in ovs}
     raw_ov = (request.query_params.get("ov") or "").strip().lower()
     preselect_ov_slug = raw_ov if raw_ov in valid else ""
+    login_info = None
+    if request.query_params.get("pending") == "1":
+        login_info = "Dein Konto ist noch nicht freigegeben. Bitte warte auf einen Administrator."
+    if request.query_params.get("registered") == "first":
+        login_info = (
+            "Als erster Nutzer bist du automatisch Administrator und freigeschaltet — "
+            "du kannst dich jetzt anmelden."
+        )
+    elif request.query_params.get("registered") == "1":
+        login_info = (
+            "Registrierung gespeichert. Sobald ein Administrator dich freischaltet, "
+            "kannst du dich anmelden."
+        )
     return templates.TemplateResponse(
         request,
         "home.html",
-        {"ovs": ovs, "preselect_ov_slug": preselect_ov_slug},
+        {
+            "ovs": ovs,
+            "preselect_ov_slug": preselect_ov_slug,
+            "login_error": None,
+            "login_info": login_info,
+        },
     )
