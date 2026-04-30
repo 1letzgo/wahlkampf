@@ -527,23 +527,6 @@ def app_menu(
     )
 
 
-@tenant_router.get("/meine-orte", response_class=HTMLResponse)
-def menu_meine_orte(
-    mandant_slug: str,
-    request: Request,
-    pdb: Annotated[Session, Depends(get_platform_db)],
-    user: CurrentUser,
-):
-    return templates.TemplateResponse(
-        request,
-        "menu_meine_orte.html",
-        {
-            "user": user,
-            "my_ovs": _approved_user_ovs_menu_items(pdb, mandant_slug, user.id),
-        },
-    )
-
-
 @tenant_router.get("/sharepic", response_class=HTMLResponse)
 def sharepic_creator(mandant_slug: str, request: Request, user: CurrentUser):
     ov_display = (getattr(request.state, "ortsverband_name", None) or "").strip()
