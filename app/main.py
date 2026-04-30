@@ -36,6 +36,7 @@ from app.config import (
     SECRET_KEY,
     SESSION_COOKIE,
     is_superadmin_username,
+    superadmin_usernames,
     upload_dir_for_slug,
 )
 from app.deps import AdminUser, AuthenticatedUser, CurrentUser
@@ -773,23 +774,56 @@ def _ov_user_rows_for_admin(pdb: Session, mandant_slug: str) -> list:
         .order_by(OvMembership.id.asc())
         .all()
     )
+    seen_ids: set[int] = set()
     out: list = []
     for m in memberships:
         pu = pdb.get(PlatformUser, m.user_id)
         if not pu:
             continue
+        seen_ids.add(pu.id)
+        sup = is_superadmin_username(pu.username)
         out.append(
             SimpleNamespace(
                 id=pu.id,
                 username=pu.username,
                 display_name=pu.display_name,
                 created_at=pu.created_at,
-                is_admin=m.is_admin,
+                is_admin=bool(m.is_admin or sup),
                 is_approved=m.is_approved,
-            )
+                shadow_superadmin=False,
+                platform_superadmin=sup,
+            ),
         )
-    out.sort(key=lambda r: r.created_at)
-    return out
+    names = superadmin_usernames()
+    if names:
+        shadow_candidates = (
+            pdb.query(PlatformUser)
+            .filter(PlatformUser.username.in_(tuple(names)))
+            .order_by(func.lower(PlatformUser.display_name), PlatformUser.username.asc())
+            .all()
+        )
+        for pu in shadow_candidates:
+            if pu.id in seen_ids:
+                continue
+            out.append(
+                SimpleNamespace(
+                    id=pu.id,
+                    username=pu.username,
+                    display_name=pu.display_name,
+                    created_at=pu.created_at,
+                    is_admin=True,
+                    is_approved=True,
+                    shadow_superadmin=True,
+                    platform_superadmin=True,
+                ),
+            )
+    regular = [r for r in out if not r.shadow_superadmin]
+    shadows = [r for r in out if r.shadow_superadmin]
+    regular.sort(key=lambda r: r.created_at)
+    shadows.sort(
+        key=lambda r: ((r.display_name or r.username).lower(), r.username.lower()),
+    )
+    return regular + shadows
 
 
 @tenant_router.get("/admin/benutzer", response_class=HTMLResponse)

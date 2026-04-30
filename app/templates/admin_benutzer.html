@@ -18,6 +18,7 @@
           <h2 class="ics-popup__h">Benutzer</h2>
           <p class="ics-popup__lead">
             Mitgliedschaft in diesem OV steuern: freischalten, Admin-Rechte, Zugriff nur hier entziehen (globales Konto bleibt).
+            Plattform-Superadmins erscheinen in jedem OV zur Übersicht ohne OV-Aktionen.
           </p>
         </div>
       </header>
@@ -48,6 +49,10 @@
                 {% endif %}
               </td>
               <td data-label="Status">
+                {% if u.shadow_superadmin %}
+                <span style="white-space:nowrap;">Freigegeben</span>
+                <br><span class="muted" style="font-size:0.8rem;">Plattform-Superadmin · alle OVs</span>
+                {% else %}
                 {% if u.is_approved %}
                 <span style="white-space:nowrap;">Freigegeben</span>
                 {% else %}
@@ -56,10 +61,15 @@
                 {% if u.is_admin %}
                 <br><span class="muted" style="font-size:0.8rem;">Administrator</span>
                 {% endif %}
+                {% if u.platform_superadmin %}
+                <br><span class="muted" style="font-size:0.8rem;">Plattform-Superadmin</span>
+                {% endif %}
+                {% endif %}
               </td>
               <td data-label="Seit" class="muted admin-users-td-date">{{ u.created_at.strftime('%d.%m.%Y') }}</td>
               <td data-label="Aktionen" class="admin-users-td-actions">
                 <div>
+                  {% if not u.shadow_superadmin %}
                   {% if not u.is_approved %}
                   <form method="post" action="{{ request.state.mandanten_prefix }}/admin/benutzer/{{ u.id }}/freigeben" style="margin:0;">
                     <button type="submit" class="btn btn-sm btn-ico btn-with-label" aria-label="Nutzer {{ u.display_name or u.username }} freigeben">
@@ -86,6 +96,9 @@
                       {{ ico.svg_logout() }}<span class="btn-text">Zugriff entziehen</span>
                     </button>
                   </form>
+                  {% endif %}
+                  {% else %}
+                  <span class="muted" style="font-size:0.82rem;">Keine OV-Aktionen</span>
                   {% endif %}
                 </div>
               </td>
