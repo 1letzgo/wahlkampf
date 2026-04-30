@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Annotated
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from starlette.templating import Jinja2Templates
@@ -13,7 +13,6 @@ from app.config import PUBLIC_SITE_MANDANT_SLUG
 from app.ov_services import (
     delete_ortsverband_completely,
     register_ortsverband,
-    save_uploaded_sharepic_mask,
     validate_ov_slug,
 )
 from app.platform_database import get_platform_db
@@ -59,13 +58,12 @@ def superadmin_ov_new_form(
 
 
 @router.post("/admin/ortsverbaende/neu", response_class=HTMLResponse)
-async def superadmin_ov_new_submit(
+def superadmin_ov_new_submit(
     request: Request,
     db: Annotated[Session, Depends(get_platform_db)],
     _: LetzgoSuperadmin,
     slug: Annotated[str, Form()],
     display_name: Annotated[str, Form()],
-    mask: UploadFile | None = File(None),
 ):
     err = validate_ov_slug(slug)
     if err:
@@ -84,17 +82,6 @@ async def superadmin_ov_new_submit(
             status_code=400,
         )
     register_ortsverband(db, s, display_name)
-    if mask is not None and getattr(mask, "filename", None) and str(mask.filename).strip():
-        try:
-            body = await mask.read()
-            save_uploaded_sharepic_mask(s, body)
-        except ValueError as e:
-            return templates.TemplateResponse(
-                request,
-                "superadmin_ov_form.html",
-                {"error": str(e), "ov": None, "is_new": True},
-                status_code=400,
-            )
     return RedirectResponse("/admin/ortsverbaende", status_code=302)
 
 
@@ -116,13 +103,12 @@ def superadmin_ov_edit_form(
 
 
 @router.post("/admin/ortsverbaende/{slug}/bearbeiten", response_class=HTMLResponse)
-async def superadmin_ov_edit_submit(
+def superadmin_ov_edit_submit(
     slug: str,
     request: Request,
     db: Annotated[Session, Depends(get_platform_db)],
     _: LetzgoSuperadmin,
     display_name: Annotated[str, Form()],
-    mask: UploadFile | None = File(None),
 ):
     ov = db.get(Ortsverband, slug.strip().lower())
     if not ov:
@@ -130,17 +116,6 @@ async def superadmin_ov_edit_submit(
     ov.display_name = " ".join(display_name.split()).strip() or ov.slug
     db.add(ov)
     db.commit()
-    if mask is not None and getattr(mask, "filename", None) and str(mask.filename).strip():
-        try:
-            body = await mask.read()
-            save_uploaded_sharepic_mask(ov.slug, body)
-        except ValueError as e:
-            return templates.TemplateResponse(
-                request,
-                "superadmin_ov_form.html",
-                {"error": str(e), "ov": ov, "is_new": False},
-                status_code=400,
-            )
     return RedirectResponse("/admin/ortsverbaende", status_code=302)
 
 

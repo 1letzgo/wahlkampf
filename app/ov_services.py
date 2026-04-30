@@ -1,11 +1,9 @@
-"""OV anlegen: Ordner, SQLite, Sharepic-Maske."""
+"""OV anlegen: Ordner, SQLite, Mandanten-Daten."""
 
 from __future__ import annotations
 
 import re
 import shutil
-from pathlib import Path
-from shutil import copy2
 
 from sqlalchemy.orm import Session
 
@@ -30,16 +28,6 @@ def validate_ov_slug(slug: str) -> str | None:
     return None
 
 
-def ensure_sharepic_mask(slug: str) -> None:
-    static_dir = Path(__file__).resolve().parent / "static"
-    src = static_dir / "sharepic-mask2.png"
-    dest_dir = upload_dir_for_slug(slug)
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    dest = dest_dir / "sharepic-mask.png"
-    if not dest.is_file() and src.is_file():
-        copy2(src, dest)
-
-
 def provision_ortsverband_storage(slug: str) -> None:
     """Legt Mandanten-DB und Upload-Struktur an (idempotent)."""
     slug = slug.strip().lower()
@@ -51,7 +39,6 @@ def provision_ortsverband_storage(slug: str) -> None:
     models.Base.metadata.create_all(bind=engine)
     run_sqlite_migrations(engine)
     migrate_plakate_from_legacy_sqlite(engine)
-    ensure_sharepic_mask(slug)
 
 
 def delete_ortsverband_completely(db_platform: Session, slug: str) -> None:
@@ -83,22 +70,3 @@ def register_ortsverband(db_platform: Session, slug: str, display_name: str) -> 
     db_platform.merge(Ortsverband(slug=slug, display_name=dn))
     db_platform.commit()
     provision_ortsverband_storage(slug)
-
-
-PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
-
-
-def save_uploaded_sharepic_mask(slug: str, data: bytes) -> None:
-    """PNG aus Superadmin-Upload speichern (Rohbytes)."""
-    if len(data) > 8 * 1024 * 1024:
-        raise ValueError("Datei zu groß (max. 8 MB).")
-    if len(data) < len(PNG_SIGNATURE) or not data.startswith(PNG_SIGNATURE):
-        raise ValueError("Nur gültige PNG-Dateien sind erlaubt.")
-
-    ud = upload_dir_for_slug(slug)
-    ud.mkdir(parents=True, exist_ok=True)
-    dest = ud / "sharepic-mask.png"
-    try:
-        dest.write_bytes(data)
-    except OSError as e:
-        raise ValueError(f"Speichern fehlgeschlagen: {e}") from e

@@ -23,7 +23,7 @@
             {% if is_new %}
             Slug wird zur URL unter <code>/m/&lt;slug&gt;/…</code>. Anlage legt Mandanten-Ordner und Datenbank an.
             {% else %}
-            Slug <code>{{ ov.slug }}</code> ist fest; Anzeigename und Sharepic-Maske können geändert werden.
+            Slug <code>{{ ov.slug }}</code> ist fest; der Anzeigename kann geändert werden.
             {% endif %}
           </p>
         </div>
@@ -32,14 +32,11 @@
       {% if error %}<div class="error">{{ error }}</div>{% endif %}
 
       {% if is_new %}
-      <form method="post" action="/admin/ortsverbaende/neu" enctype="multipart/form-data">
+      <form method="post" action="/admin/ortsverbaende/neu">
         <label for="ov-slug">Slug (URL-Pfad)</label>
         <input id="ov-slug" name="slug" type="text" required pattern="[a-z0-9][a-z0-9_-]{1,79}" placeholder="z. B. westerstede" autocomplete="off">
         <label for="ov-display">Anzeigename</label>
         <input id="ov-display" name="display_name" type="text" required maxlength="200" placeholder="Name im OV-Header">
-        <label for="ov-mask">Sharepic-Maske (PNG, optional)</label>
-        <input id="ov-mask" type="file" name="mask" accept="image/png,.png">
-        <p class="muted" style="margin-top: 0.35rem;">Ohne Upload wird die Standardmaske aus der App kopiert.</p>
         <p style="margin-top: 1.25rem;">
           <button type="submit" class="btn btn-ico btn-with-label" aria-label="Ortsverband anlegen">
             {{ ico.svg_check() }}<span class="btn-text">Anlegen</span>
@@ -47,11 +44,9 @@
         </p>
       </form>
       {% else %}
-      <form method="post" action="/admin/ortsverbaende/{{ ov.slug }}/bearbeiten" enctype="multipart/form-data">
+      <form method="post" action="/admin/ortsverbaende/{{ ov.slug }}/bearbeiten">
         <label for="ov-display-edit">Anzeigename</label>
         <input id="ov-display-edit" name="display_name" type="text" value="{{ ov.display_name }}" required maxlength="200">
-        <label for="ov-mask-edit">Neue Sharepic-Maske (PNG)</label>
-        <input id="ov-mask-edit" type="file" name="mask" accept="image/png,.png">
         <p style="margin-top: 1.25rem;">
           <button type="submit" class="btn btn-ico btn-with-label" aria-label="Änderungen speichern">
             {{ ico.svg_check() }}<span class="btn-text">Speichern</span>

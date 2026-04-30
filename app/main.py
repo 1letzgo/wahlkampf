@@ -43,7 +43,7 @@ from app.settings_store import (
     verify_ics_token,
 )
 from app.superadmin_web import router as superadmin_router
-from app.tenant_assets import sharepic_mask_src_suffix
+from app.tenant_assets import sharepic_mask_url
 from app.termin_extern import (
     EXTERNE_TEILNEHMER_KEYS,
     EXTERNE_TEILNEHMER_OPTIONS,
@@ -471,7 +471,7 @@ def sharepic_creator(mandant_slug: str, request: Request, user: CurrentUser):
         {
             "user": user,
             "path_prefix": _app_path_prefix(request),
-            "mask_src_suffix": sharepic_mask_src_suffix(mandant_slug),
+            "mask_src_suffix": sharepic_mask_url(),
             "sharepic_slogan_default": f"Für {ov_display}.\nFür Dich.",
         },
     )
