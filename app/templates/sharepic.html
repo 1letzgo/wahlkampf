@@ -102,8 +102,8 @@
     font-size: 16px;
     line-height: 1.35;
   }
-  .sharepic-page .sharepic-bild-text-card textarea#sharepic-slogan {
-    min-height: 5rem;
+  .sharepic-page .sharepic-bild-text-card textarea#sharepic-mid {
+    min-height: 4.5rem;
   }
   .sharepic-page .sharepic-bild-text-card .sharepic-label-spaced {
     margin-top: 0.85rem;
@@ -159,7 +159,7 @@
       <div class="ics-popup__head-icon" aria-hidden="true">{{ ico.svg_image() }}</div>
       <div>
         <h2 class="ics-popup__h">Bild &amp; Text</h2>
-        <p class="ics-popup__lead">Eigenes Foto wählen und Slogan sowie Fußtext setzen — Slogan erscheint oben rechts neben dem SPD-Logo.</p>
+        <p class="ics-popup__lead">Foto, Slogan oben rechts, Text im mittleren Balken und Fußzeile — unter dem SPD-Logo steht automatisch der OV-Anzeigename.</p>
       </div>
     </header>
 
@@ -174,9 +174,15 @@
     </section>
 
     <section class="ics-popup__panel" aria-label="Texte">
+      <p class="muted sharepic-hint" style="margin:0 0 0.75rem;">Unter dem SPD-Logo (links): automatisch <strong>{{ sharepic_ov_display_name }}</strong></p>
+
       <label for="sharepic-slogan" class="ics-popup__label">Slogan (oben rechts)</label>
-      <p class="muted sharepic-hint" style="margin:-0.35rem 0 0.45rem;">Max. 3 Zeilen — im roten Kopfband rechts neben dem Logo (Open Sans, fett).</p>
+      <p class="muted sharepic-hint" style="margin:-0.35rem 0 0.45rem;">Max. 3 Zeilen — größere Schrift im Kopfband rechts.</p>
       <textarea id="sharepic-slogan" name="slogan" rows="3" maxlength="500">{{ sharepic_slogan_default }}</textarea>
+
+      <label for="sharepic-mid" class="ics-popup__label sharepic-label-spaced">Text mittlerer Balken</label>
+      <p class="muted sharepic-hint" style="margin:-0.35rem 0 0.45rem;">Max. 3 Zeilen — roter Streifen zwischen Kopf und Bildfläche.</p>
+      <textarea id="sharepic-mid" name="mid" rows="3" maxlength="500" placeholder="z. B. Kurzbotschaft oder Claim"></textarea>
 
       <label for="sharepic-text2" class="ics-popup__label sharepic-label-spaced">Text unten</label>
       <p class="muted sharepic-hint" style="margin:-0.35rem 0 0.45rem;">Max. 2 Zeilen</p>
@@ -197,11 +203,15 @@
 (function () {
   var pathPrefix = {{ path_prefix | tojson }};
   var MASK_SRC = pathPrefix + {{ mask_src_suffix | tojson }};
+  var OV_DISPLAY_NAME = {{ sharepic_ov_display_name | tojson }};
   var W = 768;
   var H = 1024;
-  /* Globale Maske /static/sharepic-mask.png: Kopf ~0–11 % (Slogan rechts), Foto ~22–82 %, Fuß ~82–100 % */
+  /* Maske: Kopf ~0–11 %, mittlerer Balken ~11–22 %, Foto ~22–82 %, Fuß ~82–100 % */
   var HEADER_BOTTOM = Math.round(H * 0.11);
+  var MID_TOP = HEADER_BOTTOM;
   var PHOTO_TOP = Math.round(H * 0.22);
+  var MID_BOTTOM = PHOTO_TOP;
+  var MID_H = MID_BOTTOM - MID_TOP;
   var PHOTO_BOTTOM = Math.round(H * 0.82);
   var PHOTO = { x: 0, y: PHOTO_TOP, w: W, h: PHOTO_BOTTOM - PHOTO_TOP };
   var FOOTER_TOP = Math.round(H * 0.82);
@@ -209,6 +219,7 @@
   var SLOGAN_MAX_LINES = 3;
   var SLOGAN_RIGHT_PAD = 20;
   var SLOGAN_MAX_WIDTH_FRAC = 0.48;
+  var MID_MAX_LINES = 3;
   var TEXT2_LH = 50;
   var TEXT2 = {
     maxW: 680,
@@ -390,6 +401,77 @@
     ctx.restore();
   }
 
+  function drawOvNameUnderLogo(ctx) {
+    var name = (OV_DISPLAY_NAME && String(OV_DISPLAY_NAME).trim()) || "";
+    if (!name) return;
+    var maxW = W * 0.40;
+    var xLeft = 26;
+    ctx.fillStyle = FILL;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    var fs = 26;
+    var lh;
+    var lines;
+    for (; fs >= 15; fs -= 2) {
+      lh = Math.round(fs * 1.14);
+      ctx.font = '700 ' + fs + 'px "Open Sans", system-ui, sans-serif';
+      lines = textToLines(ctx, name, maxW, 2);
+      var blockH = lines.length * lh;
+      var ok = blockH <= HEADER_BOTTOM - 12;
+      if (ok) {
+        for (var w = 0; w < lines.length && ok; w++) {
+          if (ctx.measureText(lines[w]).width > maxW) ok = false;
+        }
+      }
+      if (ok) break;
+    }
+    lh = Math.round(fs * 1.14);
+    ctx.font = '700 ' + fs + 'px "Open Sans", system-ui, sans-serif';
+    lines = textToLines(ctx, name, maxW, 2);
+    var blockH = lines.length * lh;
+    var y0 = Math.round(HEADER_BOTTOM * 0.48);
+    if (y0 + blockH > HEADER_BOTTOM - 6) {
+      y0 = Math.max(6, HEADER_BOTTOM - blockH - 6);
+    }
+    for (var i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], xLeft, y0 + i * lh);
+    }
+  }
+
+  function drawMiddleBanner(ctx) {
+    var raw = document.getElementById("sharepic-mid").value;
+    var maxW = W - 48;
+    var cx = W * 0.5;
+    ctx.fillStyle = FILL;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    var fs = 40;
+    var lh;
+    var lines;
+    for (; fs >= 18; fs -= 2) {
+      lh = Math.round(fs * 1.08);
+      ctx.font = '700 ' + fs + 'px "Open Sans", system-ui, sans-serif';
+      lines = textToLines(ctx, raw, maxW, MID_MAX_LINES);
+      var blockH = lines.length * lh;
+      var ok = blockH <= MID_H - 10;
+      if (ok) {
+        for (var w = 0; w < lines.length && ok; w++) {
+          if (ctx.measureText(lines[w]).width > maxW) ok = false;
+        }
+      }
+      if (ok) break;
+    }
+    lh = Math.round(fs * 1.08);
+    ctx.font = '700 ' + fs + 'px "Open Sans", system-ui, sans-serif';
+    lines = textToLines(ctx, raw, maxW, MID_MAX_LINES);
+    var blockH = lines.length * lh;
+    var y0 = MID_TOP + Math.max(4, Math.floor((MID_H - blockH) / 2));
+    for (var i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], cx, y0 + i * lh);
+    }
+    ctx.textAlign = "left";
+  }
+
   function drawHeaderSlogan(ctx) {
     var raw = document.getElementById("sharepic-slogan").value;
     var maxW = W * SLOGAN_MAX_WIDTH_FRAC;
@@ -397,10 +479,10 @@
     ctx.fillStyle = FILL;
     ctx.textAlign = "right";
     ctx.textBaseline = "top";
-    var fs = 34;
+    var fs = 46;
     var lh;
     var lines;
-    for (; fs >= 17; fs -= 2) {
+    for (; fs >= 22; fs -= 2) {
       lh = Math.round(fs * 1.1);
       ctx.font = '700 ' + fs + 'px "Open Sans", system-ui, sans-serif';
       lines = textToLines(ctx, raw, maxW, SLOGAN_MAX_LINES);
@@ -434,7 +516,9 @@
     if (maskImg.complete && maskImg.naturalWidth) {
       ctx.drawImage(maskImg, 0, 0, W, H);
     }
+    drawOvNameUnderLogo(ctx);
     drawHeaderSlogan(ctx);
+    drawMiddleBanner(ctx);
 
     ctx.font = FONT;
     ctx.fillStyle = FILL;
@@ -609,9 +693,14 @@
   });
 
   var taSlogan = document.getElementById("sharepic-slogan");
+  var taMid = document.getElementById("sharepic-mid");
   var ta2 = document.getElementById("sharepic-text2");
   taSlogan.addEventListener("input", function () {
     limitLines(taSlogan, SLOGAN_MAX_LINES);
+    scheduleRedraw();
+  });
+  taMid.addEventListener("input", function () {
+    limitLines(taMid, MID_MAX_LINES);
     scheduleRedraw();
   });
   ta2.addEventListener("input", function () {
@@ -619,6 +708,7 @@
     scheduleRedraw();
   });
   limitLines(taSlogan, SLOGAN_MAX_LINES);
+  limitLines(taMid, MID_MAX_LINES);
   limitLines(ta2, 2);
 
   document.getElementById("sharepic-download").addEventListener("click", function () {

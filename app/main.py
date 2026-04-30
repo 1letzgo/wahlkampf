@@ -472,6 +472,7 @@ def sharepic_creator(mandant_slug: str, request: Request, user: CurrentUser):
             "user": user,
             "path_prefix": _app_path_prefix(request),
             "mask_src_suffix": sharepic_mask_url(),
+            "sharepic_ov_display_name": ov_display,
             "sharepic_slogan_default": f"Für {ov_display}.\nFür Dich.",
         },
     )
