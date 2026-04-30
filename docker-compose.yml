@@ -6,8 +6,10 @@ services:
       - "8000:8000"
     environment:
       SECRET_KEY: ${SECRET_KEY:-dev-change-me-in-production}
-      # Optional: Superadmin-Benutzername (Standard letzgo), gleiche Session wie OV-Login:
-      # SUPERADMIN_USERNAME: letzgo
+      # Plattform-Superadmin (Pflicht für /admin/ortsverbaende …): gleicher Benutzername wie in platform_users.
+      SUPERADMIN_USERNAME: ${SUPERADMIN_USERNAME:-}
+      SUPERADMIN_USERNAMES: ${SUPERADMIN_USERNAMES:-}
+      # Mehrere nur über SUPERADMIN_USERNAMES (Komma), zusätzlich zu SUPERADMIN_USERNAME.
       # Mandant per Subdomain (optional): Host „slug.<BASE>“ → ohne /m/slug in der URL
       # Beispiel lokal: MANDANT_HOST_BASE_DOMAIN=localhost → http://westerstede.localhost:8000/login
       # Statt Subdomain (nur Tests): MANDANT_HOST_IS_RAW_SLUG=true → Hostname = Slug, z. B. http://westerstede:8000/

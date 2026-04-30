@@ -34,7 +34,6 @@ os.environ.setdefault("PLATFORM_DATABASE_PATH", str(ROOT / "platform.db"))
 from app.auth import hash_password  # noqa: E402
 from app.config import DEFAULT_MANDANT_SLUG  # noqa: E402
 from app.database import get_engine_for_mandant, get_sessionmaker  # noqa: E402
-from app.db_migrate import run_sqlite_migrations  # noqa: E402
 from app.models import AppSetting, Base as TenantBase  # noqa: E402
 from app.platform_database import platform_engine  # noqa: E402
 from app.platform_models import Ortsverband, OvMembership, PlatformBase, PlatformUser  # noqa: E402
@@ -108,7 +107,6 @@ def main() -> None:
         if was_empty:
             t_eng = get_engine_for_mandant(slug)
             TenantBase.metadata.create_all(bind=t_eng)
-            run_sqlite_migrations(t_eng)
             tdb = get_sessionmaker(slug)()
             try:
                 tdb.merge(AppSetting(key="founder_done", value="1"))

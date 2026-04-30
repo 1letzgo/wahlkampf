@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from app import models
 from app.config import MANDANTEN_ROOT, mandant_dir, upload_dir_for_slug
 from app.database import discard_mandant_engine, get_engine_for_mandant
-from app.db_migrate import migrate_plakate_from_legacy_sqlite, run_sqlite_migrations
 from app.platform_models import OvMembership, Ortsverband, Termin
 
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{1,79}$")
@@ -37,8 +36,6 @@ def provision_ortsverband_storage(slug: str) -> None:
     (ud / "plakate").mkdir(parents=True, exist_ok=True)
     engine = get_engine_for_mandant(slug)
     models.Base.metadata.create_all(bind=engine)
-    run_sqlite_migrations(engine)
-    migrate_plakate_from_legacy_sqlite(engine)
 
 
 def delete_ortsverband_completely(db_platform: Session, slug: str) -> None:

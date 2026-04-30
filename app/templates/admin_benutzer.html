@@ -17,7 +17,7 @@
         <div>
           <h2 class="ics-popup__h">Benutzer</h2>
           <p class="ics-popup__lead">
-            Alle Konten verwalten: freischalten, zum Administrator machen oder entfernen, löschen.
+            Mitgliedschaft in diesem OV steuern: freischalten, Admin-Rechte, Zugriff nur hier entziehen (globales Konto bleibt).
           </p>
         </div>
       </header>
@@ -81,9 +81,9 @@
                   </form>
                   {% endif %}
                   {% if u.id != user.id and (not u.is_admin or admin_count > 1) %}
-                  <form method="post" action="{{ request.state.mandanten_prefix }}/admin/benutzer/{{ u.id }}/loeschen" style="margin:0;" onsubmit="return confirm('Diesen Nutzer wirklich löschen?');">
-                    <button type="submit" class="btn btn-danger btn-sm btn-ico btn-with-label" aria-label="Nutzer {{ u.display_name or u.username }} löschen">
-                      {{ ico.svg_trash() }}<span class="btn-text">Löschen</span>
+                  <form method="post" action="{{ request.state.mandanten_prefix }}/admin/benutzer/{{ u.id }}/zugriff-entziehen" style="margin:0;" onsubmit="return confirm('Zugriff auf dieses OV für diesen Nutzer entziehen? (Konto bleibt für andere OVs bestehen.)');">
+                    <button type="submit" class="btn btn-danger btn-sm btn-ico btn-with-label" aria-label="Zugriff für {{ u.display_name or u.username }} auf dieses OV entziehen">
+                      {{ ico.svg_logout() }}<span class="btn-text">Zugriff entziehen</span>
                     </button>
                   </form>
                   {% endif %}

@@ -830,19 +830,20 @@ def admin_benutzer_admin_entfernen(
     return RedirectResponse(f"{_mp(request)}/admin/benutzer", status_code=302)
 
 
-@tenant_router.post("/admin/benutzer/{uid}/loeschen")
-def admin_benutzer_loeschen(
+@tenant_router.post("/admin/benutzer/{uid}/zugriff-entziehen")
+def admin_benutzer_zugriff_entziehen(
     mandant_slug: str,
     uid: int,
     request: Request,
     pdb: Annotated[Session, Depends(get_platform_db)],
     actor: AdminUser,
 ):
+    """Nur Mitgliedschaft in diesem OV entfernen — globales PlatformUser-Konto bleibt bestehen."""
     ms = mandant_slug.strip().lower()
     if uid == actor.id:
         raise HTTPException(
             status_code=403,
-            detail="Du kannst dein eigenes Konto nicht löschen.",
+            detail="Du kannst dir nicht selbst den Zugriff auf dieses OV entziehen.",
         )
     mem = (
         pdb.query(OvMembership)
@@ -854,9 +855,8 @@ def admin_benutzer_loeschen(
     if mem.is_admin and _admin_count(pdb, mandant_slug) <= 1:
         raise HTTPException(
             status_code=403,
-            detail="Der letzte Administrator kann nicht gelöscht werden.",
+            detail="Der letzte Administrator kann nicht entfernt werden.",
         )
-    n_memberships = pdb.query(OvMembership).filter(OvMembership.user_id == uid).count()
 
     pdb.query(Termin).filter(
         Termin.mandant_slug == ms,
@@ -866,14 +866,22 @@ def admin_benutzer_loeschen(
         synchronize_session=False,
     )
     pdb.delete(mem)
-    pdb.flush()
-
-    if n_memberships <= 1:
-        pu = pdb.get(PlatformUser, uid)
-        if pu:
-            pdb.delete(pu)
     pdb.commit()
     return RedirectResponse(f"{_mp(request)}/admin/benutzer", status_code=302)
+
+
+@tenant_router.post("/admin/benutzer/{uid}/loeschen")
+def admin_benutzer_loeschen_compat(
+    mandant_slug: str,
+    uid: int,
+    request: Request,
+    pdb: Annotated[Session, Depends(get_platform_db)],
+    actor: AdminUser,
+):
+    """Frühere Route: entfernt nur die OV-Mitgliedschaft (kein PlatformUser-Löschen)."""
+    return admin_benutzer_zugriff_entziehen(
+        mandant_slug, uid, request, pdb, actor
+    )
 
 
 @tenant_router.get("/logout")
