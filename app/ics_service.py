@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 from icalendar import Calendar, Event
 from sqlalchemy.orm import Session
 
-from app.models import Termin, TerminTeilnahme
+from app.platform_models import Termin, TerminTeilnahme
 from app.termin_extern import externe_teilnehmer_decode, externe_teilnehmer_labels
 
 TZ = ZoneInfo("Europe/Berlin")
@@ -56,16 +56,23 @@ def build_ics_calendar(termine: list[Termin], cal_name: str = "SPD Wahlkampf") -
     return cal.to_ical()
 
 
-def all_termine_for_feed(db: Session) -> list[Termin]:
-    return db.query(Termin).order_by(Termin.starts_at.asc()).all()
+def all_termine_for_feed(db: Session, mandant_slug: str) -> list[Termin]:
+    ms = mandant_slug.strip().lower()
+    return (
+        db.query(Termin)
+        .filter(Termin.mandant_slug == ms)
+        .order_by(Termin.starts_at.asc())
+        .all()
+    )
 
 
-def termine_for_user_teilnahmen(db: Session, user_id: int) -> list[Termin]:
-    """Nur Termine, für die der User eine Teilnahme (Zusage) eingetragen hat."""
+def termine_for_user_teilnahmen(db: Session, user_id: int, mandant_slug: str) -> list[Termin]:
+    """Nur Termine dieses Mandanten, für die der User eine Teilnahme eingetragen hat."""
+    ms = mandant_slug.strip().lower()
     return (
         db.query(Termin)
         .join(TerminTeilnahme, TerminTeilnahme.termin_id == Termin.id)
-        .filter(TerminTeilnahme.user_id == user_id)
+        .filter(TerminTeilnahme.user_id == user_id, Termin.mandant_slug == ms)
         .order_by(Termin.starts_at.asc())
         .all()
     )

@@ -8,6 +8,7 @@ from app.config import DEFAULT_MANDANT_SLUG, MANDANTEN_ROOT
 from app.db_migrate import migrate_legacy_flat_into_mandant
 from app.ov_services import provision_ortsverband_storage, register_ortsverband
 from app.platform_database import platform_engine
+from app.platform_legacy_import import migrate_legacy_into_platform_if_needed
 from app.platform_models import Ortsverband, PlatformBase
 
 
@@ -34,6 +35,8 @@ def bootstrap_platform() -> None:
 
         for ov in db.query(Ortsverband).all():
             provision_ortsverband_storage(ov.slug)
+
+        migrate_legacy_into_platform_if_needed(db)
 
         if db.query(Ortsverband).count() == 0:
             register_ortsverband(db, DEFAULT_MANDANT_SLUG, "Westerstede")

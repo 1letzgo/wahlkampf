@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import DateTime, Float, Integer, String, Text
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from app.database import Base
+
+class Base(DeclarativeBase):
+    pass
 
 
 class AppSetting(Base):
@@ -16,84 +17,8 @@ class AppSetting(Base):
     value: Mapped[str] = mapped_column(String(512))
 
 
-class User(Base):
-    __tablename__ = "users"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    username: Mapped[str] = mapped_column(String(80), unique=True, index=True)
-    password_hash: Mapped[str] = mapped_column(String(255))
-    display_name: Mapped[str] = mapped_column(String(120), default="")
-    is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
-    is_approved: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    # Geheimer Token für /calendar/me.ics (nur zugesagte Termine)
-    calendar_token: Mapped[Optional[str]] = mapped_column(
-        String(64), unique=True, nullable=True, index=True
-    )
-
-    termine: Mapped[List["Termin"]] = relationship(back_populates="creator")
-    teilnahmen: Mapped[List["TerminTeilnahme"]] = relationship(back_populates="user")
-
-
-class TerminTeilnahme(Base):
-    __tablename__ = "termin_teilnahmen"
-    __table_args__ = (
-        UniqueConstraint("termin_id", "user_id", name="uq_teilnahme_termin_user"),
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    termin_id: Mapped[int] = mapped_column(ForeignKey("termine.id", ondelete="CASCADE"))
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-
-    termin: Mapped["Termin"] = relationship(back_populates="teilnahmen")
-    user: Mapped["User"] = relationship(back_populates="teilnahmen")
-
-
-class Termin(Base):
-    __tablename__ = "termine"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    title: Mapped[str] = mapped_column(String(200))
-    description: Mapped[str] = mapped_column(Text, default="")
-    vorbereitung: Mapped[str] = mapped_column(Text, default="")
-    nachbereitung: Mapped[str] = mapped_column(Text, default="")
-    location: Mapped[str] = mapped_column(String(300), default="")
-    starts_at: Mapped[datetime] = mapped_column(DateTime)
-    ends_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    image_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    externe_teilnehmer_json: Mapped[str] = mapped_column(Text, default="[]")
-    created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-
-    creator: Mapped["User"] = relationship(back_populates="termine")
-    teilnahmen: Mapped[List["TerminTeilnahme"]] = relationship(
-        back_populates="termin",
-        cascade="all, delete-orphan",
-    )
-    kommentare: Mapped[List["TerminKommentar"]] = relationship(
-        back_populates="termin",
-        cascade="all, delete-orphan",
-    )
-
-
-class TerminKommentar(Base):
-    __tablename__ = "termin_kommentare"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    termin_id: Mapped[int] = mapped_column(
-        ForeignKey("termine.id", ondelete="CASCADE"), index=True
-    )
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    body: Mapped[str] = mapped_column(Text, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-
-    termin: Mapped["Termin"] = relationship(back_populates="kommentare")
-    user: Mapped["User"] = relationship()
-
-
 class Plakat(Base):
-    """Plakat-Standort; User-IDs verweisen auf users (ohne FK, wie zuvor in separater DB)."""
+    """Plakat-Standort; user_ids verweisen auf globale platform_users.id (ohne FK)."""
 
     __tablename__ = "plakate"
 
@@ -102,10 +27,10 @@ class Plakat(Base):
     longitude: Mapped[float] = mapped_column(Float)
     hung_by_user_id: Mapped[int] = mapped_column(Integer, index=True)
     hung_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    image_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    image_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     note: Mapped[str] = mapped_column(Text, default="")
-    removed_by_user_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    removed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    removed_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     @property
     def is_active(self) -> bool:

@@ -5,6 +5,7 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import date, datetime, time
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -25,11 +26,11 @@ from app.config import (
     PUBLIC_SITE_MANDANT_SLUG,
     SECRET_KEY,
     SESSION_COOKIE,
-    SUPERADMIN_USERNAME,
+    is_superadmin_username,
     upload_dir_for_slug,
 )
-from app.database import get_db
-from app.deps import AdminUser, CurrentUser
+from app.database import get_db, get_sessionmaker
+from app.deps import AdminUser, AuthenticatedUser, CurrentUser
 from app.ics_service import (
     all_termine_for_feed,
     build_ics_calendar,
@@ -37,6 +38,8 @@ from app.ics_service import (
 )
 from app.mandant_host import apply_mandant_host_path_rewrite
 from app.platform_bootstrap import bootstrap_platform
+from app.platform_database import get_platform_db
+from app.platform_models import OvMembership, PlatformUser, Termin, TerminKommentar, TerminTeilnahme
 from app.settings_store import (
     ensure_ics_token_for_ui,
     ensure_user_calendar_token,
@@ -228,7 +231,9 @@ def web_app_manifest(request: Request):
     )
 
 
-def _can_manage_termin(user: models.User, termin: models.Termin) -> bool:
+def _can_manage_termin(user: AuthenticatedUser, termin: Termin) -> bool:
+    if termin.mandant_slug != user.mandant_slug:
+        return False
     return bool(user.is_admin or termin.created_by_id == user.id)
 
 
@@ -256,40 +261,40 @@ def _safe_ext(filename: Optional[str], content_type: Optional[str]) -> str:
     return ""
 
 
-def _pending_approval_count(db: Session, user: models.User) -> int:
+def _pending_approval_count(pdb: Session, mandant_slug: str, user: AuthenticatedUser) -> int:
     if not user.is_admin:
         return 0
+    ms = mandant_slug.strip().lower()
     return (
-        db.query(models.User)
-        .filter(models.User.is_approved.is_(False))
+        pdb.query(OvMembership)
+        .filter(
+            OvMembership.ov_slug == ms,
+            OvMembership.is_approved.is_(False),
+        )
         .count()
     )
 
 
-def _user_display_names(db: Session, user_ids: set[int]) -> dict[int, str]:
+def _user_display_names(pdb: Session, user_ids: set[int]) -> dict[int, str]:
     if not user_ids:
         return {}
-    rows = (
-        db.query(models.User)
-        .filter(models.User.id.in_(user_ids))
-        .all()
-    )
+    rows = pdb.query(PlatformUser).filter(PlatformUser.id.in_(user_ids)).all()
     return {
         u.id: ((u.display_name or u.username).strip() or u.username) for u in rows
     }
 
 
 def _termin_kommentare_public(
-    db: Session, termin_id: int, user: models.User
+    pdb: Session, termin_id: int, user: AuthenticatedUser
 ) -> list[dict]:
     rows = (
-        db.query(models.TerminKommentar)
-        .filter(models.TerminKommentar.termin_id == termin_id)
-        .order_by(models.TerminKommentar.created_at.asc())
+        pdb.query(TerminKommentar)
+        .filter(TerminKommentar.termin_id == termin_id)
+        .order_by(TerminKommentar.created_at.asc())
         .all()
     )
     ids = {r.user_id for r in rows}
-    names = _user_display_names(db, ids)
+    names = _user_display_names(pdb, ids)
     out: list[dict] = []
     for r in rows:
         dt = r.created_at
@@ -308,7 +313,7 @@ def _termin_kommentare_public(
     return out
 
 
-def _plakate_list_payload(db: Session, request: Request) -> list[dict]:
+def _plakate_list_payload(db: Session, pdb: Session, request: Request) -> list[dict]:
     mp = _mp(request)
     rows = (
         db.query(models.Plakat)
@@ -320,7 +325,7 @@ def _plakate_list_payload(db: Session, request: Request) -> list[dict]:
         ids.add(r.hung_by_user_id)
         if r.removed_by_user_id:
             ids.add(r.removed_by_user_id)
-    names = _user_display_names(db, ids)
+    names = _user_display_names(pdb, ids)
     out: list[dict] = []
     for r in rows:
         out.append(
@@ -394,39 +399,61 @@ def login_form(request: Request):
 def login_submit(
     mandant_slug: str,
     request: Request,
-    db: Annotated[Session, Depends(get_db)],
+    pdb: Annotated[Session, Depends(get_platform_db)],
     username: Annotated[str, Form()],
     password: Annotated[str, Form()],
 ):
-    uname = username.strip()
-    user = (
-        db.query(models.User)
-        .filter(func.lower(models.User.username) == uname.lower())
+    uname = username.strip().lower()
+    pu = (
+        pdb.query(PlatformUser)
+        .filter(func.lower(PlatformUser.username) == uname)
         .first()
     )
-    if not user or not verify_password(password, user.password_hash):
+    if not pu or not verify_password(password, pu.password_hash):
         return templates.TemplateResponse(
             request,
             "login.html",
             {"error": "Benutzername oder Passwort falsch.", "info": None},
             status_code=401,
         )
-    if not user.is_approved:
-        # Kein aktiver Administrator → Notfall: einloggender Nutzer wird freigeschaltet
-        # und Admin (z. B. nach fehlerhaftem Gründer-Flag oder leerer Verwaltung).
+    ms = mandant_slug.strip().lower()
+    mem = (
+        pdb.query(OvMembership)
+        .filter(OvMembership.user_id == pu.id, OvMembership.ov_slug == ms)
+        .first()
+    )
+
+    if is_superadmin_username(pu.username):
+        pass
+    elif mem is None:
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            {
+                "error": None,
+                "info": "Für diesen Ortsverband gibt es kein Konto. Bitte zuerst registrieren.",
+            },
+        )
+    elif not mem.is_approved:
         has_active_admin = (
-            db.query(models.User)
+            pdb.query(OvMembership)
             .filter(
-                models.User.is_admin.is_(True),
-                models.User.is_approved.is_(True),
+                OvMembership.ov_slug == ms,
+                OvMembership.is_admin.is_(True),
+                OvMembership.is_approved.is_(True),
             )
             .first()
         )
         if not has_active_admin:
-            user.is_approved = True
-            user.is_admin = True
-            db.merge(models.AppSetting(key="founder_done", value="1"))
-            db.commit()
+            mem.is_approved = True
+            mem.is_admin = True
+            tdb = get_sessionmaker(ms)()
+            try:
+                tdb.merge(models.AppSetting(key="founder_done", value="1"))
+                tdb.commit()
+            finally:
+                tdb.close()
+            pdb.commit()
         else:
             return templates.TemplateResponse(
                 request,
@@ -436,16 +463,17 @@ def login_submit(
                     "info": "Dein Konto ist noch nicht freigegeben. Bitte warte auf einen Administrator.",
                 },
             )
-    ms = mandant_slug.strip().lower()
-    request.session["user_id"] = user.id
+
+    request.session["user_id"] = pu.id
     request.session["mandant_slug"] = ms
     return RedirectResponse(f"{_mp(request)}/menu", status_code=302)
 
 
 @tenant_router.get("/menu", response_class=HTMLResponse)
 def app_menu(
+    mandant_slug: str,
     request: Request,
-    db: Annotated[Session, Depends(get_db)],
+    pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
 ):
     return templates.TemplateResponse(
@@ -453,9 +481,8 @@ def app_menu(
         "menu.html",
         {
             "user": user,
-            "pending_count": _pending_approval_count(db, user),
-            "show_superadmin_link": user.username.strip().lower()
-            == SUPERADMIN_USERNAME,
+            "pending_count": _pending_approval_count(pdb, mandant_slug, user),
+            "show_superadmin_link": is_superadmin_username(user.username),
         },
     )
 
@@ -482,6 +509,7 @@ def sharepic_creator(mandant_slug: str, request: Request, user: CurrentUser):
 def plakate_view(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
+    pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
 ):
     return templates.TemplateResponse(
@@ -489,7 +517,7 @@ def plakate_view(
         "plakate.html",
         {
             "user": user,
-            "plakate_initial": _plakate_list_payload(db, request),
+            "plakate_initial": _plakate_list_payload(db, pdb, request),
             "max_mb": MAX_UPLOAD_MB,
         },
     )
@@ -499,15 +527,17 @@ def plakate_view(
 def plakate_api_list(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
+    pdb: Annotated[Session, Depends(get_platform_db)],
     _: CurrentUser,
 ):
-    return JSONResponse(_plakate_list_payload(db, request))
+    return JSONResponse(_plakate_list_payload(db, pdb, request))
 
 
 @tenant_router.post("/plakate/api/hinzufuegen")
 async def plakate_hinzufuegen(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
+    pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
     lat: Annotated[str, Form()],
     lng: Annotated[str, Form()],
@@ -558,13 +588,14 @@ async def plakate_hinzufuegen(
                 detail="Nur JPEG-, PNG- oder WebP-Bilder erlaubt.",
             )
     db.commit()
-    return JSONResponse({"ok": True, "plakate": _plakate_list_payload(db, request)})
+    return JSONResponse({"ok": True, "plakate": _plakate_list_payload(db, pdb, request)})
 
 
 @tenant_router.post("/plakate/api/abhaengen/{plakat_id}")
 def plakate_abhaengen(
     plakat_id: int,
     db: Annotated[Session, Depends(get_db)],
+    pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
 ):
     p = db.get(models.Plakat, plakat_id)
@@ -577,7 +608,7 @@ def plakate_abhaengen(
     p.removed_at = datetime.utcnow()
     db.add(p)
     db.commit()
-    return JSONResponse({"ok": True, "plakate": _plakate_list_payload(db, request)})
+    return JSONResponse({"ok": True, "plakate": _plakate_list_payload(db, pdb, request)})
 
 
 @tenant_router.get("/registrierung", response_class=HTMLResponse)
@@ -595,8 +626,10 @@ def registrierung_form(request: Request):
 
 @tenant_router.post("/registrierung", response_class=HTMLResponse)
 def registrierung_submit(
+    mandant_slug: str,
     request: Request,
     db: Annotated[Session, Depends(get_db)],
+    pdb: Annotated[Session, Depends(get_platform_db)],
     name: Annotated[str, Form()],
     benutzername: Annotated[str, Form()],
     password: Annotated[str, Form()],
@@ -634,9 +667,10 @@ def registrierung_submit(
             {"error": err, **ctx},
             status_code=400,
         )
+    ms = mandant_slug.strip().lower()
     if (
-        db.query(models.User)
-        .filter(func.lower(models.User.username) == username_norm)
+        pdb.query(PlatformUser)
+        .filter(func.lower(PlatformUser.username) == username_norm)
         .first()
     ):
         return templates.TemplateResponse(
@@ -648,125 +682,197 @@ def registrierung_submit(
             },
             status_code=400,
         )
-    # Gründer:in = erste erfolgreiche Registrierung (persistiertes Flag, nicht nur User-Zähler)
     founder_done = db.get(models.AppSetting, "founder_done")
     is_first_user = founder_done is None
-    db.add(
-        models.User(
-            username=username_norm,
-            password_hash=hash_password(password),
-            display_name=display_name,
-            is_approved=is_first_user,
+    pu = PlatformUser(
+        username=username_norm,
+        password_hash=hash_password(password),
+        display_name=display_name,
+    )
+    pdb.add(pu)
+    pdb.flush()
+    pdb.add(
+        OvMembership(
+            user_id=pu.id,
+            ov_slug=ms,
             is_admin=is_first_user,
-        ),
+            is_approved=is_first_user,
+        )
     )
     if is_first_user:
         db.merge(models.AppSetting(key="founder_done", value="1"))
-    db.commit()
+        db.commit()
+    pdb.commit()
     if is_first_user:
         return RedirectResponse(f"{_mp(request)}/login?registered=first", status_code=302)
     return RedirectResponse(f"{_mp(request)}/login?registered=1", status_code=302)
 
 
-def _admin_count(db: Session) -> int:
+def _admin_count(pdb: Session, mandant_slug: str) -> int:
+    ms = mandant_slug.strip().lower()
     return (
-        db.query(models.User).filter(models.User.is_admin.is_(True)).count()
+        pdb.query(OvMembership)
+        .filter(OvMembership.ov_slug == ms, OvMembership.is_admin.is_(True))
+        .count()
     )
+
+
+def _ov_user_rows_for_admin(pdb: Session, mandant_slug: str) -> list:
+    ms = mandant_slug.strip().lower()
+    memberships = (
+        pdb.query(OvMembership)
+        .filter(OvMembership.ov_slug == ms)
+        .order_by(OvMembership.id.asc())
+        .all()
+    )
+    out: list = []
+    for m in memberships:
+        pu = pdb.get(PlatformUser, m.user_id)
+        if not pu:
+            continue
+        out.append(
+            SimpleNamespace(
+                id=pu.id,
+                username=pu.username,
+                display_name=pu.display_name,
+                created_at=pu.created_at,
+                is_admin=m.is_admin,
+                is_approved=m.is_approved,
+            )
+        )
+    out.sort(key=lambda r: r.created_at)
+    return out
 
 
 @tenant_router.get("/admin/benutzer", response_class=HTMLResponse)
 def admin_benutzer_list(
+    mandant_slug: str,
     request: Request,
-    db: Annotated[Session, Depends(get_db)],
+    pdb: Annotated[Session, Depends(get_platform_db)],
     user: AdminUser,
 ):
-    all_users = (
-        db.query(models.User).order_by(models.User.created_at.asc()).all()
-    )
+    all_users = _ov_user_rows_for_admin(pdb, mandant_slug)
     return templates.TemplateResponse(
         request,
         "admin_benutzer.html",
         {
             "user": user,
             "users": all_users,
-            "admin_count": _admin_count(db),
+            "admin_count": _admin_count(pdb, mandant_slug),
         },
     )
 
 
 @tenant_router.post("/admin/benutzer/{uid}/freigeben")
 def admin_benutzer_freigeben(
+    mandant_slug: str,
     uid: int,
-    db: Annotated[Session, Depends(get_db)],
+    request: Request,
+    pdb: Annotated[Session, Depends(get_platform_db)],
     _: AdminUser,
 ):
-    u = db.get(models.User, uid)
-    if u and not u.is_approved:
-        u.is_approved = True
-        db.commit()
+    ms = mandant_slug.strip().lower()
+    m = (
+        pdb.query(OvMembership)
+        .filter(OvMembership.user_id == uid, OvMembership.ov_slug == ms)
+        .first()
+    )
+    if m and not m.is_approved:
+        m.is_approved = True
+        pdb.commit()
     return RedirectResponse(f"{_mp(request)}/admin/benutzer", status_code=302)
 
 
 @tenant_router.post("/admin/benutzer/{uid}/admin-ernennen")
 def admin_benutzer_admin_ernennen(
+    mandant_slug: str,
     uid: int,
-    db: Annotated[Session, Depends(get_db)],
+    request: Request,
+    pdb: Annotated[Session, Depends(get_platform_db)],
     _: AdminUser,
 ):
-    u = db.get(models.User, uid)
-    if u:
-        u.is_admin = True
-        u.is_approved = True
-        db.commit()
+    ms = mandant_slug.strip().lower()
+    m = (
+        pdb.query(OvMembership)
+        .filter(OvMembership.user_id == uid, OvMembership.ov_slug == ms)
+        .first()
+    )
+    if m:
+        m.is_admin = True
+        m.is_approved = True
+        pdb.commit()
     return RedirectResponse(f"{_mp(request)}/admin/benutzer", status_code=302)
 
 
 @tenant_router.post("/admin/benutzer/{uid}/admin-entfernen")
 def admin_benutzer_admin_entfernen(
+    mandant_slug: str,
     uid: int,
-    db: Annotated[Session, Depends(get_db)],
+    request: Request,
+    pdb: Annotated[Session, Depends(get_platform_db)],
     _: AdminUser,
 ):
-    u = db.get(models.User, uid)
-    if not u or not u.is_admin:
+    ms = mandant_slug.strip().lower()
+    m = (
+        pdb.query(OvMembership)
+        .filter(OvMembership.user_id == uid, OvMembership.ov_slug == ms)
+        .first()
+    )
+    if not m or not m.is_admin:
         return RedirectResponse(f"{_mp(request)}/admin/benutzer", status_code=302)
-    if _admin_count(db) <= 1:
+    if _admin_count(pdb, mandant_slug) <= 1:
         raise HTTPException(
             status_code=403,
             detail="Es muss mindestens ein Administrator bleiben.",
         )
-    u.is_admin = False
-    db.commit()
+    m.is_admin = False
+    pdb.commit()
     return RedirectResponse(f"{_mp(request)}/admin/benutzer", status_code=302)
 
 
 @tenant_router.post("/admin/benutzer/{uid}/loeschen")
 def admin_benutzer_loeschen(
+    mandant_slug: str,
     uid: int,
-    db: Annotated[Session, Depends(get_db)],
+    request: Request,
+    pdb: Annotated[Session, Depends(get_platform_db)],
     actor: AdminUser,
 ):
+    ms = mandant_slug.strip().lower()
     if uid == actor.id:
         raise HTTPException(
             status_code=403,
             detail="Du kannst dein eigenes Konto nicht löschen.",
         )
-    u = db.get(models.User, uid)
-    if not u:
+    mem = (
+        pdb.query(OvMembership)
+        .filter(OvMembership.user_id == uid, OvMembership.ov_slug == ms)
+        .first()
+    )
+    if not mem:
         return RedirectResponse(f"{_mp(request)}/admin/benutzer", status_code=302)
-    if u.is_admin and _admin_count(db) <= 1:
+    if mem.is_admin and _admin_count(pdb, mandant_slug) <= 1:
         raise HTTPException(
             status_code=403,
             detail="Der letzte Administrator kann nicht gelöscht werden.",
         )
-    db.query(models.Termin).filter(
-        models.Termin.created_by_id == uid,
+    n_memberships = pdb.query(OvMembership).filter(OvMembership.user_id == uid).count()
+
+    pdb.query(Termin).filter(
+        Termin.mandant_slug == ms,
+        Termin.created_by_id == uid,
     ).update(
-        {models.Termin.created_by_id: actor.id},
+        {Termin.created_by_id: actor.id},
         synchronize_session=False,
     )
-    db.delete(u)
-    db.commit()
+    pdb.delete(mem)
+    pdb.flush()
+
+    if n_memberships <= 1:
+        pu = pdb.get(PlatformUser, uid)
+        if pu:
+            pdb.delete(pu)
+    pdb.commit()
     return RedirectResponse(f"{_mp(request)}/admin/benutzer", status_code=302)
 
 
@@ -777,32 +883,32 @@ def logout(request: Request):
     return RedirectResponse(f"{_mp(request)}/login", status_code=302)
 
 
-def _termin_kommentar_counts_by_termin(db: Session, termin_ids: list[int]) -> dict[int, int]:
+def _termin_kommentar_counts_by_termin(pdb: Session, termin_ids: list[int]) -> dict[int, int]:
     if not termin_ids:
         return {}
     q = (
-        db.query(
-            models.TerminKommentar.termin_id,
-            func.count(models.TerminKommentar.id),
+        pdb.query(
+            TerminKommentar.termin_id,
+            func.count(TerminKommentar.id),
         )
-        .filter(models.TerminKommentar.termin_id.in_(termin_ids))
-        .group_by(models.TerminKommentar.termin_id)
+        .filter(TerminKommentar.termin_id.in_(termin_ids))
+        .group_by(TerminKommentar.termin_id)
         .all()
     )
     return {int(tid): int(c) for tid, c in q}
 
 
 def _termin_row_from_instance(
-    t: models.Termin,
-    user: models.User,
+    pdb: Session,
+    t: Termin,
+    user: AuthenticatedUser,
     *,
     kommentar_count: int = 0,
 ) -> dict:
+    uids = {tn.user_id for tn in t.teilnahmen}
+    names_map = _user_display_names(pdb, uids)
     names = sorted(
-        {
-            (tn.user.display_name or tn.user.username).strip()
-            for tn in t.teilnahmen
-        },
+        {(names_map.get(tn.user_id, "Unbekannt")).strip() for tn in t.teilnahmen},
         key=str.lower,
     )
     ich = any(tn.user_id == user.id for tn in t.teilnahmen)
@@ -829,8 +935,8 @@ def _filter_extern_gast_keys(extern_gast: Optional[List[str]]) -> list[str]:
 
 def _termin_form_context(
     *,
-    user: models.User,
-    termin: Optional[models.Termin],
+    user: AuthenticatedUser,
+    termin: Optional[Termin],
     error: Optional[str],
     extern_gast: Optional[List[str]] = None,
 ) -> dict:
@@ -850,40 +956,38 @@ def _termin_form_context(
     }
 
 
-def _termin_list_rows(db: Session, user: models.User) -> list[dict]:
+def _termin_list_rows(pdb: Session, mandant_slug: str, user: AuthenticatedUser) -> list[dict]:
+    ms = mandant_slug.strip().lower()
     rows = (
-        db.query(models.Termin)
-        .options(
-            selectinload(models.Termin.teilnahmen).selectinload(
-                models.TerminTeilnahme.user
-            ),
-        )
-        .order_by(models.Termin.starts_at.asc())
+        pdb.query(Termin)
+        .options(selectinload(Termin.teilnahmen))
+        .filter(Termin.mandant_slug == ms)
+        .order_by(Termin.starts_at.asc())
         .all()
     )
     ids = [t.id for t in rows]
-    counts = _termin_kommentar_counts_by_termin(db, ids)
+    counts = _termin_kommentar_counts_by_termin(pdb, ids)
     return [
-        _termin_row_from_instance(t, user, kommentar_count=counts.get(t.id, 0))
+        _termin_row_from_instance(pdb, t, user, kommentar_count=counts.get(t.id, 0))
         for t in rows
     ]
 
 
-def _termin_detail_row(db: Session, user: models.User, termin_id: int) -> dict | None:
+def _termin_detail_row(
+    pdb: Session, mandant_slug: str, user: AuthenticatedUser, termin_id: int
+) -> dict | None:
+    ms = mandant_slug.strip().lower()
     t = (
-        db.query(models.Termin)
-        .options(
-            selectinload(models.Termin.teilnahmen).selectinload(
-                models.TerminTeilnahme.user
-            ),
-        )
-        .filter(models.Termin.id == termin_id)
+        pdb.query(Termin)
+        .options(selectinload(Termin.teilnahmen))
+        .filter(Termin.id == termin_id, Termin.mandant_slug == ms)
         .first()
     )
     if not t:
         return None
-    counts = _termin_kommentar_counts_by_termin(db, [t.id])
+    counts = _termin_kommentar_counts_by_termin(pdb, [t.id])
     return _termin_row_from_instance(
+        pdb,
         t,
         user,
         kommentar_count=counts.get(t.id, 0),
@@ -900,15 +1004,17 @@ def _split_termine_upcoming_past(rows: list[dict]) -> tuple[list[dict], list[dic
 
 @tenant_router.get("/termine", response_class=HTMLResponse)
 def termine_list(
+    mandant_slug: str,
     request: Request,
     db: Annotated[Session, Depends(get_db)],
+    pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
 ):
-    termin_rows = _termin_list_rows(db, user)
+    termin_rows = _termin_list_rows(pdb, mandant_slug, user)
     termin_upcoming, termin_past = _split_termine_upcoming_past(termin_rows)
     token = ensure_ics_token_for_ui(db, ICS_TOKEN)
     base = str(request.base_url).rstrip("/")
-    my_token = ensure_user_calendar_token(db, user)
+    my_token = ensure_user_calendar_token(pdb, user.platform_user)
     mp = _mp(request)
     feed_url_my = f"{base}{mp}/calendar/me.ics?t={my_token}"
     feed_url_all = f"{base}{mp}/calendar.ics?t={token}"
@@ -936,8 +1042,9 @@ def termin_new_form(request: Request, user: CurrentUser):
 
 @tenant_router.post("/termine/neu", response_class=HTMLResponse)
 async def termin_create(
+    mandant_slug: str,
     request: Request,
-    db: Annotated[Session, Depends(get_db)],
+    pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
     title: Annotated[str, Form()],
     datum: Annotated[date, Form()],
@@ -968,7 +1075,8 @@ async def termin_create(
     if en and en <= st:
         en = None
 
-    t = models.Termin(
+    t = Termin(
+        mandant_slug=mandant_slug.strip().lower(),
         title=title.strip(),
         description=description.strip(),
         vorbereitung=vorbereitung.strip(),
@@ -981,8 +1089,8 @@ async def termin_create(
         ),
         created_by_id=user.id,
     )
-    db.add(t)
-    db.flush()
+    pdb.add(t)
+    pdb.flush()
 
     if bild and bild.filename:
         ext = _safe_ext(bild.filename, bild.content_type)
@@ -1009,24 +1117,25 @@ async def termin_create(
                         )
                     f.write(chunk)
             t.image_path = dest_name
-            db.add(t)
+            pdb.add(t)
 
-    db.commit()
+    pdb.commit()
     return RedirectResponse(f"{_mp(request)}/termine/{t.id}", status_code=302)
 
 
 @tenant_router.get("/termine/{termin_id}", response_class=HTMLResponse)
 def termin_detail(
+    mandant_slug: str,
     termin_id: int,
     request: Request,
-    db: Annotated[Session, Depends(get_db)],
+    pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
 ):
-    row = _termin_detail_row(db, user, termin_id)
+    row = _termin_detail_row(pdb, mandant_slug, user, termin_id)
     if not row:
         raise HTTPException(status_code=404, detail="Termin nicht gefunden")
     termin_vergangen = row["termin"].starts_at < datetime.utcnow()
-    kommentare = _termin_kommentare_public(db, termin_id, user)
+    kommentare = _termin_kommentare_public(pdb, termin_id, user)
     return templates.TemplateResponse(
         request,
         "termin_detail.html",
@@ -1041,48 +1150,55 @@ def termin_detail(
 
 @tenant_router.post("/termine/{termin_id}/kommentare")
 def termin_kommentar_create(
+    mandant_slug: str,
     termin_id: int,
     payload: TerminKommentarPayload,
-    db: Annotated[Session, Depends(get_db)],
+    pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
 ):
-    text = payload.body.strip()
-    if not text:
+    ms = mandant_slug.strip().lower()
+    body_txt = payload.body.strip()
+    if not body_txt:
         raise HTTPException(status_code=400, detail="Kommentar darf nicht leer sein.")
-    t = db.get(models.Termin, termin_id)
+    t = (
+        pdb.query(Termin)
+        .filter(Termin.id == termin_id, Termin.mandant_slug == ms)
+        .first()
+    )
     if not t:
         raise HTTPException(status_code=404, detail="Termin nicht gefunden.")
-    km = models.TerminKommentar(
+    km = TerminKommentar(
         termin_id=termin_id,
         user_id=user.id,
-        body=text[:4000],
+        body=body_txt[:4000],
     )
-    db.add(km)
-    db.commit()
+    pdb.add(km)
+    pdb.commit()
     return JSONResponse(
         {
             "ok": True,
-            "kommentare": _termin_kommentare_public(db, termin_id, user),
+            "kommentare": _termin_kommentare_public(pdb, termin_id, user),
         },
     )
 
 
 @tenant_router.patch("/termine/{termin_id}/kommentare/{kommentar_id}")
 def termin_kommentar_update(
+    mandant_slug: str,
     termin_id: int,
     kommentar_id: int,
     payload: TerminKommentarPayload,
-    db: Annotated[Session, Depends(get_db)],
+    pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
 ):
-    text = payload.body.strip()
-    if not text:
+    body_txt = payload.body.strip()
+    if not body_txt:
         raise HTTPException(status_code=400, detail="Kommentar darf nicht leer sein.")
     km = (
-        db.query(models.TerminKommentar)
+        pdb.query(TerminKommentar)
         .filter(
-            models.TerminKommentar.id == kommentar_id,
-            models.TerminKommentar.termin_id == termin_id,
+            TerminKommentar.id == kommentar_id,
+            TerminKommentar.termin_id == termin_id,
         )
         .first()
     )
@@ -1090,29 +1206,30 @@ def termin_kommentar_update(
         raise HTTPException(status_code=404, detail="Kommentar nicht gefunden.")
     if not (user.is_admin or km.user_id == user.id):
         raise HTTPException(status_code=403, detail="Keine Berechtigung.")
-    km.body = text[:4000]
-    db.add(km)
-    db.commit()
+    km.body = body_txt[:4000]
+    pdb.add(km)
+    pdb.commit()
     return JSONResponse(
         {
             "ok": True,
-            "kommentare": _termin_kommentare_public(db, termin_id, user),
+            "kommentare": _termin_kommentare_public(pdb, termin_id, user),
         },
     )
 
 
 @tenant_router.delete("/termine/{termin_id}/kommentare/{kommentar_id}")
 def termin_kommentar_delete(
+    mandant_slug: str,
     termin_id: int,
     kommentar_id: int,
-    db: Annotated[Session, Depends(get_db)],
+    pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
 ):
     km = (
-        db.query(models.TerminKommentar)
+        pdb.query(TerminKommentar)
         .filter(
-            models.TerminKommentar.id == kommentar_id,
-            models.TerminKommentar.termin_id == termin_id,
+            TerminKommentar.id == kommentar_id,
+            TerminKommentar.termin_id == termin_id,
         )
         .first()
     )
@@ -1120,36 +1237,42 @@ def termin_kommentar_delete(
         raise HTTPException(status_code=404, detail="Kommentar nicht gefunden.")
     if not (user.is_admin or km.user_id == user.id):
         raise HTTPException(status_code=403, detail="Keine Berechtigung.")
-    db.delete(km)
-    db.commit()
+    pdb.delete(km)
+    pdb.commit()
     return JSONResponse(
         {
             "ok": True,
-            "kommentare": _termin_kommentare_public(db, termin_id, user),
+            "kommentare": _termin_kommentare_public(pdb, termin_id, user),
         },
     )
 
 
 @tenant_router.post("/termine/{termin_id}/teilnehmen")
 def termin_teilnehmen(
+    mandant_slug: str,
     termin_id: int,
-    db: Annotated[Session, Depends(get_db)],
+    pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
     return_to: Annotated[str | None, Form()] = None,
 ):
-    t = db.get(models.Termin, termin_id)
+    ms = mandant_slug.strip().lower()
+    t = (
+        pdb.query(Termin)
+        .filter(Termin.id == termin_id, Termin.mandant_slug == ms)
+        .first()
+    )
     if not t:
         raise HTTPException(status_code=404, detail="Termin nicht gefunden")
     exists = (
-        db.query(models.TerminTeilnahme)
+        pdb.query(TerminTeilnahme)
         .filter_by(termin_id=termin_id, user_id=user.id)
         .first()
     )
     if not exists:
-        db.add(
-            models.TerminTeilnahme(termin_id=termin_id, user_id=user.id),
+        pdb.add(
+            TerminTeilnahme(termin_id=termin_id, user_id=user.id),
         )
-        db.commit()
+        pdb.commit()
     if return_to == "list":
         return RedirectResponse(f"{_mp(request)}/termine", status_code=302)
     return RedirectResponse(f"{_mp(request)}/termine/{termin_id}", status_code=302)
@@ -1158,19 +1281,20 @@ def termin_teilnehmen(
 @tenant_router.post("/termine/{termin_id}/abmelden")
 @tenant_router.post("/termine/{termin_id}/absagen")
 def termin_abmelden(
+    mandant_slug: str,
     termin_id: int,
-    db: Annotated[Session, Depends(get_db)],
+    pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
     return_to: Annotated[str | None, Form()] = None,
 ):
     row = (
-        db.query(models.TerminTeilnahme)
+        pdb.query(TerminTeilnahme)
         .filter_by(termin_id=termin_id, user_id=user.id)
         .first()
     )
     if row:
-        db.delete(row)
-        db.commit()
+        pdb.delete(row)
+        pdb.commit()
     if return_to == "list":
         return RedirectResponse(f"{_mp(request)}/termine", status_code=302)
     return RedirectResponse(f"{_mp(request)}/termine/{termin_id}", status_code=302)
@@ -1178,12 +1302,18 @@ def termin_abmelden(
 
 @tenant_router.get("/termine/{termin_id}/bearbeiten", response_class=HTMLResponse)
 def termin_edit_form(
+    mandant_slug: str,
     termin_id: int,
     request: Request,
-    db: Annotated[Session, Depends(get_db)],
+    pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
 ):
-    t = db.get(models.Termin, termin_id)
+    ms = mandant_slug.strip().lower()
+    t = (
+        pdb.query(Termin)
+        .filter(Termin.id == termin_id, Termin.mandant_slug == ms)
+        .first()
+    )
     if not t:
         raise HTTPException(status_code=404, detail="Termin nicht gefunden")
     if not _can_manage_termin(user, t):
@@ -1200,9 +1330,10 @@ def termin_edit_form(
 
 @tenant_router.post("/termine/{termin_id}/bearbeiten", response_class=HTMLResponse)
 async def termin_edit_save(
+    mandant_slug: str,
     termin_id: int,
     request: Request,
-    db: Annotated[Session, Depends(get_db)],
+    pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
     title: Annotated[str, Form()],
     datum: Annotated[date, Form()],
@@ -1216,7 +1347,12 @@ async def termin_edit_save(
     extern_gast: Annotated[Optional[List[str]], Form()] = None,
     bild: Annotated[Optional[UploadFile], File()] = None,
 ):
-    t = db.get(models.Termin, termin_id)
+    ms = mandant_slug.strip().lower()
+    t = (
+        pdb.query(Termin)
+        .filter(Termin.id == termin_id, Termin.mandant_slug == ms)
+        .first()
+    )
     if not t:
         raise HTTPException(status_code=404, detail="Termin nicht gefunden")
     if not _can_manage_termin(user, t):
@@ -1270,8 +1406,8 @@ async def termin_edit_save(
                     size += len(chunk)
                     if size > max_b:
                         dest.unlink(missing_ok=True)
-                        db.rollback()
-                        db.refresh(t)
+                        pdb.rollback()
+                        pdb.refresh(t)
                         return templates.TemplateResponse(
                             request,
                             "termin_form.html",
@@ -1287,19 +1423,25 @@ async def termin_edit_save(
             _unlink_upload(t.image_path, _upload_root(request))
             t.image_path = dest_name
 
-    db.add(t)
-    db.commit()
+    pdb.add(t)
+    pdb.commit()
     return RedirectResponse(f"{_mp(request)}/termine/{termin_id}", status_code=302)
 
 
 @tenant_router.get("/termine/{termin_id}/loeschen", response_class=HTMLResponse)
 def termin_delete_confirm(
+    mandant_slug: str,
     termin_id: int,
     request: Request,
-    db: Annotated[Session, Depends(get_db)],
+    pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
 ):
-    t = db.get(models.Termin, termin_id)
+    ms = mandant_slug.strip().lower()
+    t = (
+        pdb.query(Termin)
+        .filter(Termin.id == termin_id, Termin.mandant_slug == ms)
+        .first()
+    )
     if not t:
         raise HTTPException(status_code=404, detail="Termin nicht gefunden")
     if not _can_manage_termin(user, t):
@@ -1316,12 +1458,18 @@ def termin_delete_confirm(
 
 @tenant_router.post("/termine/{termin_id}/loeschen")
 def termin_delete_do(
+    mandant_slug: str,
     termin_id: int,
     request: Request,
-    db: Annotated[Session, Depends(get_db)],
+    pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
 ):
-    t = db.get(models.Termin, termin_id)
+    ms = mandant_slug.strip().lower()
+    t = (
+        pdb.query(Termin)
+        .filter(Termin.id == termin_id, Termin.mandant_slug == ms)
+        .first()
+    )
     if not t:
         raise HTTPException(status_code=404, detail="Termin nicht gefunden")
     if not _can_manage_termin(user, t):
@@ -1330,8 +1478,8 @@ def termin_delete_do(
             detail="Du darfst diesen Termin nicht löschen.",
         )
     _unlink_upload(t.image_path, _upload_root(request))
-    db.delete(t)
-    db.commit()
+    pdb.delete(t)
+    pdb.commit()
     return RedirectResponse(f"{_mp(request)}/termine", status_code=302)
 
 
@@ -1355,13 +1503,15 @@ def _combine(d: date, hhmm: str) -> datetime:
 
 @tenant_router.get("/calendar.ics")
 def calendar_ics(
+    mandant_slug: str,
     request: Request,
     db: Annotated[Session, Depends(get_db)],
+    pdb: Annotated[Session, Depends(get_platform_db)],
     t: Optional[str] = None,
 ):
     if not verify_ics_token(db, ICS_TOKEN, t):
         raise HTTPException(status_code=404, detail="Not found")
-    termine = all_termine_for_feed(db)
+    termine = all_termine_for_feed(pdb, mandant_slug)
     body = build_ics_calendar(termine)
     return Response(
         content=body,
@@ -1375,20 +1525,21 @@ def calendar_ics(
 
 @tenant_router.get("/calendar/me.ics")
 def calendar_ics_me(
-    db: Annotated[Session, Depends(get_db)],
+    mandant_slug: str,
+    pdb: Annotated[Session, Depends(get_platform_db)],
     t: Optional[str] = None,
 ):
     """Persönlicher Feed: nur Termine mit Zusage (Teilnahme) für den zugehörigen Account."""
     if not t:
         raise HTTPException(status_code=404, detail="Not found")
     owner = (
-        db.query(models.User)
-        .filter(models.User.calendar_token == t)
+        pdb.query(PlatformUser)
+        .filter(PlatformUser.calendar_token == t)
         .first()
     )
     if not owner:
         raise HTTPException(status_code=404, detail="Not found")
-    termine = termine_for_user_teilnahmen(db, owner.id)
+    termine = termine_for_user_teilnahmen(pdb, owner.id, mandant_slug)
     body = build_ics_calendar(termine, cal_name="Meine Zusagen — Wahlkampf")
     return Response(
         content=body,

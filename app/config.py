@@ -18,8 +18,25 @@ SESSION_COOKIE = "wahlkampf_session"
 ICS_TOKEN = os.environ.get("ICS_TOKEN", "")
 MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "8"))
 
-# OV-Benutzer mit diesem Namen darf /admin/ortsverbaende (normale Session, kein separates Superadmin-Login)
+# Superadmin: Plattform (/admin/ortsverbaende …). Kommagetrennt oder Semikolon; SUPERADMIN_USERNAME zusätzlich gezählt.
 SUPERADMIN_USERNAME = os.environ.get("SUPERADMIN_USERNAME", "letzgo").strip().lower()
+_super_raw = os.environ.get("SUPERADMIN_USERNAMES", "").strip()
+
+
+def superadmin_usernames() -> frozenset[str]:
+    names: set[str] = set()
+    if SUPERADMIN_USERNAME:
+        names.add(SUPERADMIN_USERNAME)
+    if _super_raw:
+        for part in _super_raw.replace(";", ",").split(","):
+            u = part.strip().lower()
+            if u:
+                names.add(u)
+    return frozenset(names)
+
+
+def is_superadmin_username(username: str) -> bool:
+    return username.strip().lower() in superadmin_usernames()
 
 # Mandant per Hostname (optional): z. B. MANDANT_HOST_BASE_DOMAIN=localhost → westerstede.localhost:8000 → Slug westerstede
 MANDANT_HOST_BASE_DOMAIN = os.environ.get("MANDANT_HOST_BASE_DOMAIN", "").strip().lower()
