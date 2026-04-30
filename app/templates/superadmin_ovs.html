@@ -20,10 +20,11 @@
 </style>
 {% endblock %}
 {% block body %}
+{% set path_prefix = request.scope.get('root_path') or '' %}
 {{ app_header('Ortsverbände') }}
 
 <div class="page-toolbar" aria-label="Aktionen Ortsverbände">
-  <a href="/admin/ortsverbaende/neu" class="btn btn-sm btn-ico btn-with-label" aria-label="Neuer Ortsverband">
+  <a href="{{ path_prefix }}/admin/ortsverbaende/neu" class="btn btn-sm btn-ico btn-with-label" aria-label="Neuer Ortsverband">
     {{ ico.svg_plus() }}<span class="btn-text">Neuer Ortsverband</span>
   </a>
 </div>
@@ -74,13 +75,13 @@
               <td data-label="Anzeigename">{{ o.display_name }}</td>
               <td data-label="Aktionen" class="admin-users-td-actions">
                 <div>
-                  <a href="/m/{{ o.slug }}/login" class="btn btn-sm btn-ghost btn-ico btn-with-label" aria-label="Zum OV {{ o.slug }}">
+                  <a href="{{ path_prefix }}/m/{{ o.slug }}/login" class="btn btn-sm btn-ghost btn-ico btn-with-label" aria-label="Zum OV {{ o.slug }}">
                     {{ ico.svg_login() }}<span class="btn-text">Zum OV</span>
                   </a>
-                  <a href="/admin/ortsverbaende/{{ o.slug }}/bearbeiten" class="btn btn-sm btn-ico btn-with-label" aria-label="OV {{ o.slug }} bearbeiten">
+                  <a href="{{ path_prefix }}/admin/ortsverbaende/{{ o.slug }}/bearbeiten" class="btn btn-sm btn-ico btn-with-label" aria-label="OV {{ o.slug }} bearbeiten">
                     {{ ico.svg_pencil() }}<span class="btn-text">Bearbeiten</span>
                   </a>
-                  <a href="/admin/ortsverbaende/{{ o.slug }}/loeschen" class="btn btn-sm btn-danger btn-ico btn-with-label" aria-label="OV {{ o.slug }} löschen">
+                  <a href="{{ path_prefix }}/admin/ortsverbaende/{{ o.slug }}/loeschen" class="btn btn-sm btn-danger btn-ico btn-with-label" aria-label="OV {{ o.slug }} löschen">
                     {{ ico.svg_trash() }}<span class="btn-text">Löschen</span>
                   </a>
                 </div>

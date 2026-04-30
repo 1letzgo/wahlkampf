@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 import uuid
 from contextlib import asynccontextmanager
-from urllib.parse import quote, urlencode
+from urllib.parse import urlencode
 from datetime import date, datetime, time
 from pathlib import Path
 from types import SimpleNamespace
@@ -153,12 +153,13 @@ async def mandanten_kontext(request: Request, call_next):
 def _browser_login_url(request: Request, slug: str, *, pending: bool = False) -> str:
     s = slug.strip().lower()
     if getattr(request.state, "hide_mandant_path_prefix", False):
-        q = "?pending=1" if pending else ""
-        return f"/login{q}"
+        pfx = _app_path_prefix(request)
+        login_base = f"{pfx}/login" if pfx else "/login"
+        return f"{login_base}?pending=1" if pending else login_base
     params = [("ov", s)]
     if pending:
         params.append(("pending", "1"))
-    return f"/?{urlencode(params)}"
+    return _app_home_with_query(request, params)
 
 
 @app.exception_handler(HTTPException)
@@ -218,6 +219,14 @@ def _upload_root(request: Request) -> Path:
 def _app_path_prefix(request: Request) -> str:
     """Pfad-Präfix hinter Reverse-Proxy (uvicorn --root-path) für PWA scope/start_url."""
     return (request.scope.get("root_path") or "").rstrip("/")
+
+
+def _app_home_with_query(request: Request, params: list[tuple[str, str]]) -> str:
+    """Start-URL der App inkl. root_path; params werden zu ?a=b …"""
+    pfx = _app_path_prefix(request)
+    base = f"{pfx}/" if pfx else "/"
+    qs = urlencode(params)
+    return f"{base}?{qs}" if qs else base
 
 
 @app.get("/manifest.webmanifest", include_in_schema=False)
@@ -403,7 +412,10 @@ def _redirect_after_registrierung(request: Request, ov_slug: str, *, first_user:
         q = "registered=first" if first_user else "registered=1"
         return RedirectResponse(f"{_mp(request)}/login?{q}", status_code=302)
     reg_val = "first" if first_user else "1"
-    return RedirectResponse(f"/?{urlencode([('ov', ms), ('registered', reg_val)])}", status_code=302)
+    return RedirectResponse(
+        _app_home_with_query(request, [("ov", ms), ("registered", reg_val)]),
+        status_code=302,
+    )
 
 
 def _user_display_names(pdb: Session, user_ids: set[int]) -> dict[int, str]:
@@ -507,7 +519,7 @@ def tenant_root(request: Request, mandant_slug: str):
         return RedirectResponse(f"{_mp(request)}/menu", status_code=302)
     if getattr(request.state, "hide_mandant_path_prefix", False):
         return RedirectResponse(f"{_mp(request)}/login", status_code=302)
-    return RedirectResponse(f"/?ov={quote(ms, safe='')}", status_code=302)
+    return RedirectResponse(_app_home_with_query(request, [("ov", ms)]), status_code=302)
 
 
 @tenant_router.get("/login", response_class=HTMLResponse)
@@ -518,7 +530,7 @@ def login_form(request: Request, mandant_slug: str):
         for k, v in request.query_params.multi_items():
             if k != "ov":
                 params.append((k, v))
-        return RedirectResponse(f"/?{urlencode(params)}", status_code=302)
+        return RedirectResponse(_app_home_with_query(request, params), status_code=302)
     info = None
     if request.query_params.get("pending") == "1":
         info = "Dein Konto ist noch nicht freigegeben. Bitte warte auf einen Administrator."
@@ -1177,7 +1189,7 @@ def logout(request: Request, mandant_slug: str):
     request.session.pop("mandant_slug", None)
     if getattr(request.state, "hide_mandant_path_prefix", False):
         return RedirectResponse(f"{_mp(request)}/login", status_code=302)
-    return RedirectResponse(f"/?{urlencode([('ov', slug)])}", status_code=302)
+    return RedirectResponse(_app_home_with_query(request, [("ov", slug)]), status_code=302)
 
 
 def _termin_kommentar_counts_by_termin(pdb: Session, termin_ids: list[int]) -> dict[int, int]:
