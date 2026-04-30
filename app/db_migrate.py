@@ -53,6 +53,33 @@ def migrate_legacy_flat_into_mandant(slug: str) -> None:
                 break
 
 
+def run_platform_sqlite_migrations(engine: Engine) -> None:
+    """Bestehende platform.db an aktuelles PlatformBase-ORM anbinden (fehlende Spalten).
+
+    `metadata.create_all` legt keine neuen Spalten an bestehenden Tabellen an; Deployments mit
+    älterer platform_users-Struktur würden sonst beim ersten SELECT scheitern.
+    """
+    if engine.dialect.name != "sqlite":
+        return
+    insp = inspect(engine)
+    if insp.has_table("platform_users"):
+        cols = {c["name"] for c in insp.get_columns("platform_users")}
+        with engine.begin() as conn:
+            if "display_name" not in cols:
+                conn.execute(
+                    text(
+                        "ALTER TABLE platform_users ADD COLUMN display_name "
+                        "VARCHAR(120) NOT NULL DEFAULT ''"
+                    ),
+                )
+            if "calendar_token" not in cols:
+                conn.execute(
+                    text(
+                        "ALTER TABLE platform_users ADD COLUMN calendar_token VARCHAR(64)"
+                    ),
+                )
+
+
 def run_sqlite_migrations(engine: Engine) -> None:
     if engine.dialect.name != "sqlite":
         return

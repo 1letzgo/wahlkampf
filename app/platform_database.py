@@ -5,6 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from starlette.requests import Request
 
 from app.config import PLATFORM_DATABASE_PATH
+from app.db_migrate import run_platform_sqlite_migrations
 
 
 class _PlatformEngine:
@@ -25,6 +26,7 @@ def _ensure_engine():
             autoflush=False,
             bind=_PlatformEngine.engine,
         )
+        run_platform_sqlite_migrations(_PlatformEngine.engine)
 
 
 def platform_engine():
