@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import uuid
 from contextlib import asynccontextmanager
+from urllib.parse import quote
 from datetime import date, datetime, time
 from pathlib import Path
 from types import SimpleNamespace
@@ -437,7 +438,9 @@ def tenant_root(request: Request, mandant_slug: str):
     ms = mandant_slug.strip().lower()
     if request.session.get("user_id") and request.session.get("mandant_slug") == ms:
         return RedirectResponse(f"{_mp(request)}/menu", status_code=302)
-    return RedirectResponse(f"{_mp(request)}/login", status_code=302)
+    if getattr(request.state, "hide_mandant_path_prefix", False):
+        return RedirectResponse(f"{_mp(request)}/login", status_code=302)
+    return RedirectResponse(f"/?ov={quote(ms, safe='')}", status_code=302)
 
 
 @tenant_router.get("/login", response_class=HTMLResponse)
@@ -462,15 +465,22 @@ def login_form(request: Request):
     )
 
 
-@tenant_router.post("/login", response_class=HTMLResponse)
-def login_submit(
-    mandant_slug: str,
+def _login_submit_response(
+    pdb: Session,
     request: Request,
-    pdb: Annotated[Session, Depends(get_platform_db)],
-    username: Annotated[str, Form()],
-    password: Annotated[str, Form()],
+    mandant_slug: str,
+    username_raw: str,
+    password: str,
 ):
-    uname = username.strip().lower()
+    ms = mandant_slug.strip().lower()
+    if pdb.get(Ortsverband, ms) is None:
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            {"error": "Dieser Ortsverband ist nicht bekannt.", "info": None},
+            status_code=404,
+        )
+    uname = username_raw.strip().lower()
     pu = (
         pdb.query(PlatformUser)
         .filter(func.lower(PlatformUser.username) == uname)
@@ -483,7 +493,6 @@ def login_submit(
             {"error": "Benutzername oder Passwort falsch.", "info": None},
             status_code=401,
         )
-    ms = mandant_slug.strip().lower()
     mem = (
         pdb.query(OvMembership)
         .filter(OvMembership.user_id == pu.id, OvMembership.ov_slug == ms)
@@ -565,6 +574,17 @@ def login_submit(
     request.session["user_id"] = pu.id
     request.session["mandant_slug"] = ms
     return RedirectResponse(f"{_mp(request)}/menu", status_code=302)
+
+
+@tenant_router.post("/login", response_class=HTMLResponse)
+def login_submit(
+    mandant_slug: str,
+    request: Request,
+    pdb: Annotated[Session, Depends(get_platform_db)],
+    username: Annotated[str, Form()],
+    password: Annotated[str, Form()],
+):
+    return _login_submit_response(pdb, request, mandant_slug, username, password)
 
 
 @tenant_router.get("/menu", response_class=HTMLResponse)
@@ -1739,7 +1759,18 @@ def root(request: Request):
     SessionP = sessionmaker(autocommit=False, autoflush=False, bind=platform_engine())
     pdb = SessionP()
     try:
-        ovs = pdb.query(Ortsverband).order_by(Ortsverband.slug.asc()).all()
+        ovs = (
+            pdb.query(Ortsverband)
+            .order_by(func.lower(Ortsverband.display_name), Ortsverband.slug.asc())
+            .all()
+        )
     finally:
         pdb.close()
-    return templates.TemplateResponse(request, "home.html", {"ovs": ovs})
+    valid = {o.slug.strip().lower() for o in ovs}
+    raw_ov = (request.query_params.get("ov") or "").strip().lower()
+    preselect_ov_slug = raw_ov if raw_ov in valid else ""
+    return templates.TemplateResponse(
+        request,
+        "home.html",
+        {"ovs": ovs, "preselect_ov_slug": preselect_ov_slug},
+    )

@@ -1,67 +1,52 @@
 {% extends "base.html" %}
 {% from '_ui_macros.html' import app_header with context %}
+{% import '_icons.html' as ico %}
 {% block title %}Wahlkampf — Start{% endblock %}
-{% block head %}
-<style>
-  .ov-tile-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
-    gap: 0.75rem;
-    margin: 1rem 0 0;
-    padding: 0;
-    list-style: none;
-  }
-  .ov-tile-grid > li {
-    margin: 0;
-  }
-  .ov-tile {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    gap: 0.3rem;
-    padding: 0.9rem 1rem;
-    min-height: 4.25rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--bg);
-    text-decoration: none !important;
-    color: var(--text) !important;
-    box-sizing: border-box;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
-  }
-  .ov-tile:hover {
-    border-color: rgba(196, 30, 58, 0.38);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  }
-  .ov-tile__name {
-    font-weight: 650;
-    font-size: 0.98rem;
-    line-height: 1.25;
-    text-align: center;
-    max-width: 100%;
-  }
-</style>
-{% endblock %}
 {% block body %}
+{% set login_action_slug = preselect_ov_slug if preselect_ov_slug else (ovs[0].slug if ovs else '') %}
 {{ app_header('Start', '/') }}
-<div class="card" style="max-width: 720px; margin: 0 auto;">
-  <h2 style="margin-top:0;">Willkommen</h2>
-  <p class="muted" style="margin-top:0;">Wähle deinen Ortsverband — Termine, Kalender und Sharepic sind je OV getrennt.</p>
+<div class="card" style="max-width: 440px; margin: 0 auto;">
+  <h2 style="margin-top:0;">Anmelden</h2>
   {% if ovs %}
-  <ul class="ov-tile-grid">
-    {% for o in ovs %}
-    <li>
-    <a class="ov-tile" href="/m/{{ o.slug }}/login">
-      <span class="ov-tile__name">{{ (o.display_name or '').strip() }}</span>
-    </a>
-    </li>
-    {% endfor %}
-  </ul>
-  <p class="muted" style="margin-top:1.25rem; font-size:.88rem;">Noch kein Konto? Über „Registrieren“ beim jeweiligen Ortsverband.</p>
+  <p class="muted" style="margin-top:0;">Wähle den Ortsverband und melde dich mit Benutzername und Passwort an.</p>
+  <form id="home-login-form" method="post" action="/m/{{ login_action_slug }}/login">
+    <label for="home-ov-select">Ortsverband</label>
+    <select id="home-ov-select" required autocomplete="off">
+      {% for o in ovs %}
+      {% set oslug = o.slug | lower %}
+      <option value="{{ o.slug }}" {% if preselect_ov_slug == oslug %}selected{% elif not preselect_ov_slug and loop.first %}selected{% endif %}>{{ (o.display_name or '').strip() or o.slug }}</option>
+      {% endfor %}
+    </select>
+    <label for="home-username">Benutzername</label>
+    <input id="home-username" name="username" type="text" autocomplete="username" required placeholder="Benutzername">
+    <label for="home-password">Passwort</label>
+    <input id="home-password" name="password" type="password" autocomplete="current-password" required>
+    <p style="margin-top:1.25rem;">
+      <button type="submit" class="btn btn-ico" aria-label="Einloggen">
+        {{ ico.svg_login() }}<span class="btn-text">Einloggen</span>
+      </button>
+    </p>
+  </form>
+  <p class="muted">Schon bei einem anderen OV registriert? Hier dasselbe Konto nutzen — weiteren Account gibt es nicht.</p>
+  <p class="muted" style="margin-bottom:0;">Noch kein Konto? <a id="home-reg-link" href="/m/{{ login_action_slug }}/registrierung">Registrieren</a> beim gewählten Ortsverband.</p>
+  <script>
+    (function () {
+      var form = document.getElementById("home-login-form");
+      var sel = document.getElementById("home-ov-select");
+      var reg = document.getElementById("home-reg-link");
+      function sync() {
+        var s = sel && sel.value ? sel.value : "";
+        if (!s) return;
+        if (form) form.action = "/m/" + encodeURIComponent(s) + "/login";
+        if (reg) reg.href = "/m/" + encodeURIComponent(s) + "/registrierung";
+      }
+      if (sel) sel.addEventListener("change", sync);
+      if (form) form.addEventListener("submit", sync);
+      sync();
+    })();
+  </script>
   {% else %}
-  <p class="muted">Noch keine Ortsverbände — nach dem ersten Deploy ggf. Datenbank anlegen oder Standard-Mandanten prüfen.</p>
+  <p class="muted" style="margin-top:0;">Noch keine Ortsverbände — nach dem ersten Deploy Datenbank prüfen oder Mandanten anlegen.</p>
   {% endif %}
 </div>
 {% endblock %}
