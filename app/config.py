@@ -18,8 +18,10 @@ SESSION_COOKIE = "wahlkampf_session"
 ICS_TOKEN = os.environ.get("ICS_TOKEN", "")
 MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "8"))
 
-# Bootstrap Superadmin „letzgo“ beim ersten Start, wenn gesetzt
+# Bootstrap Superadmin „letzgo“, wenn noch kein solcher Nutzer existiert
 SUPERADMIN_INITIAL_PASSWORD = os.environ.get("SUPERADMIN_INITIAL_PASSWORD", "").strip()
+# Einmalig setzen, um Passwort von „letzgo“ zu überschreiben oder Nutzer anzulegen (danach wieder entfernen)
+SUPERADMIN_RESET_PASSWORD = os.environ.get("SUPERADMIN_RESET_PASSWORD", "").strip()
 
 
 def mandant_dir(slug: str) -> Path:

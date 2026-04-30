@@ -6,6 +6,10 @@ services:
       - "8000:8000"
     environment:
       SECRET_KEY: ${SECRET_KEY:-dev-change-me-in-production}
+      # Superadmin /admin/login — Benutzer „letzgo“ wird beim ersten Start angelegt, wenn gesetzt:
+      SUPERADMIN_INITIAL_PASSWORD: ${SUPERADMIN_INITIAL_PASSWORD:-}
+      # Vergessenes Passwort: einmalig setzen, Container neu starten, Zeile wieder löschen:
+      # SUPERADMIN_RESET_PASSWORD: ...
       # Bei Altbestand: einmalig PLAKATE_DATABASE_URL=sqlite:////data/plakate.db setzen, bis Daten übernommen sind.
     volumes:
       - wahlkampf-data:/data

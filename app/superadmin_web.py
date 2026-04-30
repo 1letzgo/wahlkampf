@@ -1,13 +1,18 @@
 from __future__ import annotations
 
-from typing import Annotated, Optional
+from typing import Annotated, Optional, Tuple
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlalchemy import func
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from starlette.templating import Jinja2Templates
 
-from app.auth import hash_password, verify_password
+from app import models
+from app.auth import verify_password
+from app.config import DEFAULT_MANDANT_SLUG
+from app.database import get_sessionmaker
 from app.ov_services import (
     register_ortsverband,
     save_uploaded_sharepic_mask,
@@ -21,6 +26,45 @@ TEMPLATES_DIR = __import__("pathlib").Path(__file__).resolve().parent / "templat
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 router = APIRouter(tags=["superadmin"])
+
+
+def _mandant_slugs_for_superadmin_login(platform_db: Session) -> list[str]:
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for ov in platform_db.query(Ortsverband).order_by(Ortsverband.slug):
+        s = ov.slug.strip().lower()
+        if s not in seen:
+            ordered.append(s)
+            seen.add(s)
+    if DEFAULT_MANDANT_SLUG not in seen:
+        ordered.insert(0, DEFAULT_MANDANT_SLUG)
+    return ordered
+
+
+def _attempt_mandant_superadmin_login(
+    platform_db: Session, uname: str, password: str
+) -> Tuple[str, int] | None:
+    """OV-Admin: gleicher Benutzername und Passwort wie beim OV-Login (/m/slug/login)."""
+    for slug in _mandant_slugs_for_superadmin_login(platform_db):
+        SessionLocal = get_sessionmaker(slug)
+        tdb = SessionLocal()
+        try:
+            try:
+                tu = (
+                    tdb.query(models.User)
+                    .filter(func.lower(models.User.username) == uname)
+                    .first()
+                )
+            except OperationalError:
+                continue
+            if not tu or not verify_password(password, tu.password_hash):
+                continue
+            if not tu.is_approved or not tu.is_admin:
+                continue
+            return slug, tu.id
+        finally:
+            tdb.close()
+    return None
 
 
 @router.get("/admin/login", response_class=HTMLResponse)
@@ -45,20 +89,33 @@ def superadmin_login_submit(
         .filter(PlatformUser.username == uname)
         .first()
     )
-    if not u or not verify_password(password, u.password_hash):
-        return templates.TemplateResponse(
-            request,
-            "superadmin_login.html",
-            {"error": "Benutzername oder Passwort falsch."},
-            status_code=401,
-        )
-    request.session["platform_admin_id"] = u.id
-    return RedirectResponse("/admin/ortsverbaende", status_code=302)
+    if u and verify_password(password, u.password_hash):
+        request.session["platform_admin_id"] = u.id
+        request.session.pop("platform_superadmin_mandant_slug", None)
+        request.session.pop("platform_superadmin_user_id", None)
+        return RedirectResponse("/admin/ortsverbaende", status_code=302)
+
+    mandant_auth = _attempt_mandant_superadmin_login(db, uname, password)
+    if mandant_auth:
+        slug, uid = mandant_auth
+        request.session.pop("platform_admin_id", None)
+        request.session["platform_superadmin_mandant_slug"] = slug
+        request.session["platform_superadmin_user_id"] = uid
+        return RedirectResponse("/admin/ortsverbaende", status_code=302)
+
+    return templates.TemplateResponse(
+        request,
+        "superadmin_login.html",
+        {"error": "Benutzername oder Passwort falsch."},
+        status_code=401,
+    )
 
 
 @router.get("/admin/logout")
 def superadmin_logout(request: Request):
     request.session.pop("platform_admin_id", None)
+    request.session.pop("platform_superadmin_mandant_slug", None)
+    request.session.pop("platform_superadmin_user_id", None)
     return RedirectResponse("/admin/login", status_code=302)
 
 

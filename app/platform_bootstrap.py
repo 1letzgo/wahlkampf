@@ -9,11 +9,14 @@ from app.config import (
     DEFAULT_MANDANT_SLUG,
     MANDANTEN_ROOT,
     SUPERADMIN_INITIAL_PASSWORD,
+    SUPERADMIN_RESET_PASSWORD,
 )
 from app.db_migrate import migrate_legacy_flat_into_mandant
 from app.ov_services import provision_ortsverband_storage, register_ortsverband
 from app.platform_database import platform_engine
 from app.platform_models import Ortsverband, PlatformBase, PlatformUser
+
+_LETZGO_USERNAME = "letzgo"
 
 
 def bootstrap_platform() -> None:
@@ -21,10 +24,27 @@ def bootstrap_platform() -> None:
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=platform_engine())
     db = SessionLocal()
     try:
-        if db.query(PlatformUser).count() == 0 and SUPERADMIN_INITIAL_PASSWORD:
+        letzgo_row = (
+            db.query(PlatformUser)
+            .filter(PlatformUser.username == _LETZGO_USERNAME)
+            .first()
+        )
+        if SUPERADMIN_RESET_PASSWORD:
+            if letzgo_row:
+                letzgo_row.password_hash = hash_password(SUPERADMIN_RESET_PASSWORD)
+                db.add(letzgo_row)
+            else:
+                db.add(
+                    PlatformUser(
+                        username=_LETZGO_USERNAME,
+                        password_hash=hash_password(SUPERADMIN_RESET_PASSWORD),
+                    ),
+                )
+            db.commit()
+        elif SUPERADMIN_INITIAL_PASSWORD and letzgo_row is None:
             db.add(
                 PlatformUser(
-                    username="letzgo",
+                    username=_LETZGO_USERNAME,
                     password_hash=hash_password(SUPERADMIN_INITIAL_PASSWORD),
                 ),
             )

@@ -8,8 +8,10 @@ ENV PYTHONUNBUFFERED=1
 # (sonst ist jeder neue Container leer und die SQLite-Datei wirkt „überschrieben“).
 ENV DATABASE_URL=sqlite:////data/wahlkampf.db
 ENV UPLOAD_DIR=/data/uploads
+ENV PLATFORM_DATABASE_PATH=/data/platform.db
+ENV MANDANTEN_ROOT=/data/mandanten
 
-RUN mkdir -p /data/uploads
+RUN mkdir -p /data/uploads /data/mandanten
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
