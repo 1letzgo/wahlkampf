@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.config import PLATFORM_DATABASE_PATH, sqlite_database_path
+from app.config import PLATFORM_DATABASE_PATH, sqlite_database_path, upload_dir_for_slug
 from app.platform_models import (
+    MandantAppSetting,
+    MandantPlakat,
     Ortsverband,
     OvMembership,
     PlatformUser,
@@ -17,6 +21,8 @@ from app.platform_models import (
     TerminKommentar,
     TerminTeilnahme,
 )
+
+_PLAKAT_PATH_RE = re.compile(r"^plakate/(\d+)_(.+)$")
 
 
 def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
@@ -152,6 +158,82 @@ def migrate_legacy_into_platform_if_needed(db_platform: Session) -> None:
     bump_sqlite_sequences(PLATFORM_DATABASE_PATH)
 
 
+def migrate_mandant_sqlite_assets_into_platform(db_platform: Session) -> None:
+    """Übernimmt app_settings und plakate aus Mandanten-wahlkampf.db in die Plattform-DB (idempotent)."""
+    ovs = db_platform.query(Ortsverband).order_by(Ortsverband.slug).all()
+    changed = False
+    for ov in ovs:
+        path = sqlite_database_path(ov.slug)
+        if not path.is_file():
+            continue
+        slug = ov.slug
+        conn = sqlite3.connect(str(path))
+        try:
+            if _table_exists(conn, "app_settings"):
+                for r in _rowdicts(conn, "SELECT key, value FROM app_settings"):
+                    k = str(r["key"])
+                    if db_platform.get(MandantAppSetting, (slug, k)) is not None:
+                        continue
+                    db_platform.merge(
+                        MandantAppSetting(
+                            mandant_slug=slug,
+                            key=k,
+                            value=str(r["value"]),
+                        ),
+                    )
+                    changed = True
+
+            if _table_exists(conn, "plakate"):
+                if (
+                    db_platform.query(MandantPlakat)
+                    .filter(MandantPlakat.mandant_slug == slug)
+                    .first()
+                    is not None
+                ):
+                    continue
+                rows = _rowdicts(conn, "SELECT * FROM plakate ORDER BY id ASC")
+                root = Path(upload_dir_for_slug(slug))
+                for r in rows:
+                    legacy_id = int(r["id"])
+                    mp = MandantPlakat(
+                        mandant_slug=slug,
+                        latitude=float(r["latitude"]),
+                        longitude=float(r["longitude"]),
+                        hung_by_user_id=int(r["hung_by_user_id"]),
+                        hung_at=_parse_dt(r.get("hung_at")) or datetime.utcnow(),
+                        image_path=r.get("image_path"),
+                        note=str(r.get("note") or ""),
+                        removed_by_user_id=r.get("removed_by_user_id"),
+                        removed_at=_parse_dt(r.get("removed_at")),
+                    )
+                    db_platform.add(mp)
+                    db_platform.flush()
+                    old_path = mp.image_path
+                    if isinstance(old_path, str) and old_path.startswith("plakate/"):
+                        m = _PLAKAT_PATH_RE.match(old_path.strip())
+                        if m and int(m.group(1)) == legacy_id:
+                            suffix = m.group(2)
+                            new_rel = f"plakate/{mp.id}_{suffix}"
+                            src = root / old_path
+                            dst = root / new_rel
+                            try:
+                                if src.is_file():
+                                    dst.parent.mkdir(parents=True, exist_ok=True)
+                                    src.rename(dst)
+                                    mp.image_path = new_rel
+                                elif dst.is_file():
+                                    mp.image_path = new_rel
+                            except OSError:
+                                pass
+                    changed = True
+        finally:
+            conn.close()
+
+    if changed:
+        db_platform.commit()
+        bump_sqlite_sequences(PLATFORM_DATABASE_PATH)
+
+
 def bump_sqlite_sequences(platform_db_path: Any) -> None:
     """Nach expliziten IDs: AUTOINCREMENT-Fortsetzung für SQLite."""
     conn = sqlite3.connect(str(platform_db_path))
@@ -162,8 +244,15 @@ def bump_sqlite_sequences(platform_db_path: Any) -> None:
             "termin_teilnahmen",
             "termin_kommentare",
             "ov_memberships",
+            "mandant_plakate",
         ):
-            row = conn.execute(f"SELECT MAX(id) FROM {table}").fetchone()
+            exists = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
+                (table,),
+            ).fetchone()
+            if not exists:
+                continue
+            row = conn.execute(f"SELECT MAX(id) FROM [{table}]").fetchone()
             mx = row[0]
             if mx is None:
                 continue

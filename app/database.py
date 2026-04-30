@@ -1,14 +1,9 @@
 from __future__ import annotations
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
-from starlette.requests import Request
+from sqlalchemy.orm import sessionmaker
 
-from app.config import DEFAULT_MANDANT_SLUG, sqlite_database_path
-
-
-class Base(DeclarativeBase):
-    pass
+from app.config import sqlite_database_path
 
 
 _engines: dict[str, object] = {}
@@ -16,6 +11,7 @@ _sessionmakers: dict[str, sessionmaker] = {}
 
 
 def get_engine_for_mandant(slug: str):
+    """Nur noch für Legacy-/Hilfsskripte; Mandantendaten sind in platform.db."""
     slug = slug.strip().lower()
     if slug not in _engines:
         path = sqlite_database_path(slug)
@@ -46,17 +42,3 @@ def discard_mandant_engine(slug: str) -> None:
     eng = _engines.pop(slug, None)
     if eng is not None:
         eng.dispose()
-
-
-def get_db(request: Request):
-    slug = request.path_params.get("mandant_slug")
-    if slug:
-        slug = slug.strip().lower()
-    else:
-        slug = request.session.get("mandant_slug") or DEFAULT_MANDANT_SLUG
-    SessionLocal = get_sessionmaker(slug)
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()

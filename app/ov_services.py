@@ -7,10 +7,9 @@ import shutil
 
 from sqlalchemy.orm import Session
 
-from app import models
 from app.config import MANDANTEN_ROOT, mandant_dir, upload_dir_for_slug
-from app.database import discard_mandant_engine, get_engine_for_mandant
-from app.platform_models import OvMembership, Ortsverband, Termin
+from app.database import discard_mandant_engine
+from app.platform_models import MandantAppSetting, MandantPlakat, OvMembership, Ortsverband, Termin
 
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{1,79}$")
 
@@ -28,14 +27,12 @@ def validate_ov_slug(slug: str) -> str | None:
 
 
 def provision_ortsverband_storage(slug: str) -> None:
-    """Legt Mandanten-DB und Upload-Struktur an (idempotent)."""
+    """Legt Mandanten-Ordner und Upload-Struktur an (idempotent); Daten liegen in platform.db."""
     slug = slug.strip().lower()
     mandant_dir(slug).mkdir(parents=True, exist_ok=True)
     ud = upload_dir_for_slug(slug)
     ud.mkdir(parents=True, exist_ok=True)
     (ud / "plakate").mkdir(parents=True, exist_ok=True)
-    engine = get_engine_for_mandant(slug)
-    models.Base.metadata.create_all(bind=engine)
 
 
 def delete_ortsverband_completely(db_platform: Session, slug: str) -> None:
@@ -49,6 +46,12 @@ def delete_ortsverband_completely(db_platform: Session, slug: str) -> None:
         raise ValueError("Ortsverband nicht gefunden.")
 
     db_platform.query(OvMembership).filter(OvMembership.ov_slug == s).delete(
+        synchronize_session=False,
+    )
+    db_platform.query(MandantPlakat).filter(MandantPlakat.mandant_slug == s).delete(
+        synchronize_session=False,
+    )
+    db_platform.query(MandantAppSetting).filter(MandantAppSetting.mandant_slug == s).delete(
         synchronize_session=False,
     )
     for t in db_platform.query(Termin).filter(Termin.mandant_slug == s).all():

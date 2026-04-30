@@ -6,6 +6,7 @@ from typing import List, Optional
 from sqlalchemy import (
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -123,3 +124,42 @@ class TerminKommentar(PlatformBase):
 
     termin: Mapped["Termin"] = relationship(back_populates="kommentare")
     user: Mapped["PlatformUser"] = relationship()
+
+
+class MandantAppSetting(PlatformBase):
+    """Schlüssel/Wert pro OV (z. B. founder_done, öffentlicher ICS-Token)."""
+
+    __tablename__ = "mandant_app_settings"
+
+    mandant_slug: Mapped[str] = mapped_column(
+        String(80),
+        ForeignKey("ortsverbaende.slug", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(String(512))
+
+
+class MandantPlakat(PlatformBase):
+    """Plakat-Standort je OV; User-IDs referenzieren platform_users.id (ohne FK)."""
+
+    __tablename__ = "mandant_plakate"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    mandant_slug: Mapped[str] = mapped_column(
+        String(80),
+        ForeignKey("ortsverbaende.slug", ondelete="CASCADE"),
+        index=True,
+    )
+    latitude: Mapped[float] = mapped_column(Float)
+    longitude: Mapped[float] = mapped_column(Float)
+    hung_by_user_id: Mapped[int] = mapped_column(Integer, index=True)
+    hung_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    image_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    note: Mapped[str] = mapped_column(Text, default="")
+    removed_by_user_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    removed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    @property
+    def is_active(self) -> bool:
+        return self.removed_at is None

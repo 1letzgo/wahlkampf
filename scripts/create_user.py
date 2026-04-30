@@ -2,7 +2,7 @@
 """Legt einen Plattform-Nutzer an und ordnet ihn einem OV zu (z. B. Recovery).
 
 Normalerweise reicht die Registrierung in der App; der erste Nutzer im System setzt
-optional tenant-seitig founder_done (wie früher bei Einzel-DB).
+optional OV-weit founder_done in platform.db.
 
 Superadmins werden nicht hier gesetzt, sondern über SUPERADMIN_USERNAME /
 SUPERADMIN_USERNAMES.
@@ -33,10 +33,14 @@ os.environ.setdefault("PLATFORM_DATABASE_PATH", str(ROOT / "platform.db"))
 
 from app.auth import hash_password  # noqa: E402
 from app.config import DEFAULT_MANDANT_SLUG  # noqa: E402
-from app.database import get_engine_for_mandant, get_sessionmaker  # noqa: E402
-from app.models import AppSetting, Base as TenantBase  # noqa: E402
 from app.platform_database import platform_engine  # noqa: E402
-from app.platform_models import Ortsverband, OvMembership, PlatformBase, PlatformUser  # noqa: E402
+from app.platform_models import (  # noqa: E402
+    MandantAppSetting,
+    Ortsverband,
+    OvMembership,
+    PlatformBase,
+    PlatformUser,
+)
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 
 
@@ -102,17 +106,11 @@ def main() -> None:
                 is_approved=True,
             ),
         )
-        pdb.commit()
 
         if was_empty:
-            t_eng = get_engine_for_mandant(slug)
-            TenantBase.metadata.create_all(bind=t_eng)
-            tdb = get_sessionmaker(slug)()
-            try:
-                tdb.merge(AppSetting(key="founder_done", value="1"))
-                tdb.commit()
-            finally:
-                tdb.close()
+            pdb.merge(MandantAppSetting(mandant_slug=slug, key="founder_done", value="1"))
+
+        pdb.commit()
 
         role = "OV-Admin" if args.admin else "Mitglied"
         print(f"Nutzer „{u}“ angelegt/zugeordnet (id={user.id}, {role}, OV={slug}).")

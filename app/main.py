@@ -18,7 +18,15 @@ from sqlalchemy.orm import Session, selectinload
 from starlette.middleware.sessions import SessionMiddleware
 from pydantic import BaseModel, Field
 
-from app import models
+from app.platform_models import (
+    MandantAppSetting,
+    MandantPlakat,
+    OvMembership,
+    PlatformUser,
+    Termin,
+    TerminKommentar,
+    TerminTeilnahme,
+)
 from app.auth import hash_password, verify_password
 from app.config import (
     ICS_TOKEN,
@@ -29,7 +37,6 @@ from app.config import (
     is_superadmin_username,
     upload_dir_for_slug,
 )
-from app.database import get_db, get_sessionmaker
 from app.deps import AdminUser, AuthenticatedUser, CurrentUser
 from app.ics_service import (
     all_termine_for_feed,
@@ -39,7 +46,6 @@ from app.ics_service import (
 from app.mandant_host import apply_mandant_host_path_rewrite
 from app.platform_bootstrap import bootstrap_platform
 from app.platform_database import get_platform_db
-from app.platform_models import OvMembership, PlatformUser, Termin, TerminKommentar, TerminTeilnahme
 from app.settings_store import (
     ensure_ics_token_for_ui,
     ensure_user_calendar_token,
@@ -313,11 +319,15 @@ def _termin_kommentare_public(
     return out
 
 
-def _plakate_list_payload(db: Session, pdb: Session, request: Request) -> list[dict]:
+def _plakate_list_payload(
+    pdb: Session, mandant_slug: str, request: Request
+) -> list[dict]:
     mp = _mp(request)
+    ms = mandant_slug.strip().lower()
     rows = (
-        db.query(models.Plakat)
-        .order_by(models.Plakat.hung_at.desc())
+        pdb.query(MandantPlakat)
+        .filter(MandantPlakat.mandant_slug == ms)
+        .order_by(MandantPlakat.hung_at.desc())
         .all()
     )
     ids: set[int] = set()
@@ -447,12 +457,7 @@ def login_submit(
         if not has_active_admin:
             mem.is_approved = True
             mem.is_admin = True
-            tdb = get_sessionmaker(ms)()
-            try:
-                tdb.merge(models.AppSetting(key="founder_done", value="1"))
-                tdb.commit()
-            finally:
-                tdb.close()
+            pdb.merge(MandantAppSetting(mandant_slug=ms, key="founder_done", value="1"))
             pdb.commit()
         else:
             return templates.TemplateResponse(
@@ -507,8 +512,8 @@ def sharepic_creator(mandant_slug: str, request: Request, user: CurrentUser):
 
 @tenant_router.get("/plakate", response_class=HTMLResponse)
 def plakate_view(
+    mandant_slug: str,
     request: Request,
-    db: Annotated[Session, Depends(get_db)],
     pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
 ):
@@ -517,7 +522,7 @@ def plakate_view(
         "plakate.html",
         {
             "user": user,
-            "plakate_initial": _plakate_list_payload(db, pdb, request),
+            "plakate_initial": _plakate_list_payload(pdb, mandant_slug, request),
             "max_mb": MAX_UPLOAD_MB,
         },
     )
@@ -525,18 +530,18 @@ def plakate_view(
 
 @tenant_router.get("/plakate/api/list")
 def plakate_api_list(
+    mandant_slug: str,
     request: Request,
-    db: Annotated[Session, Depends(get_db)],
     pdb: Annotated[Session, Depends(get_platform_db)],
     _: CurrentUser,
 ):
-    return JSONResponse(_plakate_list_payload(db, pdb, request))
+    return JSONResponse(_plakate_list_payload(pdb, mandant_slug, request))
 
 
 @tenant_router.post("/plakate/api/hinzufuegen")
 async def plakate_hinzufuegen(
+    mandant_slug: str,
     request: Request,
-    db: Annotated[Session, Depends(get_db)],
     pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
     lat: Annotated[str, Form()],
@@ -551,14 +556,16 @@ async def plakate_hinzufuegen(
         raise HTTPException(status_code=400, detail="Koordinaten ungültig.")
     if not (-90 <= lat_f <= 90 and -180 <= lng_f <= 180):
         raise HTTPException(status_code=400, detail="Koordinaten außerhalb des gültigen Bereichs.")
-    p = models.Plakat(
+    ms = mandant_slug.strip().lower()
+    p = MandantPlakat(
+        mandant_slug=ms,
         latitude=lat_f,
         longitude=lng_f,
         hung_by_user_id=user.id,
         note=note.strip(),
     )
-    db.add(p)
-    db.flush()
+    pdb.add(p)
+    pdb.flush()
     if foto and foto.filename:
         ext = _safe_ext(foto.filename, foto.content_type)
         if ext and foto.content_type in ALLOWED_IMAGE:
@@ -573,32 +580,40 @@ async def plakate_hinzufuegen(
                     size += len(chunk)
                     if size > max_b:
                         dest.unlink(missing_ok=True)
-                        db.rollback()
+                        pdb.rollback()
                         raise HTTPException(
                             status_code=400,
                             detail=f"Bild zu groß (max. {MAX_UPLOAD_MB} MB).",
                         )
                     f.write(chunk)
             p.image_path = rel
-            db.add(p)
+            pdb.add(p)
         elif foto.filename:
-            db.rollback()
+            pdb.rollback()
             raise HTTPException(
                 status_code=400,
                 detail="Nur JPEG-, PNG- oder WebP-Bilder erlaubt.",
             )
-    db.commit()
-    return JSONResponse({"ok": True, "plakate": _plakate_list_payload(db, pdb, request)})
+    pdb.commit()
+    return JSONResponse({"ok": True, "plakate": _plakate_list_payload(pdb, mandant_slug, request)})
 
 
 @tenant_router.post("/plakate/api/abhaengen/{plakat_id}")
 def plakate_abhaengen(
+    mandant_slug: str,
     plakat_id: int,
-    db: Annotated[Session, Depends(get_db)],
     pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
 ):
-    p = db.get(models.Plakat, plakat_id)
+    ms = mandant_slug.strip().lower()
+    p = (
+        pdb.query(MandantPlakat)
+        .filter(
+            MandantPlakat.id == plakat_id,
+            MandantPlakat.mandant_slug == ms,
+        )
+        .first()
+    )
     if not p or p.removed_at is not None:
         raise HTTPException(
             status_code=404,
@@ -606,9 +621,9 @@ def plakate_abhaengen(
         )
     p.removed_by_user_id = user.id
     p.removed_at = datetime.utcnow()
-    db.add(p)
-    db.commit()
-    return JSONResponse({"ok": True, "plakate": _plakate_list_payload(db, pdb, request)})
+    pdb.add(p)
+    pdb.commit()
+    return JSONResponse({"ok": True, "plakate": _plakate_list_payload(pdb, mandant_slug, request)})
 
 
 @tenant_router.get("/registrierung", response_class=HTMLResponse)
@@ -628,7 +643,6 @@ def registrierung_form(request: Request):
 def registrierung_submit(
     mandant_slug: str,
     request: Request,
-    db: Annotated[Session, Depends(get_db)],
     pdb: Annotated[Session, Depends(get_platform_db)],
     name: Annotated[str, Form()],
     benutzername: Annotated[str, Form()],
@@ -682,7 +696,7 @@ def registrierung_submit(
             },
             status_code=400,
         )
-    founder_done = db.get(models.AppSetting, "founder_done")
+    founder_done = pdb.get(MandantAppSetting, (ms, "founder_done"))
     is_first_user = founder_done is None
     pu = PlatformUser(
         username=username_norm,
@@ -700,8 +714,7 @@ def registrierung_submit(
         )
     )
     if is_first_user:
-        db.merge(models.AppSetting(key="founder_done", value="1"))
-        db.commit()
+        pdb.merge(MandantAppSetting(mandant_slug=ms, key="founder_done", value="1"))
     pdb.commit()
     if is_first_user:
         return RedirectResponse(f"{_mp(request)}/login?registered=first", status_code=302)
@@ -1014,13 +1027,12 @@ def _split_termine_upcoming_past(rows: list[dict]) -> tuple[list[dict], list[dic
 def termine_list(
     mandant_slug: str,
     request: Request,
-    db: Annotated[Session, Depends(get_db)],
     pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
 ):
     termin_rows = _termin_list_rows(pdb, mandant_slug, user)
     termin_upcoming, termin_past = _split_termine_upcoming_past(termin_rows)
-    token = ensure_ics_token_for_ui(db, ICS_TOKEN)
+    token = ensure_ics_token_for_ui(pdb, mandant_slug, ICS_TOKEN)
     base = str(request.base_url).rstrip("/")
     my_token = ensure_user_calendar_token(pdb, user.platform_user)
     mp = _mp(request)
@@ -1513,11 +1525,10 @@ def _combine(d: date, hhmm: str) -> datetime:
 def calendar_ics(
     mandant_slug: str,
     request: Request,
-    db: Annotated[Session, Depends(get_db)],
     pdb: Annotated[Session, Depends(get_platform_db)],
     t: Optional[str] = None,
 ):
-    if not verify_ics_token(db, ICS_TOKEN, t):
+    if not verify_ics_token(pdb, mandant_slug, ICS_TOKEN, t):
         raise HTTPException(status_code=404, detail="Not found")
     termine = all_termine_for_feed(pdb, mandant_slug)
     body = build_ics_calendar(termine)
