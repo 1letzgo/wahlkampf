@@ -1271,6 +1271,7 @@ def termin_kommentar_delete(
 def termin_teilnehmen(
     mandant_slug: str,
     termin_id: int,
+    request: Request,
     pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
     return_to: Annotated[str | None, Form()] = None,
@@ -1303,6 +1304,7 @@ def termin_teilnehmen(
 def termin_abmelden(
     mandant_slug: str,
     termin_id: int,
+    request: Request,
     pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
     return_to: Annotated[str | None, Form()] = None,
