@@ -10,7 +10,11 @@ services:
       SUPERADMIN_INITIAL_PASSWORD: ${SUPERADMIN_INITIAL_PASSWORD:-}
       # Vergessenes Passwort: einmalig setzen, Container neu starten, Zeile wieder löschen:
       # SUPERADMIN_RESET_PASSWORD: ...
-      # Bei Altbestand: einmalig PLAKATE_DATABASE_URL=sqlite:////data/plakate.db setzen, bis Daten übernommen sind.
+      # Mandant per Subdomain (optional): Host „slug.<BASE>“ → ohne /m/slug in der URL
+      # Beispiel lokal: MANDANT_HOST_BASE_DOMAIN=localhost → http://westerstede.localhost:8000/login
+      # Statt Subdomain (nur Tests): MANDANT_HOST_IS_RAW_SLUG=true → Hostname = Slug, z. B. http://westerstede:8000/
+      # MANDANT_HOST_BASE_DOMAIN: ${MANDANT_HOST_BASE_DOMAIN:-}
+      # MANDANT_HOST_IS_RAW_SLUG: ${MANDANT_HOST_IS_RAW_SLUG:-}
     volumes:
       - wahlkampf-data:/data
 

@@ -27,6 +27,7 @@ from app.ics_service import (
     build_ics_calendar,
     termine_for_user_teilnahmen,
 )
+from app.mandant_host import apply_mandant_host_path_rewrite
 from app.platform_bootstrap import bootstrap_platform
 from app.settings_store import (
     ensure_ics_token_for_ui,
@@ -72,6 +73,7 @@ app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, session_cookie=SESS
 
 @app.middleware("http")
 async def mandanten_kontext(request: Request, call_next):
+    apply_mandant_host_path_rewrite(request.scope)
     request.state.mandanten_prefix = ""
     request.state.mandant_slug = ""
     request.state.ortsverband_name = ""
@@ -329,6 +331,14 @@ def serve_tenant_media(mandant_slug: str, resource_path: str):
         raise HTTPException(status_code=404, detail="Not found")
     return FileResponse(candidate)
 
+
+
+@tenant_router.get("/", include_in_schema=False)
+def tenant_root(request: Request, mandant_slug: str):
+    ms = mandant_slug.strip().lower()
+    if request.session.get("user_id") and request.session.get("mandant_slug") == ms:
+        return RedirectResponse(f"/m/{ms}/menu", status_code=302)
+    return RedirectResponse(f"/m/{ms}/login", status_code=302)
 
 
 @tenant_router.get("/login", response_class=HTMLResponse)
