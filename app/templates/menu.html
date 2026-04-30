@@ -20,7 +20,13 @@
   .menu-page-footer a:hover {
     text-decoration: underline;
   }
-  .menu-my-ovs__caption {
+  .menu-list-section {
+    margin: 0;
+    padding: 0;
+    border-bottom: 1px solid var(--border);
+    list-style: none;
+  }
+  .menu-list-section__label {
     margin: 0;
     padding: 0.72rem 1.25rem;
     font-size: 0.72rem;
@@ -28,100 +34,47 @@
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--muted);
-    border-bottom: 1px solid var(--border);
     background: color-mix(in srgb, var(--border) 35%, transparent);
   }
-  .menu-my-ovs__grid {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    padding: 0.55rem 0.75rem 0.85rem;
+  .menu-list__main.menu-list__main--stack {
+    align-items: flex-start;
   }
-  .menu-ov-card {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.45rem 0.75rem;
-    padding: 0.88rem 1rem;
-    text-decoration: none;
-    color: inherit;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--bg);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
-  }
-  .menu-ov-card:hover {
-    border-color: rgba(196, 30, 58, 0.38);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.65),
-      0 2px 12px rgba(0, 0, 0, 0.06);
-  }
-  .menu-ov-card:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-  .menu-ov-card--current {
-    border-color: rgba(196, 30, 58, 0.42);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.65),
-      0 0 0 1px rgba(196, 30, 58, 0.12);
-  }
-  .menu-ov-card__main {
+  .menu-list__main.menu-list__main--stack .menu-list-ov-text {
     display: flex;
     flex-direction: column;
     gap: 0.12rem;
     min-width: 0;
-    flex: 1 1 auto;
-  }
-  .menu-ov-card__name {
-    font-weight: 650;
-    font-size: 1.02rem;
+    font-weight: 600;
     line-height: 1.25;
-    letter-spacing: -0.02em;
   }
-  .menu-ov-card__slug {
+  .menu-list-ov-slug {
     font-size: 0.78rem;
+    font-weight: 500;
     color: var(--muted);
     font-family: ui-monospace, monospace;
   }
-  .menu-ov-card__meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.35rem;
+  .menu-list a:hover .menu-list-ov-slug {
+    color: rgba(255, 255, 255, 0.88);
+  }
+  .menu-list a.menu-list-ov-active {
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+  .menu-list a.menu-list-ov-active:not(:hover) {
+    background: color-mix(in srgb, var(--accent) 9%, transparent);
+  }
+  .menu-ov-suffix {
     flex-shrink: 0;
-  }
-  .menu-ov-card__pill {
-    font-size: 0.68rem;
+    font-size: 0.72rem;
     font-weight: 700;
+    color: var(--muted);
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    padding: 0.22rem 0.45rem;
-    border-radius: 6px;
-    white-space: nowrap;
+    letter-spacing: 0.04em;
+    max-width: 42%;
+    text-align: right;
+    line-height: 1.25;
   }
-  .menu-ov-card__pill--active {
-    background: rgba(196, 30, 58, 0.14);
-    color: var(--accent);
-  }
-  .menu-ov-card__pill--admin {
-    background: var(--border);
-    color: var(--muted);
-  }
-  .menu-ov-card__go {
-    display: flex;
-    align-items: center;
-    color: var(--muted);
-  }
-  .menu-ov-card__go .ico {
-    width: 1.15rem;
-    height: 1.15rem;
-    transform: scaleX(-1);
-  }
-  .menu-ov-card:hover .menu-ov-card__go {
-    color: var(--accent);
+  .menu-list a:hover .menu-ov-suffix {
+    color: rgba(255, 255, 255, 0.92);
   }
 </style>
 {% endblock %}
@@ -129,33 +82,30 @@
 {% set menu_title = (request.state.ortsverband_name or request.state.mandant_slug or 'Menü') %}
 {{ app_header(menu_title) }}
 
-{% if my_ovs | length %}
-<div class="card card--flush menu-my-ovs" aria-labelledby="menu-my-ovs-heading">
-  <h2 class="menu-my-ovs__caption" id="menu-my-ovs-heading">Meine Verbände</h2>
-  <div class="menu-my-ovs__grid">
-    {% for o in my_ovs %}
-    <a
-      href="{{ o.href }}"
-      class="menu-ov-card{% if o.current %} menu-ov-card--current{% endif %}"
-      {% if o.current %}aria-current="page"{% endif %}
-    >
-      <span class="menu-ov-card__main">
-        <span class="menu-ov-card__name">{{ o.display_name }}</span>
-        <span class="menu-ov-card__slug">{{ o.slug }}</span>
-      </span>
-      <span class="menu-ov-card__meta">
-        {% if o.current %}<span class="menu-ov-card__pill menu-ov-card__pill--active">Aktiv</span>{% endif %}
-        {% if o.is_admin %}<span class="menu-ov-card__pill menu-ov-card__pill--admin">Admin</span>{% endif %}
-        <span class="menu-ov-card__go" aria-hidden="true">{{ ico.svg_arrow_left() }}</span>
-      </span>
-    </a>
-    {% endfor %}
-  </div>
-</div>
-{% endif %}
-
 <div class="card card--flush">
   <ul class="menu-list" role="list">
+    {% if my_ovs | length %}
+    <li class="menu-list-section">
+      <h2 class="menu-list-section__label" id="menu-my-ovs-heading">Meine Verbände</h2>
+    </li>
+    {% for o in my_ovs %}
+    <li>
+      <a
+        href="{{ o.href }}"
+        class="{% if o.current %}menu-list-ov-active{% endif %}"
+        {% if o.current %}aria-current="page"{% endif %}
+      >
+        <span class="menu-list__main menu-list__main--stack">
+          {{ ico.svg_home() }}
+          <span class="menu-list-ov-text">{{ o.display_name }}<span class="menu-list-ov-slug">{{ o.slug }}</span></span>
+        </span>
+        {% if o.current or o.is_admin %}
+        <span class="menu-ov-suffix">{% if o.current %}Aktiv{% endif %}{% if o.current and o.is_admin %} · {% endif %}{% if o.is_admin %}Admin{% endif %}</span>
+        {% endif %}
+      </a>
+    </li>
+    {% endfor %}
+    {% endif %}
     <li><a href="{{ request.state.mandanten_prefix }}/termine"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Termine</span></span></a></li>
     <li><a href="{{ request.state.mandanten_prefix }}/plakate"><span class="menu-list__main">{{ ico.svg_map_pin() }}<span>Plakate</span></span></a></li>
     <li><a href="{{ request.state.mandanten_prefix }}/sharepic"><span class="menu-list__main">{{ ico.svg_image() }}<span>Sharepic</span></span></a></li>
