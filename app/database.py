@@ -39,6 +39,15 @@ def get_sessionmaker(slug: str) -> sessionmaker:
     return _sessionmakers[slug]
 
 
+def discard_mandant_engine(slug: str) -> None:
+    """SQLAlchemy-Engine für einen Mandanten aus dem Cache werfen (z. B. nach OV-Löschung)."""
+    slug = slug.strip().lower()
+    _sessionmakers.pop(slug, None)
+    eng = _engines.pop(slug, None)
+    if eng is not None:
+        eng.dispose()
+
+
 def get_db(request: Request):
     slug = request.path_params.get("mandant_slug")
     if slug:

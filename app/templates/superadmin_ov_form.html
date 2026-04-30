@@ -30,6 +30,10 @@
     <button type="submit" class="btn">Speichern</button>
     <a href="/admin/ortsverbaende" class="btn btn-ghost" style="margin-left:.5rem;">Zurück</a>
   </form>
+  <p style="margin-top:1.5rem; padding-top:1rem; border-top:1px solid var(--border);" class="muted">
+    <a href="/admin/ortsverbaende/{{ ov.slug }}/loeschen" class="btn btn-sm btn-danger">Ortsverband löschen…</a>
+    <span style="display:block; margin-top:.5rem; font-size:.85rem;">Entfernt Plattform-Eintrag, SQLite und alle Uploads dieses OV.</span>
+  </p>
   {% endif %}
 </div>
 {% endblock %}

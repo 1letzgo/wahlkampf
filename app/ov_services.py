@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import re
+import shutil
 from pathlib import Path
 from shutil import copy2
 
 from sqlalchemy.orm import Session
 
 from app import models
-from app.config import mandant_dir, upload_dir_for_slug
-from app.database import get_engine_for_mandant
+from app.config import MANDANTEN_ROOT, mandant_dir, upload_dir_for_slug
+from app.database import discard_mandant_engine, get_engine_for_mandant
 from app.db_migrate import migrate_plakate_from_legacy_sqlite, run_sqlite_migrations
 from app.platform_models import Ortsverband
 
@@ -50,6 +51,29 @@ def provision_ortsverband_storage(slug: str) -> None:
     run_sqlite_migrations(engine)
     migrate_plakate_from_legacy_sqlite(engine)
     ensure_sharepic_mask(slug)
+
+
+def delete_ortsverband_completely(db_platform: Session, slug: str) -> None:
+    """Entfernt den OV aus der Plattform-DB, wirft Engine-Cache und löscht Mandantenordner rekursiv."""
+    err = validate_ov_slug(slug)
+    if err:
+        raise ValueError(err)
+    s = slug.strip().lower()
+    ov = db_platform.get(Ortsverband, s)
+    if not ov:
+        raise ValueError("Ortsverband nicht gefunden.")
+
+    db_platform.delete(ov)
+    db_platform.commit()
+
+    discard_mandant_engine(s)
+
+    root = mandant_dir(s).resolve()
+    mr = MANDANTEN_ROOT.resolve()
+    if root.is_dir():
+        if root == mr or not root.is_relative_to(mr):
+            raise RuntimeError("Ungültiger Mandantenpfad; Ordner wurde nicht gelöscht.")
+        shutil.rmtree(root)
 
 
 def register_ortsverband(db_platform: Session, slug: str, display_name: str) -> None:

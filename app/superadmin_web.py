@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Annotated, Optional
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -8,7 +9,9 @@ from sqlalchemy.orm import Session
 from starlette.templating import Jinja2Templates
 
 from app.deps import LetzgoSuperadmin
+from app.config import PUBLIC_SITE_MANDANT_SLUG
 from app.ov_services import (
+    delete_ortsverband_completely,
     register_ortsverband,
     save_uploaded_sharepic_mask,
     validate_ov_slug,
@@ -34,10 +37,12 @@ def superadmin_ov_list(
     _: LetzgoSuperadmin,
 ):
     ovs = db.query(Ortsverband).order_by(Ortsverband.slug.asc()).all()
+    flash_ok = request.query_params.get("geloescht") == "1"
+    flash_warn = request.query_params.get("ordner_warnung")
     return templates.TemplateResponse(
         request,
         "superadmin_ovs.html",
-        {"ovs": ovs},
+        {"ovs": ovs, "flash_ok": flash_ok, "flash_warn": flash_warn},
     )
 
 
@@ -135,3 +140,59 @@ async def superadmin_ov_edit_submit(
                 status_code=400,
             )
     return RedirectResponse("/admin/ortsverbaende", status_code=302)
+
+
+@router.get("/admin/ortsverbaende/{slug}/loeschen", response_class=HTMLResponse)
+def superadmin_ov_delete_form(
+    slug: str,
+    request: Request,
+    db: Annotated[Session, Depends(get_platform_db)],
+    _: LetzgoSuperadmin,
+):
+    s = slug.strip().lower()
+    ov = db.get(Ortsverband, s)
+    if not ov:
+        raise HTTPException(status_code=404, detail="Unbekannt")
+    warn_public_site = bool(PUBLIC_SITE_MANDANT_SLUG and s == PUBLIC_SITE_MANDANT_SLUG)
+    return templates.TemplateResponse(
+        request,
+        "superadmin_ov_loeschen.html",
+        {"ov": ov, "error": None, "warn_public_site": warn_public_site},
+    )
+
+
+@router.post("/admin/ortsverbaende/{slug}/loeschen")
+def superadmin_ov_delete_submit(
+    slug: str,
+    request: Request,
+    db: Annotated[Session, Depends(get_platform_db)],
+    _: LetzgoSuperadmin,
+    confirm_slug: Annotated[str, Form()],
+):
+    s = slug.strip().lower()
+    ov = db.get(Ortsverband, s)
+    if not ov:
+        raise HTTPException(status_code=404, detail="Unbekannt")
+    warn_public_site = bool(PUBLIC_SITE_MANDANT_SLUG and s == PUBLIC_SITE_MANDANT_SLUG)
+    if confirm_slug.strip().lower() != s:
+        return templates.TemplateResponse(
+            request,
+            "superadmin_ov_loeschen.html",
+            {
+                "ov": ov,
+                "error": f"Zur Bestätigung bitte exakt den Slug „{s}“ eingeben.",
+                "warn_public_site": warn_public_site,
+            },
+            status_code=400,
+        )
+    try:
+        delete_ortsverband_completely(db, s)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except (OSError, RuntimeError) as e:
+        q = quote(str(e), safe="")
+        return RedirectResponse(
+            f"/admin/ortsverbaende?ordner_warnung={q}",
+            status_code=302,
+        )
+    return RedirectResponse("/admin/ortsverbaende?geloescht=1", status_code=302)

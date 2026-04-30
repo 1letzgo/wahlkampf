@@ -12,6 +12,14 @@
     </div>
   </div>
   <div style="padding:1rem 1.1rem;">
+    {% if flash_ok %}
+    <p style="margin:0 0 .75rem; padding:.6rem .75rem; background:var(--panel); border-radius:var(--radius); font-size:.92rem;">Ortsverband wurde gelöscht.</p>
+    {% endif %}
+    {% if flash_warn %}
+    <p style="margin:0 0 .75rem; padding:.6rem .75rem; border:1px solid var(--accent); border-radius:var(--radius); font-size:.92rem; color:var(--accent);">
+      Plattform-Eintrag wurde entfernt; Mandantenordner konnte nicht gelöscht werden: {{ flash_warn }}
+    </p>
+    {% endif %}
     {% if not ovs %}
     <p class="muted">Noch keine Einträge.</p>
     {% else %}
@@ -20,7 +28,7 @@
         <tr style="text-align:left; border-bottom:1px solid var(--border);">
           <th style="padding:.45rem 0;">Slug (URL)</th>
           <th style="padding:.45rem 0;">Anzeigename</th>
-          <th style="padding:.45rem 0; width:9rem;"></th>
+          <th style="padding:.45rem 0; width:11rem;"></th>
         </tr>
       </thead>
       <tbody>
@@ -31,6 +39,7 @@
           <td style="padding:.55rem 0;">
             <a href="/m/{{ o.slug }}/login" class="btn btn-sm btn-ghost">Zum OV</a>
             <a href="/admin/ortsverbaende/{{ o.slug }}/bearbeiten" class="btn btn-sm">Bearbeiten</a>
+            <a href="/admin/ortsverbaende/{{ o.slug }}/loeschen" class="btn btn-sm btn-danger">Löschen</a>
           </td>
         </tr>
         {% endfor %}

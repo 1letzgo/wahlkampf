@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from '_ui_macros.html' import app_header with context %}
+{% import '_icons.html' as ico %}
+{% block title %}Ortsverband löschen{% endblock %}
+{% block body %}
+{{ app_header('Ortsverband löschen', '/admin/ortsverbaende') }}
+<div class="card" style="max-width: 520px; margin: 0 auto;">
+  <h2 style="margin-top:0;">OV unwiderruflich löschen?</h2>
+  {% if warn_public_site %}
+  <p style="color:var(--accent); font-size:.92rem;">Hinweis: Dieser Slug entspricht <code>PUBLIC_SITE_MANDANT_SLUG</code>. Nach dem Löschen kann die öffentliche Site dieses Hosts nicht mehr diesem OV zugeordnet werden.</p>
+  {% endif %}
+  <p class="muted" style="margin:0 0 .75rem;"><strong>{{ ov.display_name }}</strong> · <code>{{ ov.slug }}</code></p>
+  <p class="muted" style="font-size:.9rem; margin:0 0 1rem;">Der Eintrag in der Plattform-Datenbank wird entfernt. Der Mandantenordner inkl. SQLite (<code>wahlkampf.db</code>) und aller Uploads wird gelöscht.</p>
+  {% if error %}<p style="color:var(--accent);">{{ error }}</p>{% endif %}
+  <form method="post" action="/admin/ortsverbaende/{{ ov.slug }}/loeschen" style="margin-top:1rem;">
+    <label class="muted">Zur Bestätigung Slug eingeben: <code>{{ ov.slug }}</code></label>
+    <input name="confirm_slug" required autocomplete="off"
+      placeholder="{{ ov.slug }}"
+      style="width:100%; padding:.5rem; margin:.35rem 0 1rem; border:1px solid var(--border); border-radius:var(--radius); box-sizing:border-box;">
+    <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
+      <button type="submit" class="btn btn-sm btn-danger btn-ico btn-with-label" aria-label="Ortsverband endgültig löschen">
+        {{ ico.svg_trash() }}<span class="btn-text">Endgültig löschen</span>
+      </button>
+      <a href="/admin/ortsverbaende" class="btn btn-sm btn-ghost btn-ico btn-with-label" aria-label="Abbrechen">
+        {{ ico.svg_x() }}<span class="btn-text">Abbrechen</span>
+      </a>
+    </div>
+  </form>
+</div>
+{% endblock %}
