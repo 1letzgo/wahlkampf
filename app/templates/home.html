@@ -39,11 +39,6 @@
     font-size: 0.98rem;
     line-height: 1.25;
   }
-  .ov-tile__slug {
-    font-size: 0.72rem;
-    color: var(--muted);
-    letter-spacing: 0.02em;
-  }
 </style>
 {% endblock %}
 {% block body %}
@@ -56,8 +51,7 @@
     {% for o in ovs %}
     <li>
     <a class="ov-tile" href="/m/{{ o.slug }}/login">
-      <span class="ov-tile__name">{{ o.display_name }}</span>
-      <span class="ov-tile__slug">{{ o.slug }}</span>
+      <span class="ov-tile__name">{{ (o.display_name or '').strip() }}</span>
     </a>
     </li>
     {% endfor %}
