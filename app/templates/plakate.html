@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from '_ui_macros.html' import app_header, public_tenant_prefix with context %}
+{% from '_ui_macros.html' import app_header with context %}
 {% import '_icons.html' as ico %}
 {% block title %}Plakate — Wahlkampf{% endblock %}
 {% block head %}
@@ -268,8 +268,14 @@
 <script>
 (function () {
   var initial = {{ plakate_initial | tojson }};
-  var MP = {{ public_tenant_prefix(request) | tojson }};
   var dialog = document.getElementById("plakate-add-dialog");
+
+  /** Relativ zur aktuellen Seite (/…/plakate), damit Proxy/root_path immer stimmen */
+  function plakateApiPath(rest) {
+    var path = window.location.pathname.replace(/\/+$/, "") || "/";
+    if (rest.charAt(0) === "/") rest = rest.slice(1);
+    return path + "/" + rest;
+  }
 
   function deDt(iso) {
     if (!iso) return "—";
@@ -528,13 +534,21 @@
     var pid = rid != null ? parseInt(String(rid).trim(), 10) : NaN;
     if (!Number.isFinite(pid) || pid < 1) return;
     if (!confirm("Dieses Plakat als abgehängt melden?")) return;
-    var url = MP + "/plakate/api/abhaengen/" + pid;
+    var url = plakateApiPath("api/abhaengen/" + pid);
     fetch(url, {
       method: "POST",
       credentials: "same-origin",
       headers: { Accept: "application/json" },
     })
       .then(function (r) {
+        var ct = (r.headers.get("content-type") || "").toLowerCase();
+        if (!ct.includes("application/json")) {
+          return r.text().then(function () {
+            throw new Error(
+              r.status >= 400 ? "HTTP " + r.status : "Unerwartete Antwort vom Server.",
+            );
+          });
+        }
         return r.json().then(function (j) {
           if (!r.ok) {
             var d = j.detail;
@@ -566,13 +580,21 @@
     var fd = new FormData(e.target);
     var msg = document.getElementById("plakate-form-msg");
     msg.textContent = "Speichern…";
-    fetch(MP + "/plakate/api/hinzufuegen", {
+    fetch(plakateApiPath("api/hinzufuegen"), {
       method: "POST",
       body: fd,
       credentials: "same-origin",
       headers: { Accept: "application/json" },
     })
       .then(function (r) {
+        var ct = (r.headers.get("content-type") || "").toLowerCase();
+        if (!ct.includes("application/json")) {
+          return r.text().then(function () {
+            throw new Error(
+              r.status >= 400 ? "HTTP " + r.status : "Unerwartete Antwort vom Server.",
+            );
+          });
+        }
         return r.json().then(function (j) {
           if (!r.ok) {
             var d = j.detail;
