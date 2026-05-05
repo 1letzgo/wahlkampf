@@ -1549,12 +1549,15 @@ def _termin_list_rows(pdb: Session, mandant_slug: str, user: AuthenticatedUser) 
     if ks and ms != ks:
         q = q.filter(
             or_(
-                Termin.mandant_slug == ms,
-                and_(Termin.promoted_all_ovs.is_(True), Termin.mandant_slug == ks),
+                func.lower(Termin.mandant_slug) == ms,
+                and_(
+                    Termin.promoted_all_ovs == True,  # noqa: E712
+                    func.lower(Termin.mandant_slug) == ks,
+                ),
             ),
         )
     else:
-        q = q.filter(Termin.mandant_slug == ms)
+        q = q.filter(func.lower(Termin.mandant_slug) == ms)
     rows = q.order_by(Termin.starts_at.asc()).all()
     ids = [t.id for t in rows]
     counts = _termin_kommentar_counts_by_termin(pdb, ids)
@@ -1667,7 +1670,10 @@ def _termin_list_rows_multi(
         q = q.filter(
             or_(
                 Termin.mandant_slug.in_(sl),
-                and_(Termin.promoted_all_ovs.is_(True), Termin.mandant_slug == ks),
+                and_(
+                    Termin.promoted_all_ovs == True,  # noqa: E712
+                    func.lower(Termin.mandant_slug) == ks,
+                ),
             ),
         )
     else:

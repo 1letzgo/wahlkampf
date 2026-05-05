@@ -68,12 +68,16 @@ PUBLIC_SITE_HOSTS = _parse_public_site_hosts(
 PUBLIC_SITE_MANDANT_SLUG = os.environ.get("PUBLIC_SITE_MANDANT_SLUG", "").strip().lower()
 
 # Kreis-/überörtlicher OV: Slug für projektweit sichtbare Termine (optional).
-_raw_kreis_ov = os.environ.get("WAHKAMPF_KREIS_OV_SLUG", "").strip().lower()
+# Pro Aufruf aus os.environ lesen (Workers/Reload, gleiche Slugs wie ortsverbaende.slug).
 
 
 def kreis_ov_slug() -> str | None:
     """Mandanten-Slug des Kreises oder None, wenn nicht konfiguriert."""
-    return _raw_kreis_ov if _raw_kreis_ov else None
+    raw = os.environ.get("WAHKAMPF_KREIS_OV_SLUG", "").strip()
+    if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in "\"'":
+        raw = raw[1:-1].strip()
+    raw = raw.lower()
+    return raw if raw else None
 
 
 def mandant_dir(slug: str) -> Path:

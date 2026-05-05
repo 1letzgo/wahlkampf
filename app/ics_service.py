@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from icalendar import Calendar, Event
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.config import kreis_ov_slug
@@ -74,10 +74,13 @@ def _mandanten_filter_for_feed(ms: str):
     ks = kreis_ov_slug()
     if ks and ms != ks:
         return or_(
-            Termin.mandant_slug == ms,
-            and_(Termin.promoted_all_ovs.is_(True), Termin.mandant_slug == ks),
+            func.lower(Termin.mandant_slug) == ms,
+            and_(
+                Termin.promoted_all_ovs == True,  # noqa: E712
+                func.lower(Termin.mandant_slug) == ks,
+            ),
         )
-    return Termin.mandant_slug == ms
+    return func.lower(Termin.mandant_slug) == ms
 
 
 def all_termine_for_feed(db: Session, mandant_slug: str) -> list[Termin]:
@@ -113,11 +116,14 @@ def termine_zugesagt_multi_mandanten(
         return []
     slugs = [s.strip().lower() for s in mandant_slugs]
     ks = kreis_ov_slug()
-    mandanten_cond = Termin.mandant_slug.in_(slugs)
+    mandanten_cond = func.lower(Termin.mandant_slug).in_(slugs)
     if ks:
         mandanten_cond = or_(
             mandanten_cond,
-            and_(Termin.promoted_all_ovs.is_(True), Termin.mandant_slug == ks),
+            and_(
+                Termin.promoted_all_ovs == True,  # noqa: E712
+                func.lower(Termin.mandant_slug) == ks,
+            ),
         )
     return (
         db.query(Termin)
@@ -137,11 +143,14 @@ def all_termine_multi_mandanten(db: Session, mandant_slugs: list[str]) -> list[T
         return []
     slugs = [s.strip().lower() for s in mandant_slugs]
     ks = kreis_ov_slug()
-    mandanten_cond = Termin.mandant_slug.in_(slugs)
+    mandanten_cond = func.lower(Termin.mandant_slug).in_(slugs)
     if ks:
         mandanten_cond = or_(
             mandanten_cond,
-            and_(Termin.promoted_all_ovs.is_(True), Termin.mandant_slug == ks),
+            and_(
+                Termin.promoted_all_ovs == True,  # noqa: E712
+                func.lower(Termin.mandant_slug) == ks,
+            ),
         )
     return (
         db.query(Termin)

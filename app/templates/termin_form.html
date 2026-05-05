@@ -160,6 +160,17 @@
 
     {% if error %}<div class="error">{{ error }}</div>{% endif %}
 
+    {% if show_promoted_all_ovs_checkbox %}
+    <section class="ics-popup__panel" aria-label="Sichtbarkeit">
+      <h3 class="ics-popup__label">Sichtbarkeit</h3>
+      <label>
+        <input type="checkbox" name="promoted_all_ovs" value="1"{% if promoted_all_ovs_checked %} checked{% endif %}>
+        In allen Ortsverbänden anzeigen
+      </label>
+      <p class="muted" style="margin:0.5rem 0 0; font-size:.85rem;">Zusätzlich in den Terminlisten aller anderen Verbände sichtbar (nur Kreis).</p>
+    </section>
+    {% endif %}
+
     {% if not termin and termin_neu_ov_options %}
     <section class="ics-popup__panel termin-form-card__ov-panel" aria-label="Ortsverband">
       <h3 class="ics-popup__label">Ortsverband</h3>
@@ -216,17 +227,6 @@
         {% endfor %}
       </div>
     </section>
-
-    {% if show_promoted_all_ovs_checkbox %}
-    <section class="ics-popup__panel" aria-label="Sichtbarkeit">
-      <h3 class="ics-popup__label">Sichtbarkeit</h3>
-      <label>
-        <input type="checkbox" name="promoted_all_ovs" value="1"{% if promoted_all_ovs_checked %} checked{% endif %}>
-        In allen Ortsverbänden anzeigen
-      </label>
-      <p class="muted" style="margin:0.5rem 0 0; font-size:.85rem;">Zusätzlich in den Terminlisten aller anderen Verbände sichtbar (nur Kreis).</p>
-    </section>
-    {% endif %}
 
     {% if termin and termin.image_path %}
     <section class="ics-popup__panel" aria-label="Aktuelles Foto">
