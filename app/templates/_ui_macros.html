@@ -1,3 +1,5 @@
+{% import '_icons.html' as _hdr_icons %}
+
 {# Öffentlicher URL-Pfad: Reverse-Proxy root_path + Mandanten-Prefix (/m/slug oder leer). #}
 {% macro public_tenant_prefix(request, mandanten_prefix=None) -%}
   {%- set mp = mandanten_prefix if mandanten_prefix is not none else (request.state.mandanten_prefix | default('', true)) -%}
@@ -18,7 +20,7 @@
   {%- endif -%}
 {%- endmacro %}
 
-{% macro app_header(title, brand_href=None) %}
+{% macro app_header(title, brand_href=None, profile_href=None) %}
 <header class="site-header">
   <div class="header-inner">
     {% if brand_href is none %}
@@ -28,7 +30,11 @@
     {% endif %}
     <a href="{{ bh }}" class="header-brand">SPD vor Ort</a>
     <div class="header-toolbar-spacer" aria-hidden="true"></div>
+    {% if profile_href %}
+    <a href="{{ profile_href }}" class="header-profile-link" aria-label="Mein Konto">{{ _hdr_icons.svg_user() }}</a>
+    {% else %}
     <h1 class="header-page-title">{{ title }}</h1>
+    {% endif %}
   </div>
 </header>
 {% endmacro %}

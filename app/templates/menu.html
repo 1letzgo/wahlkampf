@@ -127,7 +127,8 @@
 </style>
 {% endblock %}
 {% block body %}
-{{ app_header('Menü') }}
+{{ app_header('', profile_href=public_tenant_prefix(request) ~ '/profil') }}
+<h1 class="sr-only">Menü</h1>
 
 {% if show_alle_termine | default(false) %}
 <div class="card card--flush">
@@ -175,20 +176,6 @@
   </details>
 </div>
 {% endfor %}
-
-<div class="card card--flush">
-  <ul class="menu-list" role="list">
-    <li class="menu-list-section">
-      <h2 class="menu-list-section__label" id="menu-konto-heading">Konto</h2>
-    </li>
-    <li>
-      <a href="{{ public_tenant_prefix(request) }}/profil">
-        <span class="menu-list__main">{{ ico.svg_user() }}<span>Mein Konto</span></span>
-      </a>
-    </li>
-    <li><a href="{{ request.state.mandanten_prefix }}/logout" class="menu-link-logout"><span class="menu-list__main">{{ ico.svg_logout() }}<span>Ausloggen</span></span></a></li>
-  </ul>
-</div>
 
 {% if show_superadmin_link | default(false) %}
 <div class="card card--flush">

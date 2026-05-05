@@ -16,6 +16,29 @@
     gap: 0.5rem;
     justify-content: flex-end;
   }
+  .profil-account-actions {
+    padding: 1rem 1.25rem 1.15rem;
+    border-top: 1px solid var(--border);
+  }
+  .profil-logout-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--accent) !important;
+    text-decoration: none !important;
+  }
+  .profil-logout-link:hover {
+    color: var(--accent-dim) !important;
+    text-decoration: underline !important;
+  }
+  .profil-logout-link .ico {
+    width: 1.28rem;
+    height: 1.28rem;
+    flex-shrink: 0;
+    opacity: 0.92;
+  }
 </style>
 {% endblock %}
 {% block body %}
@@ -70,5 +93,8 @@
       </div>
     </footer>
   </form>
+  <nav class="profil-account-actions" aria-label="Sitzung">
+    <a href="{{ request.state.mandanten_prefix }}/logout" class="profil-logout-link">{{ ico.svg_logout() }}<span>Ausloggen</span></a>
+  </nav>
 </div>
 {% endblock %}
