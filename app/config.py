@@ -20,6 +20,12 @@ SESSION_COOKIE = "wahlkampf_session"
 ICS_TOKEN = os.environ.get("ICS_TOKEN", "")
 MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "8"))
 
+# RSS → Fraktionstermine (Hintergrundabruf). 0 = kein automatischer Abruf im Prozess.
+RSS_FRAKTION_IMPORT_INTERVAL_SECONDS = int(
+    os.environ.get("RSS_FRAKTION_IMPORT_INTERVAL_SECONDS", "3600")
+)
+RSS_FETCH_TIMEOUT_SECONDS = int(os.environ.get("RSS_FETCH_TIMEOUT_SECONDS", "25"))
+
 # Superadmin: Plattform (/admin/ortsverbaende …). Nur über Env (wie PUBLIC_SITE_*), kein Hardcode.
 # SUPERADMIN_USERNAME=einname oder SUPERADMIN_USERNAMES=a,b (Komma/Semikolon).
 SUPERADMIN_USERNAME = os.environ.get("SUPERADMIN_USERNAME", "").strip().lower()

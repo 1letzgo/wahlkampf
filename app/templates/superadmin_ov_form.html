@@ -30,6 +30,10 @@
       </header>
 
       {% if error %}<div class="error">{{ error }}</div>{% endif %}
+      {% if not is_new %}
+      {% if rss_flash_created is not none %}<div class="success" style="margin-bottom: 0.85rem;">{{ rss_flash_created }} neue Termine aus dem RSS übernommen.</div>{% endif %}
+      {% if rss_flash_err %}<div class="error" style="margin-bottom: 0.85rem;">RSS-Abruf: {{ rss_flash_err }}</div>{% endif %}
+      {% endif %}
 
       {% if is_new %}
       <form method="post" action="/admin/ortsverbaende/neu">
@@ -63,6 +67,24 @@
             <input type="checkbox" name="feature_fraktion" value="1" {% if feature_fraktion %}checked{% endif %}>
             Fraktion (eigene Terminliste, vertrauliche Sitzungen)
           </label>
+        </fieldset>
+
+        <fieldset style="margin-top: 1rem; border: 1px solid var(--border); border-radius: var(--radius); padding: 0.85rem 1rem;">
+          <legend class="ics-popup__label" style="padding: 0 0.35rem;">RSS-Feed (Fraktionstermine)</legend>
+          <p class="muted" style="margin: 0 0 0.65rem; font-size: 0.84rem;">
+            Optional: Öffentlicher RSS-Link (z. B. RIS „Aktuelle Sitzungen“). Wird regelmäßig abgerufen und neue Einträge als Fraktionstermine angelegt. Nur wirksam, wenn „Fraktion“ aktiviert ist.
+          </p>
+          <label for="fraktion-rss-url">Feed-URL</label>
+          <input id="fraktion-rss-url" name="fraktion_rss_feed_url" type="url" inputmode="url" maxlength="8000"
+            placeholder="https://…"
+            value="{{ rss_feed_url_input if rss_feed_url_input is not none else (ov.fraktion_rss_feed_url or '') }}">
+          {% if feature_fraktion %}
+          <p style="margin: 0.75rem 0 0;">
+            <button type="submit" formaction="/admin/ortsverbaende/{{ ov.slug }}/fraktion-rss-sync" formmethod="post" class="btn btn-sm btn-ghost btn-with-label" aria-label="RSS jetzt abrufen">
+              <span class="btn-text">RSS jetzt abrufen</span>
+            </button>
+          </p>
+          {% endif %}
         </fieldset>
 
         <p style="margin-top: 1.25rem;">

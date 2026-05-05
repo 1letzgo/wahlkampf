@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 import re
 import uuid
 from contextlib import asynccontextmanager
@@ -37,6 +39,7 @@ from app.config import (
     ICS_TOKEN,
     MAX_UPLOAD_MB,
     PUBLIC_SITE_MANDANT_SLUG,
+    RSS_FRAKTION_IMPORT_INTERVAL_SECONDS,
     SECRET_KEY,
     SESSION_COOKIE,
     is_superadmin_username,
@@ -65,6 +68,7 @@ from app.mandant_features import (
 from app.mandant_host import apply_mandant_host_path_rewrite
 from app.platform_bootstrap import bootstrap_platform
 from app.platform_database import get_platform_db
+from app.rss_fraktion_import import run_all_fraktion_rss_imports
 from app.settings_store import (
     ensure_ics_token_for_ui,
     ensure_user_calendar_token,
@@ -92,6 +96,35 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
 
+_rss_log = logging.getLogger("wahlkampf.rss")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    bootstrap_platform()
+    interval = RSS_FRAKTION_IMPORT_INTERVAL_SECONDS
+    task: asyncio.Task | None = None
+    if interval > 0:
+
+        async def _rss_background():
+            await asyncio.sleep(45)
+            while True:
+                try:
+                    await asyncio.to_thread(run_all_fraktion_rss_imports)
+                except Exception:
+                    _rss_log.exception("RSS-Import Fraktionstermine (Hintergrund)")
+                await asyncio.sleep(interval)
+
+        task = asyncio.create_task(_rss_background())
+    yield
+    if task:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+
 ALLOWED_IMAGE = {"image/jpeg", "image/png", "image/webp"}
 EXT_MAP = {".jpg": ".jpg", ".jpeg": ".jpg", ".png": ".png", ".webp": ".webp"}
 USERNAME_PATTERN = re.compile(r"^[\w.-]+$", re.UNICODE)
@@ -100,12 +133,6 @@ tenant_router = APIRouter(prefix="/m/{mandant_slug}")
 
 class TerminKommentarPayload(BaseModel):
     body: str = Field("", max_length=4000)
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    bootstrap_platform()
-    yield
 
 
 app = FastAPI(title="Wahlkampf", lifespan=lifespan)

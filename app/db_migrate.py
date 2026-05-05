@@ -174,6 +174,8 @@ def run_platform_sqlite_migrations(engine: Engine) -> None:
     migrate_termine_drop_vorbereitung_nachbereitung_sqlite(engine)
     migrate_ov_memberships_fraktion_member_sqlite(engine)
     migrate_termine_fraktion_flags_sqlite(engine)
+    migrate_ortsverbaende_fraktion_rss_feed_url_sqlite(engine)
+    migrate_termine_rss_import_key_sqlite(engine)
 
 
 def migrate_ov_memberships_fraktion_member_sqlite(engine: Engine) -> None:
@@ -191,6 +193,43 @@ def migrate_ov_memberships_fraktion_member_sqlite(engine: Engine) -> None:
             text(
                 "ALTER TABLE ov_memberships ADD COLUMN fraktion_member "
                 "BOOLEAN NOT NULL DEFAULT 0"
+            ),
+        )
+
+
+def migrate_ortsverbaende_fraktion_rss_feed_url_sqlite(engine: Engine) -> None:
+    """Optionaler RSS-Feed-URL je OV (Fraktionstermine-Import)."""
+    if engine.dialect.name != "sqlite":
+        return
+    insp = inspect(engine)
+    if not insp.has_table("ortsverbaende"):
+        return
+    cols = {c["name"] for c in insp.get_columns("ortsverbaende")}
+    if "fraktion_rss_feed_url" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE ortsverbaende ADD COLUMN fraktion_rss_feed_url TEXT"))
+
+
+def migrate_termine_rss_import_key_sqlite(engine: Engine) -> None:
+    """Dedupe-Schlüssel für aus RSS importierte Fraktionstermine."""
+    if engine.dialect.name != "sqlite":
+        return
+    insp = inspect(engine)
+    if not insp.has_table("termine"):
+        return
+    cols = {c["name"] for c in insp.get_columns("termine")}
+    with engine.begin() as conn:
+        if "rss_import_key" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE termine ADD COLUMN rss_import_key VARCHAR(128)"
+                ),
+            )
+        conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_termine_mandant_rss_import "
+                "ON termine (mandant_slug, rss_import_key)"
             ),
         )
 
