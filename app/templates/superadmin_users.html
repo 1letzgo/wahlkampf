@@ -5,6 +5,20 @@
 {% block head %}
 {% include '_admin_shell_styles.html' %}
 {% include '_admin_data_table_styles.html' %}
+<style>
+  /* Drei Spalten (Benutzer | Mandanten | Aktionen) — Basis-CSS ist auf vier Spalten ausgelegt. */
+  @media (min-width: 640px) {
+    .superadmin-nutzer-table .admin-users-col-name {
+      width: 30%;
+    }
+    .superadmin-nutzer-table .admin-users-col-status {
+      width: 52%;
+    }
+    .superadmin-nutzer-table .admin-users-col-actions {
+      width: 18%;
+    }
+  }
+</style>
 {% endblock %}
 {% block body %}
 {{ app_header('Nutzerverwaltung') }}
@@ -30,7 +44,7 @@
       <p class="muted" style="margin: 0;">Keine Nutzer in der Datenbank.</p>
       {% else %}
       <div class="admin-users-table-wrap">
-        <table class="admin-users-table">
+        <table class="admin-users-table superadmin-nutzer-table">
           <colgroup>
             <col class="admin-users-col-name">
             <col class="admin-users-col-status">
@@ -64,9 +78,11 @@
                 {% endif %}
               </td>
               <td data-label="Aktionen" class="admin-users-td-actions">
-                <a href="/admin/nutzer/{{ u.id }}/bearbeiten" class="btn btn-sm btn-ico btn-with-label" aria-label="Nutzer {{ u.username }} bearbeiten">
-                  {{ ico.svg_pencil() }}<span class="btn-text">Bearbeiten</span>
-                </a>
+                <div>
+                  <a href="/admin/nutzer/{{ u.id }}/bearbeiten" class="btn btn-sm btn-ico btn-with-label" aria-label="Nutzer {{ u.username }} bearbeiten">
+                    {{ ico.svg_pencil() }}<span class="btn-text">Bearbeiten</span>
+                  </a>
+                </div>
               </td>
             </tr>
             {% endfor %}

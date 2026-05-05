@@ -138,33 +138,55 @@
     .admin-users-td-actions {
       text-align: left;
     }
-    /* Nur Icons: überschreibt app.css (.btn-ico.btn-with-label zeigt sonst überall Text auf Mobil) */
-    .admin-users-td-actions .btn.btn-ico.btn-with-label .btn-text {
+    /*
+     * Nur Icons (Superadmin & Co.): überschreibt app.css (.btn-ico.btn-with-label).
+     * Mandanten /admin/benutzer (.admin-users-table--tenant-benutzer): Beschriftung behalten.
+     */
+    .admin-users-table:not(.admin-users-table--tenant-benutzer) .admin-users-td-actions .btn.btn-ico.btn-with-label .btn-text {
       display: none !important;
     }
-    .admin-users-td-actions .btn.btn-ico.btn-with-label:not(.btn-xs) {
+    .admin-users-table:not(.admin-users-table--tenant-benutzer) .admin-users-td-actions .btn.btn-ico.btn-with-label:not(.btn-xs) {
       padding: 0.45rem !important;
       min-width: 2.35rem !important;
       min-height: 2.35rem !important;
       justify-content: center;
       box-sizing: border-box;
     }
-    .admin-users-td-actions > div {
+    .admin-users-table:not(.admin-users-table--tenant-benutzer) .admin-users-td-actions > div {
       display: flex;
       flex-wrap: wrap;
       gap: 0.45rem;
       justify-content: flex-start;
       align-items: center;
     }
-    .admin-users-td-actions form {
+    .admin-users-table:not(.admin-users-table--tenant-benutzer) .admin-users-td-actions form {
       margin: 0;
       display: flex;
       flex: 0 0 auto;
     }
-    .admin-users-td-actions form .btn {
+    .admin-users-table:not(.admin-users-table--tenant-benutzer) .admin-users-td-actions form .btn {
       flex: 0 0 auto;
       width: auto;
       justify-content: center;
+    }
+    /* /admin/benutzer mobil: beschriftete Buttons, untereinander, volle Zeilenbreite */
+    .admin-users-table--tenant-benutzer .admin-users-td-actions > div {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.5rem;
+    }
+    .admin-users-table--tenant-benutzer .admin-users-td-actions form {
+      margin: 0;
+      display: flex;
+      width: 100%;
+    }
+    .admin-users-table--tenant-benutzer .admin-users-td-actions form .btn {
+      width: 100%;
+      justify-content: center;
+      box-sizing: border-box;
+      white-space: normal;
+      text-align: center;
     }
   }
 </style>
