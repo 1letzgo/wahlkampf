@@ -595,6 +595,9 @@ def _my_ovs_menu_items(
                 "href": f"/m/{slug}/menu",
                 "current": slug == ms,
                 "is_admin": bool(m.is_admin or sup),
+                "feature_plakate": is_mandant_feature_enabled(pdb, slug, FEATURE_PLAKATE),
+                "feature_sharepic": is_mandant_feature_enabled(pdb, slug, FEATURE_SHAREPIC),
+                "feature_fraktion": is_mandant_feature_enabled(pdb, slug, FEATURE_FRAKTION),
             },
         )
     return out_members
@@ -950,14 +953,6 @@ def login_submit(
     )
 
 
-def _mandant_features_for_menu(pdb: Session, mandant_slug: str) -> dict[str, bool]:
-    return {
-        "feature_plakate": is_mandant_feature_enabled(pdb, mandant_slug, FEATURE_PLAKATE),
-        "feature_sharepic": is_mandant_feature_enabled(pdb, mandant_slug, FEATURE_SHAREPIC),
-        "feature_fraktion": is_mandant_feature_enabled(pdb, mandant_slug, FEATURE_FRAKTION),
-    }
-
-
 def _require_mandant_feature(pdb: Session, mandant_slug: str, feature_key: str) -> None:
     if not is_mandant_feature_enabled(pdb, mandant_slug, feature_key):
         raise HTTPException(status_code=404, detail="Not found")
@@ -996,7 +991,6 @@ def app_menu(
             "show_superadmin_link": is_superadmin_username(user.username),
             "my_ovs": _my_ovs_menu_items(pdb, mandant_slug, user.id, user.username),
             "show_alle_termine": _menu_show_alle_termine(pdb, user),
-            **_mandant_features_for_menu(pdb, mandant_slug),
         },
     )
 

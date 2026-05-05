@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from '_ui_macros.html' import app_header, public_tenant_prefix with context %}
+{% from '_ui_macros.html' import app_header_toolbar, public_tenant_prefix with context %}
 {% import '_icons.html' as ico %}
 {% block title %}SPD vor Ort — Wahlkampf{% endblock %}
 {% block head %}
@@ -36,31 +36,92 @@
     color: var(--muted);
     background: color-mix(in srgb, var(--border) 35%, transparent);
   }
-  .menu-list a.menu-list-ov-active {
-    box-shadow: inset 3px 0 0 var(--accent);
+  /* Header: Admin-Button rechts (nur Menü nutzt btn-admin in der Toolbar) */
+  header.site-header nav.header-toolbar:has(.btn-admin) {
+    justify-content: flex-end;
+    flex: 1 1 auto;
+    min-width: 0;
   }
-  .menu-list a.menu-list-ov-active:not(:hover) {
+  header.site-header nav.header-toolbar:has(.btn-admin) .btn-admin {
+    border-color: rgba(255, 255, 255, 0.45);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+  }
+  header.site-header nav.header-toolbar:has(.btn-admin) .btn-admin:hover {
+    border-color: rgba(255, 255, 255, 0.85);
+  }
+  /* Pro OV: ausklappbar, standardmäßig offen */
+  .menu-ov-details {
+    border-bottom: 1px solid var(--border);
+  }
+  .menu-ov-details:last-child {
+    border-bottom: none;
+  }
+  .menu-ov-details--current > .menu-ov-details__summary {
+    box-shadow: inset 3px 0 0 var(--accent);
     background: color-mix(in srgb, var(--accent) 9%, transparent);
   }
-  .menu-ov-suffix {
-    flex-shrink: 0;
-    font-size: 0.72rem;
+  .menu-ov-details__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    padding: 0.72rem 1.25rem;
+    cursor: pointer;
+    font-size: 1.02rem;
     font-weight: 700;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    max-width: 42%;
-    text-align: right;
-    line-height: 1.25;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    list-style: none;
+    background: color-mix(in srgb, var(--border) 28%, transparent);
   }
-  .menu-list a:hover .menu-ov-suffix {
-    color: rgba(255, 255, 255, 0.92);
+  .menu-ov-details__summary::-webkit-details-marker {
+    display: none;
+  }
+  .menu-ov-details__summary::after {
+    content: "";
+    flex-shrink: 0;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-right: 2px solid var(--muted);
+    border-bottom: 2px solid var(--muted);
+    transform: rotate(45deg);
+    margin-top: -0.25rem;
+    opacity: 0.65;
+    transition: transform 0.15s ease;
+  }
+  .menu-ov-details[open] > .menu-ov-details__summary::after {
+    transform: rotate(225deg);
+    margin-top: 0.15rem;
+  }
+  .menu-ov-details__title {
+    min-width: 0;
+  }
+  .menu-ov-details__badge {
+    flex-shrink: 0;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--accent);
+    padding: 0.12rem 0.45rem;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+  }
+  .menu-list--in-details li:last-child a {
+    border-bottom: none;
   }
 </style>
 {% endblock %}
 {% block body %}
-{% set menu_title = (request.state.ortsverband_name or request.state.mandant_slug or 'Menü') %}
-{{ app_header(menu_title) }}
+{% call app_header_toolbar('Menü') %}
+  {% if user.is_admin %}
+  <a href="{{ request.state.mandanten_prefix }}/admin/benutzer" class="btn btn-sm btn-admin btn-ico btn-with-label" aria-label="Administration{% if pending_count %}: {{ pending_count }} ausstehend{% endif %}">
+    {{ ico.svg_cog() }}<span class="btn-text">Admin</span>
+    {% if pending_count %}<span class="btn-pending-badge" aria-hidden="true">{{ pending_count }}</span>{% endif %}
+  </a>
+  {% endif %}
+{% endcall %}
 
 {% if show_alle_termine | default(false) %}
 <div class="card card--flush">
@@ -73,61 +134,37 @@
 </div>
 {% endif %}
 
+{% if my_ovs | length %}
 <div class="card card--flush">
-  <ul class="menu-list" role="list">
-    <li class="menu-list-section">
-      <h2 class="menu-list-section__label" id="menu-aktueller-verband-heading">Aktueller Verband</h2>
-    </li>
-    <li><a href="{{ request.state.mandanten_prefix }}/termine"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Termine</span></span></a></li>
-    {% if feature_fraktion %}
-    <li><a href="{{ request.state.mandanten_prefix }}/fraktion/termine"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Fraktion</span></span></a></li>
-    {% endif %}
-    {% if feature_plakate | default(true) %}
-    <li><a href="{{ request.state.mandanten_prefix }}/plakate"><span class="menu-list__main">{{ ico.svg_map_pin() }}<span>Plakate</span></span></a></li>
-    {% endif %}
-    {% if feature_sharepic | default(true) %}
-    <li><a href="{{ request.state.mandanten_prefix }}/sharepic"><span class="menu-list__main">{{ ico.svg_image() }}<span>Sharepic</span></span></a></li>
-    {% endif %}
-  </ul>
-</div>
-
-{% if my_ovs | length > 1 %}
-<div class="card card--flush">
-  <ul class="menu-list" role="list">
-    <li class="menu-list-section">
-      <h2 class="menu-list-section__label" id="menu-my-ovs-heading">Meine Verbände</h2>
-    </li>
-    {% for o in my_ovs %}
-    <li>
-      <a
-        href="{{ o.href }}"
-        class="{% if o.current %}menu-list-ov-active{% endif %}"
-        {% if o.current %}aria-current="page"{% endif %}
-      >
-        <span class="menu-list__main">{{ ico.svg_home() }}<span>{{ o.display_name }}</span></span>
-        {% if o.current or o.is_admin %}
-        <span class="menu-ov-suffix">{% if o.current %}Aktiv{% endif %}{% if o.current and o.is_admin %} · {% endif %}{% if o.is_admin %}Admin{% endif %}</span>
-        {% endif %}
-      </a>
-    </li>
-    {% endfor %}
-  </ul>
+  {% for o in my_ovs %}
+  {% set op = public_tenant_prefix(request, '/m/' ~ o.slug) %}
+  <details class="menu-ov-details{% if o.current %} menu-ov-details--current{% endif %}" open>
+    <summary class="menu-ov-details__summary" id="menu-ov-{{ o.slug }}-heading">
+      <span class="menu-ov-details__title">{{ o.display_name }}</span>
+      {% if o.current %}<span class="menu-ov-details__badge">Aktiv</span>{% endif %}
+    </summary>
+    <ul class="menu-list menu-list--in-details" role="list" aria-labelledby="menu-ov-{{ o.slug }}-heading">
+      <li><a href="{{ op }}/termine"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Termine</span></span></a></li>
+      {% if o.feature_fraktion %}
+      <li><a href="{{ op }}/fraktion/termine"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Fraktion</span></span></a></li>
+      {% endif %}
+      {% if o.feature_plakate | default(true) %}
+      <li><a href="{{ op }}/plakate"><span class="menu-list__main">{{ ico.svg_map_pin() }}<span>Plakate</span></span></a></li>
+      {% endif %}
+      {% if o.feature_sharepic | default(true) %}
+      <li><a href="{{ op }}/sharepic"><span class="menu-list__main">{{ ico.svg_image() }}<span>Sharepic</span></span></a></li>
+      {% endif %}
+    </ul>
+  </details>
+  {% endfor %}
 </div>
 {% endif %}
 
 <div class="card card--flush">
   <ul class="menu-list" role="list">
     <li class="menu-list-section">
-      <h2 class="menu-list-section__label" id="menu-verwaltung-heading">Verwaltung</h2>
+      <h2 class="menu-list-section__label" id="menu-verwaltung-heading">Konto</h2>
     </li>
-    {% if user.is_admin %}
-    <li>
-      <a href="{{ request.state.mandanten_prefix }}/admin/benutzer">
-        <span class="menu-list__main">{{ ico.svg_cog() }}<span>Administration</span></span>
-        {% if pending_count %}<span class="menu-pending-badge" aria-label="{{ pending_count }} ausstehend">{{ pending_count }}</span>{% endif %}
-      </a>
-    </li>
-    {% endif %}
     <li>
       <a href="{{ public_tenant_prefix(request) }}/profil">
         <span class="menu-list__main">{{ ico.svg_user() }}<span>Mein Konto</span></span>
