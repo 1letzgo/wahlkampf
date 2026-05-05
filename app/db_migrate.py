@@ -172,6 +172,52 @@ def run_platform_sqlite_migrations(engine: Engine) -> None:
     migrate_termine_promoted_all_ovs_sqlite(engine)
     migrate_termine_attachments_json_sqlite(engine)
     migrate_termine_drop_vorbereitung_nachbereitung_sqlite(engine)
+    migrate_ov_memberships_fraktion_member_sqlite(engine)
+    migrate_termine_fraktion_flags_sqlite(engine)
+
+
+def migrate_ov_memberships_fraktion_member_sqlite(engine: Engine) -> None:
+    """Fraktionsmitgliedschaft pro OV (Teilmenge der Verbandsmitglieder)."""
+    if engine.dialect.name != "sqlite":
+        return
+    insp = inspect(engine)
+    if not insp.has_table("ov_memberships"):
+        return
+    cols = {c["name"] for c in insp.get_columns("ov_memberships")}
+    if "fraktion_member" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE ov_memberships ADD COLUMN fraktion_member "
+                "BOOLEAN NOT NULL DEFAULT 0"
+            ),
+        )
+
+
+def migrate_termine_fraktion_flags_sqlite(engine: Engine) -> None:
+    """Fraktionstermine + optional vertraulich (nur Fraktionsmitglieder)."""
+    if engine.dialect.name != "sqlite":
+        return
+    insp = inspect(engine)
+    if not insp.has_table("termine"):
+        return
+    cols = {c["name"] for c in insp.get_columns("termine")}
+    with engine.begin() as conn:
+        if "is_fraktion_termin" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE termine ADD COLUMN is_fraktion_termin "
+                    "BOOLEAN NOT NULL DEFAULT 0"
+                ),
+            )
+        if "fraktion_vertraulich" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE termine ADD COLUMN fraktion_vertraulich "
+                    "BOOLEAN NOT NULL DEFAULT 0"
+                ),
+            )
 
 
 def migrate_termine_drop_vorbereitung_nachbereitung_sqlite(engine: Engine) -> None:

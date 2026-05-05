@@ -4,6 +4,7 @@
 {% import '_icons.html' as ico %}
 {% set t = row.termin %}
 {% set owner_mp = row.owner_mandanten_prefix | default(row.mandanten_prefix) %}
+{% set twp = row.termin_web_prefix | default('termine') %}
 {% set path_prefix = request.scope.get('root_path') or '' %}
 {% block title %}{{ t.title }} — Termin — Wahlkampf{% endblock %}
 {% block head %}
@@ -461,24 +462,24 @@
       <div class="termin-footer-actions__signup">
       {% if row.ich_teilnehme %}
       <span class="termin-zusage-badge btn btn-admin btn-sm btn-ico" role="status" title="Du hast zugesagt" aria-label="Du hast zugesagt">{{ ico.svg_check() }}</span>
-      <form method="post" action="{{ public_tenant_prefix(request) }}/termine/{{ t.id }}/absagen" data-teilnahme-live style="margin:0;">
+      <form method="post" action="{{ public_tenant_prefix(request) }}/{{ twp }}/{{ t.id }}/absagen" data-teilnahme-live style="margin:0;">
         <button type="submit" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Termin absagen">
           {{ ico.svg_minus_circle() }}<span class="btn-text">Absage</span>
         </button>
       </form>
       {% elif row.ich_abgesagt %}
-      <form method="post" action="{{ public_tenant_prefix(request) }}/termine/{{ t.id }}/teilnehmen" data-teilnahme-live style="margin:0;">
+      <form method="post" action="{{ public_tenant_prefix(request) }}/{{ twp }}/{{ t.id }}/teilnehmen" data-teilnahme-live style="margin:0;">
         <button type="submit" class="btn btn-sm btn-ico btn-with-label" aria-label="Erneut zusagen">
           {{ ico.svg_check() }}<span class="btn-text">Teilnehmen</span>
         </button>
       </form>
       {% else %}
-      <form method="post" action="{{ public_tenant_prefix(request) }}/termine/{{ t.id }}/teilnehmen" data-teilnahme-live style="margin:0;">
+      <form method="post" action="{{ public_tenant_prefix(request) }}/{{ twp }}/{{ t.id }}/teilnehmen" data-teilnahme-live style="margin:0;">
         <button type="submit" class="btn btn-sm btn-ico btn-with-label" aria-label="Am Termin teilnehmen">
           {{ ico.svg_check() }}<span class="btn-text">Teilnehmen</span>
         </button>
       </form>
-      <form method="post" action="{{ public_tenant_prefix(request) }}/termine/{{ t.id }}/absagen" data-teilnahme-live style="margin:0;">
+      <form method="post" action="{{ public_tenant_prefix(request) }}/{{ twp }}/{{ t.id }}/absagen" data-teilnahme-live style="margin:0;">
         <button type="submit" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Termin absagen">
           {{ ico.svg_minus_circle() }}<span class="btn-text">Absage</span>
         </button>
@@ -490,10 +491,10 @@
       {% endif %}
       {% if row.kann_verwalten %}
       <div class="termin-footer-actions__admin">
-        <a href="{{ owner_mp }}/termine/{{ t.id }}/bearbeiten" class="btn btn-sm btn-ghost btn-ico" aria-label="Termin bearbeiten" title="Bearbeiten">
+        <a href="{{ owner_mp }}/{{ twp }}/{{ t.id }}/bearbeiten" class="btn btn-sm btn-ghost btn-ico" aria-label="Termin bearbeiten" title="Bearbeiten">
           {{ ico.svg_pencil() }}
         </a>
-        <a href="{{ owner_mp }}/termine/{{ t.id }}/loeschen" class="btn btn-sm btn-danger btn-ico" aria-label="Termin löschen" title="Löschen">
+        <a href="{{ owner_mp }}/{{ twp }}/{{ t.id }}/loeschen" class="btn btn-sm btn-danger btn-ico" aria-label="Termin löschen" title="Löschen">
           {{ ico.svg_trash() }}
         </a>
       </div>
@@ -584,6 +585,7 @@
   var pathPrefix = {{ path_prefix | tojson }};
   var tenantBase = {{ request.state.mandanten_prefix | tojson }};
   var terminId = {{ t.id }};
+  var terminPathSeg = {{ twp | tojson }};
   var listEl = document.getElementById("termin-kommentare-list");
   var dlg = document.getElementById("termin-kommentar-dialog");
   var form = document.getElementById("termin-kommentar-form");
@@ -753,7 +755,7 @@
     if (!cid || !confirm("Diesen Kommentar wirklich löschen?")) return;
     apiJson(
       "DELETE",
-      (pathPrefix || "") + tenantBase + "/termine/" + terminId + "/kommentare/" + cid,
+      (pathPrefix || "") + tenantBase + "/" + terminPathSeg + "/" + terminId + "/kommentare/" + cid,
     )
       .then(function (j) {
         renderKommentare(j.kommentare);
@@ -777,7 +779,9 @@
     var url =
       (pathPrefix || "") +
       tenantBase +
-      "/termine/" +
+      "/" +
+      terminPathSeg +
+      "/" +
       terminId +
       "/kommentare" +
       (editId ? "/" + encodeURIComponent(editId) : "");

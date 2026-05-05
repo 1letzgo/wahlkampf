@@ -25,6 +25,9 @@ _TERMINE_CROSS_OV_PATH_RES = (
     re.compile(r"^/termine/\d+$"),
     re.compile(r"^/termine/\d+/(teilnehmen|absagen|abmelden)$"),
     re.compile(r"^/termine/\d+/kommentare(/\d+)?$"),
+    re.compile(r"^/fraktion/termine/\d+$"),
+    re.compile(r"^/fraktion/termine/\d+/(teilnehmen|absagen|abmelden)$"),
+    re.compile(r"^/fraktion/termine/\d+/kommentare(/\d+)?$"),
 )
 
 

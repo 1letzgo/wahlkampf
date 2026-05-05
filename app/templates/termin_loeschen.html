@@ -3,8 +3,9 @@
 {% import '_icons.html' as ico %}
 {% block title %}Termin löschen — Wahlkampf{% endblock %}
 {% block body %}
+{% set twp = termin_web_prefix | default('termine') %}
 {% call app_header_toolbar('Termin löschen') %}
-  <a href="{{ request.state.mandanten_prefix }}/termine/{{ termin.id }}" class="btn btn-sm btn-ghost btn-ico btn-with-label" aria-label="Abbrechen">
+  <a href="{{ request.state.mandanten_prefix }}/{{ twp }}/{{ termin.id }}" class="btn btn-sm btn-ghost btn-ico btn-with-label" aria-label="Abbrechen">
     {{ ico.svg_x() }}<span class="btn-text">Abbrechen</span>
   </a>
 {% endcall %}
@@ -13,11 +14,11 @@
   <p style="margin-top:0;">Soll dieser Termin <strong>unwiderruflich</strong> gelöscht werden?</p>
   <p class="muted" style="margin:0 0 1rem;">{{ termin.title }} · {{ termin.starts_at.strftime('%d.%m.%Y %H:%M') }}{% if termin.location %} · {{ termin.location }}{% endif %}</p>
   <p class="muted" style="font-size:.9rem;">Alle Teilnahmen und ggf. das Foto werden mit entfernt.</p>
-  <form method="post" action="{{ request.state.mandanten_prefix }}/termine/{{ termin.id }}/loeschen" style="margin-top:1.25rem; display:flex; gap:.5rem; flex-wrap:wrap;">
+  <form method="post" action="{{ request.state.mandanten_prefix }}/{{ twp }}/{{ termin.id }}/loeschen" style="margin-top:1.25rem; display:flex; gap:.5rem; flex-wrap:wrap;">
     <button type="submit" class="btn btn-sm btn-danger btn-ico btn-with-label" aria-label="Termin endgültig löschen">
       {{ ico.svg_trash() }}<span class="btn-text">Endgültig löschen</span>
     </button>
-    <a href="{{ request.state.mandanten_prefix }}/termine/{{ termin.id }}" class="btn btn-sm btn-ghost btn-ico btn-with-label" aria-label="Abbrechen">
+    <a href="{{ request.state.mandanten_prefix }}/{{ twp }}/{{ termin.id }}" class="btn btn-sm btn-ghost btn-ico btn-with-label" aria-label="Abbrechen">
       {{ ico.svg_x() }}<span class="btn-text">Abbrechen</span>
     </a>
   </form>

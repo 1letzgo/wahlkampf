@@ -19,6 +19,7 @@ from app.ov_services import (
     validate_ov_slug,
 )
 from app.mandant_features import (
+    FEATURE_FRAKTION,
     FEATURE_PLAKATE,
     FEATURE_SHAREPIC,
     is_mandant_feature_enabled,
@@ -243,6 +244,7 @@ def superadmin_ov_edit_form(
             "is_new": False,
             "feature_plakate": is_mandant_feature_enabled(db, ov.slug, FEATURE_PLAKATE),
             "feature_sharepic": is_mandant_feature_enabled(db, ov.slug, FEATURE_SHAREPIC),
+            "feature_fraktion": is_mandant_feature_enabled(db, ov.slug, FEATURE_FRAKTION),
         },
     )
 
@@ -256,6 +258,7 @@ def superadmin_ov_edit_submit(
     display_name: Annotated[str, Form()],
     feature_plakate: Annotated[Optional[str], Form()] = None,
     feature_sharepic: Annotated[Optional[str], Form()] = None,
+    feature_fraktion: Annotated[Optional[str], Form()] = None,
 ):
     ov = db.get(Ortsverband, slug.strip().lower())
     if not ov:
@@ -264,6 +267,7 @@ def superadmin_ov_edit_submit(
     ms = ov.slug.strip().lower()
     merge_mandant_feature(db, ms, FEATURE_PLAKATE, feature_plakate == "1")
     merge_mandant_feature(db, ms, FEATURE_SHAREPIC, feature_sharepic == "1")
+    merge_mandant_feature(db, ms, FEATURE_FRAKTION, feature_fraktion == "1")
     db.add(ov)
     db.commit()
     return RedirectResponse("/admin/ortsverbaende", status_code=302)

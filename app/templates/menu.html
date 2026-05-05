@@ -62,7 +62,7 @@
 {% set menu_title = (request.state.ortsverband_name or request.state.mandant_slug or 'Menü') %}
 {{ app_header(menu_title) }}
 
-{% if my_ovs | length > 1 %}
+{% if show_alle_termine | default(false) %}
 <div class="card card--flush">
   <ul class="menu-list" role="list">
     <li class="menu-list-section">
@@ -79,6 +79,9 @@
       <h2 class="menu-list-section__label" id="menu-aktueller-verband-heading">Aktueller Verband</h2>
     </li>
     <li><a href="{{ request.state.mandanten_prefix }}/termine"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Termine</span></span></a></li>
+    {% if feature_fraktion %}
+    <li><a href="{{ request.state.mandanten_prefix }}/fraktion/termine"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Fraktion</span></span></a></li>
+    {% endif %}
     {% if feature_plakate | default(true) %}
     <li><a href="{{ request.state.mandanten_prefix }}/plakate"><span class="menu-list__main">{{ ico.svg_map_pin() }}<span>Plakate</span></span></a></li>
     {% endif %}

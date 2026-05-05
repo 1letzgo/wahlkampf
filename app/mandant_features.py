@@ -8,6 +8,7 @@ from app.platform_models import MandantAppSetting
 
 FEATURE_PLAKATE = "feature_plakate"
 FEATURE_SHAREPIC = "feature_sharepic"
+FEATURE_FRAKTION = "feature_fraktion"
 
 
 def is_mandant_feature_enabled(

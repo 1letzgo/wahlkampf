@@ -77,6 +77,23 @@
                     </button>
                   </form>
                   {% endif %}
+                  {% if feature_fraktion %}
+                  {% if u.is_approved %}
+                  {% if u.fraktion_member %}
+                  <form method="post" action="{{ request.state.mandanten_prefix }}/admin/benutzer/{{ u.id }}/fraktion-kein-mitglied" style="margin:0;">
+                    <button type="submit" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Fraktionsmitgliedschaft für {{ u.display_name or u.username }} entfernen">
+                      {{ ico.svg_minus_circle() }}<span class="btn-text">Kein Fraktionsmitglied</span>
+                    </button>
+                  </form>
+                  {% else %}
+                  <form method="post" action="{{ request.state.mandanten_prefix }}/admin/benutzer/{{ u.id }}/fraktion-mitglied" style="margin:0;">
+                    <button type="submit" class="btn btn-sm btn-ico btn-with-label" aria-label="{{ u.display_name or u.username }} zur Fraktion hinzufügen">
+                      {{ ico.svg_user_plus() }}<span class="btn-text">Fraktionsmitglied</span>
+                    </button>
+                  </form>
+                  {% endif %}
+                  {% endif %}
+                  {% endif %}
                   {% if not u.is_admin %}
                   <form method="post" action="{{ request.state.mandanten_prefix }}/admin/benutzer/{{ u.id }}/admin-ernennen" style="margin:0;">
                     <button type="submit" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Nutzer {{ u.display_name or u.username }} zum Admin machen">

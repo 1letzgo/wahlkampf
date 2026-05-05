@@ -45,6 +45,10 @@ from app.config import (
     upload_dir_for_slug,
 )
 from app.deps import AdminUser, AuthenticatedUser, CurrentUser
+from app.fraktion_visibility import (
+    termin_fraktion_sichtbar_fuer_user,
+    user_is_fraktionsmitglied,
+)
 from app.ics_service import (
     all_termine_for_feed,
     all_termine_multi_mandanten,
@@ -53,6 +57,7 @@ from app.ics_service import (
     termine_zugesagt_multi_mandanten,
 )
 from app.mandant_features import (
+    FEATURE_FRAKTION,
     FEATURE_PLAKATE,
     FEATURE_SHAREPIC,
     is_mandant_feature_enabled,
@@ -307,22 +312,14 @@ def ist_kreis_admin(pdb: Session, user: AuthenticatedUser) -> bool:
     return mem is not None
 
 
-def termin_sichtbar_in_mandant(
+def _termin_visible_base(
     pdb: Session,
-    termin_id: int,
+    t: Termin,
     viewing_ms: str,
     user: AuthenticatedUser,
-) -> Termin | None:
-    """Termin im Kontext viewing_ms (URL-Mandant), inkl. Kreis-promoted."""
+) -> bool:
+    """Mandanten-/Kreis-Sichtbarkeit ohne Fraktions-Regeln."""
     viewing_ms = viewing_ms.strip().lower()
-    t = (
-        pdb.query(Termin)
-        .options(selectinload(Termin.teilnahmen))
-        .filter(Termin.id == termin_id)
-        .first()
-    )
-    if not t:
-        return None
     ms_t = t.mandant_slug.strip().lower()
     ks = kreis_ov_slug()
 
@@ -330,7 +327,7 @@ def termin_sichtbar_in_mandant(
         if ks and ms_t == ks:
             if termin_is_promoted(t):
                 if is_superadmin_username(user.username):
-                    return t
+                    return True
                 mem_any = (
                     pdb.query(OvMembership)
                     .filter(
@@ -339,7 +336,7 @@ def termin_sichtbar_in_mandant(
                     )
                     .first()
                 )
-                return t if mem_any else None
+                return mem_any is not None
             mem_here = (
                 pdb.query(OvMembership)
                 .filter(
@@ -349,13 +346,13 @@ def termin_sichtbar_in_mandant(
                 )
                 .first()
             )
-            return t if mem_here else None
-        return t
+            return mem_here is not None
+        return True
 
     if not ks or ms_t != ks or not termin_is_promoted(t):
-        return None
+        return False
     if is_superadmin_username(user.username):
-        return t
+        return True
     mem = (
         pdb.query(OvMembership)
         .filter(
@@ -365,7 +362,72 @@ def termin_sichtbar_in_mandant(
         )
         .first()
     )
-    return t if mem else None
+    return mem is not None
+
+
+def termin_sichtbar_instance(
+    pdb: Session,
+    t: Termin,
+    viewing_ms: str,
+    user: AuthenticatedUser,
+) -> bool:
+    if not _termin_visible_base(pdb, t, viewing_ms, user):
+        return False
+    if getattr(t, "is_fraktion_termin", False):
+        if not is_mandant_feature_enabled(pdb, t.mandant_slug, FEATURE_FRAKTION):
+            return False
+    return termin_fraktion_sichtbar_fuer_user(
+        pdb,
+        t,
+        user_id=user.id,
+        username=user.username,
+    )
+
+
+def termin_sichtbar_in_mandant(
+    pdb: Session,
+    termin_id: int,
+    viewing_ms: str,
+    user: AuthenticatedUser,
+) -> Termin | None:
+    """Termin im Kontext viewing_ms (URL-Mandant), inkl. Kreis-promoted und Fraktion."""
+    viewing_ms = viewing_ms.strip().lower()
+    t = (
+        pdb.query(Termin)
+        .options(selectinload(Termin.teilnahmen))
+        .filter(Termin.id == termin_id)
+        .first()
+    )
+    if not t:
+        return None
+    if not termin_sichtbar_instance(pdb, t, viewing_ms, user):
+        return None
+    return t
+
+
+def _termin_path_segment_for_instance(t: Termin) -> str:
+    return "fraktion/termine" if getattr(t, "is_fraktion_termin", False) else "termine"
+
+
+def _termin_path_segment_from_request(request: Request) -> str:
+    path = request.scope.get("path") or ""
+    if "/fraktion/termine" in path:
+        return "fraktion/termine"
+    return "termine"
+
+
+def _menu_show_alle_termine(pdb: Session, user: AuthenticatedUser) -> bool:
+    slugs = _approved_ov_slugs_for_user_feeds(pdb, user)
+    if len(slugs) > 1:
+        return True
+    if len(slugs) == 1:
+        sole = slugs[0]
+        return user_is_fraktionsmitglied(pdb, user.id, sole) and is_mandant_feature_enabled(
+            pdb,
+            sole,
+            FEATURE_FRAKTION,
+        )
+    return False
 
 
 def _termin_row_for_viewing_ov(
@@ -391,6 +453,7 @@ def _termin_row_for_viewing_ov(
             ov_labels.get(ms_t, ms_t) if ms_t != vw else ""
         )
     row["kann_verwalten"] = _can_manage_termin_cross_ov(pdb, user, t)
+    row["termin_web_prefix"] = _termin_path_segment_for_instance(t)
     return row
 
 
@@ -864,12 +927,30 @@ def _mandant_features_for_menu(pdb: Session, mandant_slug: str) -> dict[str, boo
     return {
         "feature_plakate": is_mandant_feature_enabled(pdb, mandant_slug, FEATURE_PLAKATE),
         "feature_sharepic": is_mandant_feature_enabled(pdb, mandant_slug, FEATURE_SHAREPIC),
+        "feature_fraktion": is_mandant_feature_enabled(pdb, mandant_slug, FEATURE_FRAKTION),
     }
 
 
 def _require_mandant_feature(pdb: Session, mandant_slug: str, feature_key: str) -> None:
     if not is_mandant_feature_enabled(pdb, mandant_slug, feature_key):
         raise HTTPException(status_code=404, detail="Not found")
+
+
+def _request_has_fraktion_termine_path(request: Request) -> bool:
+    path = request.scope.get("path") or ""
+    rp = (request.scope.get("root_path") or "").rstrip("/")
+    if rp and path.startswith(rp):
+        path = path[len(rp) :] or "/"
+    return "/fraktion/termine" in path
+
+
+def _require_fraktion_feature_for_request_path(
+    request: Request,
+    pdb: Session,
+    mandant_slug: str,
+) -> None:
+    if _request_has_fraktion_termine_path(request):
+        _require_mandant_feature(pdb, mandant_slug, FEATURE_FRAKTION)
 
 
 @tenant_router.get("/menu", response_class=HTMLResponse)
@@ -887,6 +968,7 @@ def app_menu(
             "pending_count": _pending_approval_count(pdb, mandant_slug, user),
             "show_superadmin_link": is_superadmin_username(user.username),
             "my_ovs": _my_ovs_menu_items(pdb, mandant_slug, user.id, user.username),
+            "show_alle_termine": _menu_show_alle_termine(pdb, user),
             **_mandant_features_for_menu(pdb, mandant_slug),
         },
     )
@@ -1295,6 +1377,7 @@ def _ov_user_rows_for_admin(pdb: Session, mandant_slug: str) -> list:
                 created_at=pu.created_at,
                 is_admin=bool(m.is_admin or sup),
                 is_approved=m.is_approved,
+                fraktion_member=bool(getattr(m, "fraktion_member", False)),
                 shadow_superadmin=False,
                 platform_superadmin=sup,
             ),
@@ -1320,6 +1403,7 @@ def _ov_user_rows_for_admin(pdb: Session, mandant_slug: str) -> list:
                     is_approved=True,
                     shadow_superadmin=True,
                     platform_superadmin=True,
+                    fraktion_member=False,
                 ),
             )
     regular = [r for r in out if not r.shadow_superadmin]
@@ -1339,6 +1423,7 @@ def admin_benutzer_list(
     user: AdminUser,
 ):
     all_users = _ov_user_rows_for_admin(pdb, mandant_slug)
+    ms = mandant_slug.strip().lower()
     return templates.TemplateResponse(
         request,
         "admin_benutzer.html",
@@ -1346,6 +1431,7 @@ def admin_benutzer_list(
             "user": user,
             "users": all_users,
             "admin_count": _admin_count(pdb, mandant_slug),
+            "feature_fraktion": is_mandant_feature_enabled(pdb, ms, FEATURE_FRAKTION),
         },
     )
 
@@ -1366,6 +1452,48 @@ def admin_benutzer_freigeben(
     )
     if m and not m.is_approved:
         m.is_approved = True
+        pdb.commit()
+    return RedirectResponse(f"{_mp(request)}/admin/benutzer", status_code=302)
+
+
+@tenant_router.post("/admin/benutzer/{uid}/fraktion-mitglied")
+def admin_benutzer_fraktion_mitglied(
+    mandant_slug: str,
+    uid: int,
+    request: Request,
+    pdb: Annotated[Session, Depends(get_platform_db)],
+    _: AdminUser,
+):
+    _require_mandant_feature(pdb, mandant_slug, FEATURE_FRAKTION)
+    ms = mandant_slug.strip().lower()
+    m = (
+        pdb.query(OvMembership)
+        .filter(OvMembership.user_id == uid, OvMembership.ov_slug == ms)
+        .first()
+    )
+    if m and m.is_approved:
+        m.fraktion_member = True
+        pdb.commit()
+    return RedirectResponse(f"{_mp(request)}/admin/benutzer", status_code=302)
+
+
+@tenant_router.post("/admin/benutzer/{uid}/fraktion-kein-mitglied")
+def admin_benutzer_fraktion_kein_mitglied(
+    mandant_slug: str,
+    uid: int,
+    request: Request,
+    pdb: Annotated[Session, Depends(get_platform_db)],
+    _: AdminUser,
+):
+    _require_mandant_feature(pdb, mandant_slug, FEATURE_FRAKTION)
+    ms = mandant_slug.strip().lower()
+    m = (
+        pdb.query(OvMembership)
+        .filter(OvMembership.user_id == uid, OvMembership.ov_slug == ms)
+        .first()
+    )
+    if m and m.is_approved:
+        m.fraktion_member = False
         pdb.commit()
     return RedirectResponse(f"{_mp(request)}/admin/benutzer", status_code=302)
 
@@ -1575,6 +1703,7 @@ def _termin_teilnahme_live_payload(
         "teilnehmer": row["teilnehmer"],
         "teilnehmer_extern": row["teilnehmer_extern"],
         "teilnehmer_abgesagt": row["teilnehmer_abgesagt"],
+        "termin_web_prefix": _termin_path_segment_for_instance(t),
     }
     footer_inner = templates.env.get_template("_termin_live_footer_inner.html").render(**ctx)
     teilnehmer_inner = templates.env.get_template("_termin_live_teilnehmer_inner.html").render(**ctx)
@@ -1603,6 +1732,7 @@ def _termin_form_context(
     extern_gast: Optional[List[str]] = None,
     pdb: Optional[Session] = None,
     mandant_slug: Optional[str] = None,
+    termin_form_segment: str = "termine",
 ) -> dict:
     if extern_gast is not None:
         auswahl = _filter_extern_gast_keys(extern_gast)
@@ -1618,6 +1748,9 @@ def _termin_form_context(
     termin_anhaenge = (
         attachments_decode(termin.attachments_json) if termin is not None else []
     )
+    show_fraktion_vertraulich = termin_form_segment == "fraktion/termine" or (
+        termin is not None and getattr(termin, "is_fraktion_termin", False)
+    )
     return {
         "user": user,
         "termin": termin,
@@ -1629,6 +1762,11 @@ def _termin_form_context(
         "externe_auswahl": auswahl,
         "show_promoted_all_ovs_checkbox": show_promoted,
         "promoted_all_ovs_checked": bool(termin and termin_is_promoted(termin)),
+        "termin_form_segment": termin_form_segment.strip().strip("/"),
+        "show_fraktion_vertraulich_checkbox": show_fraktion_vertraulich,
+        "fraktion_vertraulich_checked": bool(
+            termin and getattr(termin, "fraktion_vertraulich", False)
+        ),
     }
 
 
@@ -1648,7 +1786,45 @@ def _termin_list_rows(pdb: Session, mandant_slug: str, user: AuthenticatedUser) 
         )
     else:
         q = q.filter(func.lower(Termin.mandant_slug) == ms)
+    q = q.filter(Termin.is_fraktion_termin.is_(False))
     rows = q.order_by(Termin.starts_at.asc()).all()
+    ids = [t.id for t in rows]
+    counts = _termin_kommentar_counts_by_termin(pdb, ids)
+    label_slugs = sorted({t.mandant_slug.strip().lower() for t in rows})
+    labels = _ov_display_labels_for_slugs(pdb, label_slugs)
+    return [
+        _termin_row_for_viewing_ov(
+            pdb,
+            t,
+            user,
+            viewing_ms=ms,
+            kommentar_count=counts.get(t.id, 0),
+            ov_labels=labels,
+        )
+        for t in rows
+    ]
+
+
+def _termin_list_rows_fraktion(pdb: Session, mandant_slug: str, user: AuthenticatedUser) -> list[dict]:
+    ms = mandant_slug.strip().lower()
+    ks = kreis_ov_slug()
+    q = pdb.query(Termin).options(selectinload(Termin.teilnahmen)).filter(
+        Termin.is_fraktion_termin.is_(True),
+    )
+    if ks and ms != ks:
+        q = q.filter(
+            or_(
+                func.lower(Termin.mandant_slug) == ms,
+                and_(
+                    Termin.promoted_all_ovs == True,  # noqa: E712
+                    func.lower(Termin.mandant_slug) == ks,
+                ),
+            ),
+        )
+    else:
+        q = q.filter(func.lower(Termin.mandant_slug) == ms)
+    rows_raw = q.order_by(Termin.starts_at.asc()).all()
+    rows = [t for t in rows_raw if termin_sichtbar_instance(pdb, t, ms, user)]
     ids = [t.id for t in rows]
     counts = _termin_kommentar_counts_by_termin(pdb, ids)
     label_slugs = sorted({t.mandant_slug.strip().lower() for t in rows})
@@ -1723,6 +1899,7 @@ def _termin_row_cross_ov(
     row["mandanten_prefix"] = mp_row
     row["ov_display_name"] = dn
     row["kann_verwalten"] = _can_manage_termin_cross_ov(pdb, user, t)
+    row["termin_web_prefix"] = _termin_path_segment_for_instance(t)
     return row
 
 
@@ -1756,6 +1933,8 @@ def _termin_list_rows_multi(
     rows: list[Termin] = []
     for t in rows_ordered:
         if t.id in seen:
+            continue
+        if not termin_sichtbar_instance(pdb, t, vm, user):
             continue
         seen.add(t.id)
         rows.append(t)
@@ -1847,8 +2026,15 @@ def termine_list_alle(
     user: CurrentUser,
 ):
     slugs = _approved_ov_slugs_for_user_feeds(pdb, user)
-    if len(slugs) <= 1:
+    if not slugs:
         return RedirectResponse(f"{_mp(request)}/termine", status_code=302)
+    if len(slugs) <= 1:
+        sole = slugs[0]
+        if not (
+            user_is_fraktionsmitglied(pdb, user.id, sole)
+            and is_mandant_feature_enabled(pdb, sole, FEATURE_FRAKTION)
+        ):
+            return RedirectResponse(f"{_mp(request)}/termine", status_code=302)
     termin_rows = _termin_list_rows_multi(pdb, slugs, user, viewing_ms=mandant_slug.strip().lower())
     termin_upcoming, termin_past = _split_termine_upcoming_past(termin_rows)
     my_token = ensure_user_calendar_token(pdb, user.platform_user)
@@ -1889,6 +2075,7 @@ def termin_new_form(
             error=None,
             pdb=pdb,
             mandant_slug=mandant_slug,
+            termin_form_segment="termine",
         ),
     )
 
@@ -1922,6 +2109,7 @@ async def termin_create(
                 extern_gast=extern_gast,
                 pdb=pdb,
                 mandant_slug=mandant_slug,
+                termin_form_segment="termine",
             ),
             status_code=400,
         )
@@ -1948,6 +2136,8 @@ async def termin_create(
         ),
         created_by_id=user.id,
         promoted_all_ovs=promoted,
+        is_fraktion_termin=False,
+        fraktion_vertraulich=False,
     )
     pdb.add(t)
     pdb.flush()
@@ -1974,6 +2164,7 @@ async def termin_create(
                                 extern_gast=extern_gast,
                                 pdb=pdb,
                                 mandant_slug=mandant_slug,
+                                termin_form_segment="termine",
                             ),
                             status_code=400,
                         )
@@ -2000,6 +2191,7 @@ async def termin_create(
                     extern_gast=extern_gast,
                     pdb=pdb,
                     mandant_slug=mandant_slug,
+                    termin_form_segment="termine",
                 ),
                 status_code=400,
             )
@@ -2010,7 +2202,203 @@ async def termin_create(
     return RedirectResponse(f"{_mp(request)}/termine/{t.id}", status_code=302)
 
 
+@tenant_router.get("/fraktion", include_in_schema=False)
+def fraktion_hub_redirect(
+    mandant_slug: str,
+    request: Request,
+    pdb: Annotated[Session, Depends(get_platform_db)],
+    user: CurrentUser,
+):
+    _require_mandant_feature(pdb, mandant_slug, FEATURE_FRAKTION)
+    return RedirectResponse(f"{_mp(request)}/fraktion/termine", status_code=302)
+
+
+@tenant_router.get("/fraktion/termine", response_class=HTMLResponse)
+def fraktion_termine_list(
+    mandant_slug: str,
+    request: Request,
+    pdb: Annotated[Session, Depends(get_platform_db)],
+    user: CurrentUser,
+):
+    _require_mandant_feature(pdb, mandant_slug, FEATURE_FRAKTION)
+    termin_rows = _termin_list_rows_fraktion(pdb, mandant_slug, user)
+    termin_upcoming, termin_past = _split_termine_upcoming_past(termin_rows)
+    token = ensure_ics_token_for_ui(pdb, mandant_slug, ICS_TOKEN)
+    base = str(request.base_url).rstrip("/")
+    my_token = ensure_user_calendar_token(pdb, user.platform_user)
+    mp = _mp(request)
+    feed_url_my = f"{base}{mp}/calendar/me.ics?t={my_token}"
+    feed_url_all = f"{base}{mp}/calendar.ics?t={token}"
+    neuer_termin_href = f"{mp}/fraktion/termine/neu"
+    return templates.TemplateResponse(
+        request,
+        "termine_list.html",
+        {
+            "user": user,
+            "termin_upcoming": termin_upcoming,
+            "termin_past": termin_past,
+            "feed_url_my": feed_url_my,
+            "feed_url_all": feed_url_all,
+            "page_title": "Fraktion — Termine",
+            "show_neuer_termin_button": True,
+            "ics_my_label": "Meine Zusagen",
+            "ics_all_label": "Alle Termine",
+            "neuer_termin_button_label": "Neuer Fraktionstermin",
+            "neuer_termin_href": neuer_termin_href,
+        },
+    )
+
+
+@tenant_router.get("/fraktion/termine/neu", response_class=HTMLResponse)
+def fraktion_termin_new_form(
+    mandant_slug: str,
+    request: Request,
+    pdb: Annotated[Session, Depends(get_platform_db)],
+    user: CurrentUser,
+):
+    _require_mandant_feature(pdb, mandant_slug, FEATURE_FRAKTION)
+    return templates.TemplateResponse(
+        request,
+        "termin_form.html",
+        _termin_form_context(
+            user=user,
+            termin=None,
+            error=None,
+            pdb=pdb,
+            mandant_slug=mandant_slug,
+            termin_form_segment="fraktion/termine",
+        ),
+    )
+
+
+@tenant_router.post("/fraktion/termine/neu", response_class=HTMLResponse)
+async def fraktion_termin_create(
+    mandant_slug: str,
+    request: Request,
+    pdb: Annotated[Session, Depends(get_platform_db)],
+    user: CurrentUser,
+    title: Annotated[str, Form()],
+    datum: Annotated[date, Form()],
+    start_uhrzeit: Annotated[str, Form()],
+    description: Annotated[str, Form()] = "",
+    location: Annotated[str, Form()] = "",
+    end_uhrzeit: Annotated[str, Form()] = "",
+    extern_gast: Annotated[Optional[List[str]], Form()] = None,
+    promoted_all_ovs: Annotated[str | None, Form()] = None,
+    fraktion_vertraulich: Annotated[str | None, Form()] = None,
+    bild: Annotated[Optional[UploadFile], File()] = None,
+    anhaenge: Annotated[Optional[List[UploadFile]], File()] = None,
+):
+    _require_mandant_feature(pdb, mandant_slug, FEATURE_FRAKTION)
+    err = _parse_times(start_uhrzeit, end_uhrzeit)
+    if err:
+        return templates.TemplateResponse(
+            request,
+            "termin_form.html",
+            _termin_form_context(
+                user=user,
+                termin=None,
+                error=err,
+                extern_gast=extern_gast,
+                pdb=pdb,
+                mandant_slug=mandant_slug,
+                termin_form_segment="fraktion/termine",
+            ),
+            status_code=400,
+        )
+    st = _combine(datum, start_uhrzeit)
+    en = _combine(datum, end_uhrzeit) if end_uhrzeit.strip() else None
+    if en and en <= st:
+        en = None
+
+    ms_low = mandant_slug.strip().lower()
+    ks = kreis_ov_slug()
+    promoted = False
+    if ks and ms_low == ks and ist_kreis_admin(pdb, user):
+        promoted = (promoted_all_ovs or "").strip() == "1"
+
+    confidential = (fraktion_vertraulich or "").strip() == "1"
+
+    t = Termin(
+        mandant_slug=ms_low,
+        title=title.strip(),
+        description=description.strip(),
+        location=location.strip(),
+        starts_at=st,
+        ends_at=en,
+        externe_teilnehmer_json=externe_teilnehmer_encode(
+            _filter_extern_gast_keys(extern_gast),
+        ),
+        created_by_id=user.id,
+        promoted_all_ovs=promoted,
+        is_fraktion_termin=True,
+        fraktion_vertraulich=confidential,
+    )
+    pdb.add(t)
+    pdb.flush()
+
+    if bild and bild.filename:
+        ext = _safe_ext(bild.filename, bild.content_type)
+        if ext and bild.content_type in ALLOWED_IMAGE:
+            max_b = MAX_UPLOAD_MB * 1024 * 1024
+            dest_name = f"{t.id}_{uuid.uuid4().hex}{ext}"
+            dest = _upload_root(request) / dest_name
+            size = 0
+            with dest.open("wb") as f:
+                while chunk := await bild.read(1024 * 1024):
+                    size += len(chunk)
+                    if size > max_b:
+                        dest.unlink(missing_ok=True)
+                        return templates.TemplateResponse(
+                            request,
+                            "termin_form.html",
+                            _termin_form_context(
+                                user=user,
+                                termin=None,
+                                error=f"Bild zu groß (max. {MAX_UPLOAD_MB} MB).",
+                                extern_gast=extern_gast,
+                                pdb=pdb,
+                                mandant_slug=mandant_slug,
+                                termin_form_segment="fraktion/termine",
+                            ),
+                            status_code=400,
+                        )
+                    f.write(chunk)
+            t.image_path = dest_name
+            pdb.add(t)
+
+    uploads = _as_upload_file_list(anhaenge)
+    if uploads:
+        items, aerr = await _termin_append_attachments(
+            uploads,
+            termin_id=t.id,
+            upload_root=_upload_root(request),
+            existing=attachments_decode(t.attachments_json),
+        )
+        if aerr:
+            return templates.TemplateResponse(
+                request,
+                "termin_form.html",
+                _termin_form_context(
+                    user=user,
+                    termin=None,
+                    error=aerr,
+                    extern_gast=extern_gast,
+                    pdb=pdb,
+                    mandant_slug=mandant_slug,
+                    termin_form_segment="fraktion/termine",
+                ),
+                status_code=400,
+            )
+        t.attachments_json = attachments_encode(items)
+        pdb.add(t)
+
+    pdb.commit()
+    return RedirectResponse(f"{_mp(request)}/fraktion/termine/{t.id}", status_code=302)
+
+
 @tenant_router.get("/termine/{termin_id}", response_class=HTMLResponse)
+@tenant_router.get("/fraktion/termine/{termin_id}", response_class=HTMLResponse)
 def termin_detail(
     mandant_slug: str,
     termin_id: int,
@@ -2018,6 +2406,7 @@ def termin_detail(
     pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
 ):
+    _require_fraktion_feature_for_request_path(request, pdb, mandant_slug)
     row = _termin_detail_row(pdb, mandant_slug, user, termin_id)
     if not row:
         raise HTTPException(status_code=404, detail="Termin nicht gefunden")
@@ -2037,13 +2426,16 @@ def termin_detail(
 
 
 @tenant_router.post("/termine/{termin_id}/kommentare")
+@tenant_router.post("/fraktion/termine/{termin_id}/kommentare")
 def termin_kommentar_create(
     mandant_slug: str,
     termin_id: int,
+    request: Request,
     payload: TerminKommentarPayload,
     pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
 ):
+    _require_fraktion_feature_for_request_path(request, pdb, mandant_slug)
     ms = mandant_slug.strip().lower()
     body_txt = payload.body.strip()
     if not body_txt:
@@ -2067,14 +2459,17 @@ def termin_kommentar_create(
 
 
 @tenant_router.patch("/termine/{termin_id}/kommentare/{kommentar_id}")
+@tenant_router.patch("/fraktion/termine/{termin_id}/kommentare/{kommentar_id}")
 def termin_kommentar_update(
     mandant_slug: str,
     termin_id: int,
     kommentar_id: int,
+    request: Request,
     payload: TerminKommentarPayload,
     pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
 ):
+    _require_fraktion_feature_for_request_path(request, pdb, mandant_slug)
     body_txt = payload.body.strip()
     if not body_txt:
         raise HTTPException(status_code=400, detail="Kommentar darf nicht leer sein.")
@@ -2108,13 +2503,16 @@ def termin_kommentar_update(
 
 
 @tenant_router.delete("/termine/{termin_id}/kommentare/{kommentar_id}")
+@tenant_router.delete("/fraktion/termine/{termin_id}/kommentare/{kommentar_id}")
 def termin_kommentar_delete(
     mandant_slug: str,
     termin_id: int,
     kommentar_id: int,
+    request: Request,
     pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
 ):
+    _require_fraktion_feature_for_request_path(request, pdb, mandant_slug)
     ms = mandant_slug.strip().lower()
     t = termin_sichtbar_in_mandant(pdb, termin_id, ms, user)
     if not t:
@@ -2144,6 +2542,7 @@ def termin_kommentar_delete(
 
 
 @tenant_router.post("/termine/{termin_id}/teilnehmen")
+@tenant_router.post("/fraktion/termine/{termin_id}/teilnehmen")
 def termin_teilnehmen(
     mandant_slug: str,
     termin_id: int,
@@ -2152,6 +2551,7 @@ def termin_teilnehmen(
     user: CurrentUser,
     return_to: Annotated[str | None, Form()] = None,
 ):
+    _require_fraktion_feature_for_request_path(request, pdb, mandant_slug)
     ms = mandant_slug.strip().lower()
     t = termin_sichtbar_in_mandant(pdb, termin_id, ms, user)
     if not t:
@@ -2174,6 +2574,7 @@ def termin_teilnehmen(
         pdb.add(exists)
     pdb.commit()
     return_to_list = (return_to or "").strip() == "list"
+    seg = _termin_path_segment_for_instance(t)
     if _teilnahme_wants_live_json(request):
         return JSONResponse(
             _termin_teilnahme_live_payload(
@@ -2186,12 +2587,14 @@ def termin_teilnehmen(
             ),
         )
     if return_to_list:
-        return RedirectResponse(f"{_mp(request)}/termine", status_code=302)
-    return RedirectResponse(f"{_mp(request)}/termine/{termin_id}", status_code=302)
+        return RedirectResponse(f"{_mp(request)}/{seg}", status_code=302)
+    return RedirectResponse(f"{_mp(request)}/{seg}/{termin_id}", status_code=302)
 
 
 @tenant_router.post("/termine/{termin_id}/abmelden")
 @tenant_router.post("/termine/{termin_id}/absagen")
+@tenant_router.post("/fraktion/termine/{termin_id}/abmelden")
+@tenant_router.post("/fraktion/termine/{termin_id}/absagen")
 def termin_teilnahme_absagen(
     mandant_slug: str,
     termin_id: int,
@@ -2201,6 +2604,7 @@ def termin_teilnahme_absagen(
     return_to: Annotated[str | None, Form()] = None,
 ):
     """Absage bzw. Zusage zurücknehmen — gleiche Logik für `/absagen` und `/abmelden` (Legacy)."""
+    _require_fraktion_feature_for_request_path(request, pdb, mandant_slug)
     ms = mandant_slug.strip().lower()
     t = termin_sichtbar_in_mandant(pdb, termin_id, ms, user)
     if not t:
@@ -2223,6 +2627,7 @@ def termin_teilnahme_absagen(
         )
     pdb.commit()
     return_to_list = (return_to or "").strip() == "list"
+    seg = _termin_path_segment_for_instance(t)
     if _teilnahme_wants_live_json(request):
         return JSONResponse(
             _termin_teilnahme_live_payload(
@@ -2235,11 +2640,12 @@ def termin_teilnahme_absagen(
             ),
         )
     if return_to_list:
-        return RedirectResponse(f"{_mp(request)}/termine", status_code=302)
-    return RedirectResponse(f"{_mp(request)}/termine/{termin_id}", status_code=302)
+        return RedirectResponse(f"{_mp(request)}/{seg}", status_code=302)
+    return RedirectResponse(f"{_mp(request)}/{seg}/{termin_id}", status_code=302)
 
 
 @tenant_router.get("/termine/{termin_id}/bearbeiten", response_class=HTMLResponse)
+@tenant_router.get("/fraktion/termine/{termin_id}/bearbeiten", response_class=HTMLResponse)
 def termin_edit_form(
     mandant_slug: str,
     termin_id: int,
@@ -2247,14 +2653,16 @@ def termin_edit_form(
     pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
 ):
+    _require_fraktion_feature_for_request_path(request, pdb, mandant_slug)
     ms = mandant_slug.strip().lower()
     t = termin_sichtbar_in_mandant(pdb, termin_id, ms, user)
     if not t:
         raise HTTPException(status_code=404, detail="Termin nicht gefunden")
     owner = t.mandant_slug.strip().lower()
+    seg = _termin_path_segment_for_instance(t)
     if owner != ms:
         rp = _app_path_prefix(request).rstrip("/")
-        dest = f"{rp}/m/{owner}/termine/{termin_id}/bearbeiten"
+        dest = f"{rp}/m/{owner}/{seg}/{termin_id}/bearbeiten"
         return RedirectResponse(dest, status_code=302)
     if not _can_manage_termin_cross_ov(pdb, user, t):
         raise HTTPException(
@@ -2270,11 +2678,13 @@ def termin_edit_form(
             error=None,
             pdb=pdb,
             mandant_slug=mandant_slug,
+            termin_form_segment=_termin_path_segment_from_request(request),
         ),
     )
 
 
 @tenant_router.post("/termine/{termin_id}/bearbeiten", response_class=HTMLResponse)
+@tenant_router.post("/fraktion/termine/{termin_id}/bearbeiten", response_class=HTMLResponse)
 async def termin_edit_save(
     mandant_slug: str,
     termin_id: int,
@@ -2294,9 +2704,11 @@ async def termin_edit_save(
         Form(),
     ] = None,
     promoted_all_ovs: Annotated[str | None, Form()] = None,
+    fraktion_vertraulich: Annotated[str | None, Form()] = None,
     bild: Annotated[Optional[UploadFile], File()] = None,
     anhaenge: Annotated[Optional[List[UploadFile]], File()] = None,
 ):
+    _require_fraktion_feature_for_request_path(request, pdb, mandant_slug)
     ms = mandant_slug.strip().lower()
     t = termin_sichtbar_in_mandant(pdb, termin_id, ms, user)
     if not t:
@@ -2322,6 +2734,7 @@ async def termin_edit_save(
                 extern_gast=extern_gast,
                 pdb=pdb,
                 mandant_slug=mandant_slug,
+                termin_form_segment=_termin_path_segment_for_instance(t),
             ),
             status_code=400,
         )
@@ -2348,6 +2761,9 @@ async def termin_edit_save(
     )
     if can_prom:
         t.promoted_all_ovs = (promoted_all_ovs or "").strip() == "1"
+
+    if getattr(t, "is_fraktion_termin", False):
+        t.fraktion_vertraulich = (fraktion_vertraulich or "").strip() == "1"
 
     if bild_entfernen == "1":
         _unlink_upload(t.image_path, upload_root)
@@ -2377,6 +2793,7 @@ async def termin_edit_save(
                                 extern_gast=extern_gast,
                                 pdb=pdb,
                                 mandant_slug=mandant_slug,
+                                termin_form_segment=_termin_path_segment_for_instance(t),
                             ),
                             status_code=400,
                         )
@@ -2418,6 +2835,7 @@ async def termin_edit_save(
                     extern_gast=extern_gast,
                     pdb=pdb,
                     mandant_slug=mandant_slug,
+                    termin_form_segment=_termin_path_segment_for_instance(t),
                 ),
                 status_code=400,
             )
@@ -2427,10 +2845,12 @@ async def termin_edit_save(
 
     pdb.add(t)
     pdb.commit()
-    return RedirectResponse(f"{_mp(request)}/termine/{termin_id}", status_code=302)
+    seg = _termin_path_segment_for_instance(t)
+    return RedirectResponse(f"{_mp(request)}/{seg}/{termin_id}", status_code=302)
 
 
 @tenant_router.get("/termine/{termin_id}/loeschen", response_class=HTMLResponse)
+@tenant_router.get("/fraktion/termine/{termin_id}/loeschen", response_class=HTMLResponse)
 def termin_delete_confirm(
     mandant_slug: str,
     termin_id: int,
@@ -2438,6 +2858,7 @@ def termin_delete_confirm(
     pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
 ):
+    _require_fraktion_feature_for_request_path(request, pdb, mandant_slug)
     ms = mandant_slug.strip().lower()
     t = termin_sichtbar_in_mandant(pdb, termin_id, ms, user)
     if not t:
@@ -2445,7 +2866,8 @@ def termin_delete_confirm(
     owner = t.mandant_slug.strip().lower()
     if owner != ms:
         rp = _app_path_prefix(request).rstrip("/")
-        return RedirectResponse(f"{rp}/m/{owner}/termine/{termin_id}/loeschen", status_code=302)
+        seg = _termin_path_segment_for_instance(t)
+        return RedirectResponse(f"{rp}/m/{owner}/{seg}/{termin_id}/loeschen", status_code=302)
     if not _can_manage_termin_cross_ov(pdb, user, t):
         raise HTTPException(
             status_code=403,
@@ -2454,11 +2876,16 @@ def termin_delete_confirm(
     return templates.TemplateResponse(
         request,
         "termin_loeschen.html",
-        {"user": user, "termin": t},
+        {
+            "user": user,
+            "termin": t,
+            "termin_web_prefix": _termin_path_segment_for_instance(t),
+        },
     )
 
 
 @tenant_router.post("/termine/{termin_id}/loeschen")
+@tenant_router.post("/fraktion/termine/{termin_id}/loeschen")
 def termin_delete_do(
     mandant_slug: str,
     termin_id: int,
@@ -2466,6 +2893,7 @@ def termin_delete_do(
     pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
 ):
+    _require_fraktion_feature_for_request_path(request, pdb, mandant_slug)
     ms = mandant_slug.strip().lower()
     t = termin_sichtbar_in_mandant(pdb, termin_id, ms, user)
     if not t:
@@ -2483,7 +2911,8 @@ def termin_delete_do(
         _unlink_upload(it.get("path"), upload_root)
     pdb.delete(t)
     pdb.commit()
-    return RedirectResponse(f"{_mp(request)}/termine", status_code=302)
+    seg = _termin_path_segment_for_instance(t)
+    return RedirectResponse(f"{_mp(request)}/{seg}", status_code=302)
 
 
 _TIME_RE = re.compile(r"^\s*(\d{1,2}):(\d{2})\s*$")
@@ -2620,7 +3049,7 @@ def calendar_ics_termine_alle(
         raise HTTPException(status_code=404, detail="Not found")
     au = AuthenticatedUser(owner, mandant_slug, None)
     slugs = _approved_ov_slugs_for_user_feeds(pdb, au)
-    termine = all_termine_multi_mandanten(pdb, slugs)
+    termine = all_termine_multi_mandanten(pdb, slugs, calendar_owner_user_id=owner.id)
     ks = kreis_ov_slug()
     label_slugs = list(slugs)
     if ks and ks not in label_slugs:

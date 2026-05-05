@@ -124,28 +124,29 @@
 </style>
 {% endblock %}
 {% block body %}
+{% set tseg = termin_form_segment | default('termine') %}
 {{ app_header('Termin bearbeiten' if termin else 'Neuer Termin') }}
 
 <div class="page-toolbar" aria-label="Navigation">
   {% if termin %}
-  <a href="{{ mp }}/termine/{{ termin.id }}" class="btn btn-sm btn-ico btn-with-label" aria-label="Zur Terminansicht">
+  <a href="{{ mp }}/{{ tseg }}/{{ termin.id }}" class="btn btn-sm btn-ico btn-with-label" aria-label="Zur Terminansicht">
     {{ ico.svg_arrow_left() }}<span class="btn-text">Zurück</span>
   </a>
   {% else %}
-  <a href="{{ mp }}/termine" class="btn btn-sm btn-ico btn-with-label" aria-label="Zur Terminliste">
-    {{ ico.svg_arrow_left() }}<span class="btn-text">Termine</span>
+  <a href="{{ mp }}/{{ tseg }}" class="btn btn-sm btn-ico btn-with-label" aria-label="Zur Terminliste">
+    {{ ico.svg_arrow_left() }}<span class="btn-text">{% if tseg == 'fraktion/termine' %}Fraktion{% else %}Termine{% endif %}</span>
   </a>
   {% endif %}
 </div>
 
 <div class="card card--flush termin-form-card">
-  <form method="post" class="ics-popup__form termin-form-card__form" id="termin-main-form" action="{% if termin %}{{ mp }}/termine/{{ termin.id }}/bearbeiten{% else %}{{ mp }}/termine/neu{% endif %}" enctype="multipart/form-data">
+  <form method="post" class="ics-popup__form termin-form-card__form" id="termin-main-form" action="{% if termin %}{{ mp }}/{{ tseg }}/{{ termin.id }}/bearbeiten{% else %}{{ mp }}/{{ tseg }}/neu{% endif %}" enctype="multipart/form-data">
     <header class="ics-popup__head">
       <div class="ics-popup__head-icon" aria-hidden="true">
         {% if termin %}{{ ico.svg_pencil() }}{% else %}{{ ico.svg_plus() }}{% endif %}
       </div>
       <div>
-        <h2 class="ics-popup__h" id="termin-form-title">{% if termin %}Termin bearbeiten{% else %}Neuen Termin anlegen{% endif %}</h2>
+        <h2 class="ics-popup__h" id="termin-form-title">{% if termin %}Termin bearbeiten{% elif tseg == 'fraktion/termine' %}Neuen Fraktionstermin anlegen{% else %}Neuen Termin anlegen{% endif %}</h2>
         <p class="ics-popup__lead">
           {% if termin %}Änderungen gelten für die gesamte Terminansicht und eingetragene Teilnehmer.{% else %}Datum, Ort und Text — sichtbar für alle mit Zugang zur Terminliste.{% endif %}
         </p>
@@ -161,6 +162,17 @@
         <input type="checkbox" name="promoted_all_ovs" value="1"{% if promoted_all_ovs_checked %} checked{% endif %}>
         In allen Ortsverbänden anzeigen
       </label>
+    </section>
+    {% endif %}
+
+    {% if show_fraktion_vertraulich_checkbox %}
+    <section class="ics-popup__panel" aria-label="Fraktion">
+      <h3 class="ics-popup__label">Fraktion</h3>
+      <label>
+        <input type="checkbox" name="fraktion_vertraulich" value="1"{% if fraktion_vertraulich_checked %} checked{% endif %}>
+        Vertraulich — nur für Fraktionsmitglieder sichtbar
+      </label>
+      <p class="termin-form-card__hint muted" style="margin:0.5rem 0 0;font-size:0.84rem;">Ohne Haken sehen alle Verbandsmitglieder diesen Termin; Kreuz nur bei sensiblen Sitzungen.</p>
     </section>
     {% endif %}
 
@@ -243,7 +255,7 @@
 
     <footer class="ics-popup__foot">
       <div class="termin-form-card__actions">
-        <a href="{% if termin %}{{ mp }}/termine/{{ termin.id }}{% else %}{{ mp }}/termine{% endif %}" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Abbrechen">
+        <a href="{% if termin %}{{ mp }}/{{ tseg }}/{{ termin.id }}{% else %}{{ mp }}/{{ tseg }}{% endif %}" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Abbrechen">
           {{ ico.svg_x() }}<span class="btn-text">Abbrechen</span>
         </a>
         <button type="submit" class="btn btn-sm btn-ico btn-with-label" aria-label="Speichern">
