@@ -309,8 +309,9 @@
       text-decoration: none !important;
     }
     .menu-list a:hover {
-      background: var(--accent);
-      color: #fff !important;
+      background: color-mix(in srgb, var(--accent) 10%, var(--card));
+      color: var(--accent) !important;
+      text-decoration: underline !important;
     }
     .menu-list li:last-child a {
       border-bottom: none;
@@ -319,7 +320,9 @@
       color: var(--accent) !important;
     }
     .menu-list a.menu-link-logout:hover {
-      color: #fff !important;
+      background: color-mix(in srgb, var(--accent) 10%, var(--card));
+      color: var(--accent-dim) !important;
+      text-decoration: underline !important;
     }
     .menu-list__main {
       display: flex;
@@ -335,6 +338,7 @@
     }
     .menu-list a:hover .menu-list__main .ico {
       opacity: 1;
+      color: var(--accent);
     }
     .menu-pending-badge {
       flex-shrink: 0;

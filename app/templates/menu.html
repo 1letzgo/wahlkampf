@@ -4,6 +4,103 @@
 {% block title %}SPD vor Ort — Wahlkampf{% endblock %}
 {% block head %}
 <style>
+  /* Shell + Panels wie Terminliste / termin-card-list */
+  .menu-page-card__shell {
+    padding: 1.15rem 1.2rem 1.1rem;
+  }
+  .menu-page .ics-popup__panel {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.8rem 0.85rem 0.85rem;
+    margin-top: 0.65rem;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  }
+  .menu-page .ics-popup__panel:first-child {
+    margin-top: 0;
+  }
+  .menu-page .ics-popup__panel--accent {
+    border-color: rgba(196, 30, 58, 0.22);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.65),
+      0 0 0 1px rgba(196, 30, 58, 0.06);
+  }
+  .menu-page .ics-popup__label {
+    margin: 0 0 0.55rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.055em;
+    color: var(--muted);
+  }
+  .menu-page .menu-page-card__panel .menu-list {
+    margin: 0;
+    padding: 0;
+  }
+  .menu-page .menu-page-card__panel .menu-list a {
+    padding: 0.72rem 0.15rem;
+    border-bottom-color: var(--border);
+  }
+  .menu-page .menu-page-card__panel .menu-list li:last-child a {
+    border-bottom: none;
+    padding-bottom: 0.15rem;
+  }
+  .menu-page .menu-page-card__panel .menu-list li:first-child a {
+    padding-top: 0.15rem;
+  }
+  /* OV: Aufklappkopf wie Panel-Titel + Chevron */
+  .menu-page-ov-details > .menu-page-ov-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    cursor: pointer;
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .menu-page-ov-summary::-webkit-details-marker {
+    display: none;
+  }
+  .menu-page-ov-summary .ics-popup__label {
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+  }
+  .menu-page-ov-summary::after {
+    content: "";
+    flex-shrink: 0;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-right: 2px solid var(--muted);
+    border-bottom: 2px solid var(--muted);
+    transform: rotate(45deg);
+    margin-top: -0.2rem;
+    opacity: 0.55;
+    transition: transform 0.15s ease;
+  }
+  .menu-page-ov-details[open] > .menu-page-ov-summary::after {
+    transform: rotate(225deg);
+    margin-top: 0.12rem;
+  }
+  .menu-page-ov-details[open] > .menu-page-ov-summary {
+    margin-bottom: 0.35rem;
+  }
+  .menu-page-ov-details > .menu-list {
+    margin-top: 0.15rem !important;
+  }
+  .menu-page .menu-list a.menu-list__admin-row {
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+    box-shadow: inset 3px 0 0 rgba(196, 30, 58, 0.38);
+    border-radius: 6px;
+    margin-top: 0.15rem;
+    padding-left: 0.55rem;
+    border-bottom: none;
+  }
+  .menu-page .menu-list a.menu-list__admin-row:hover {
+    box-shadow: inset 3px 0 0 rgba(196, 30, 58, 0.55);
+  }
   .menu-page-footer {
     margin-top: 1.75rem;
     padding-top: 1rem;
@@ -20,161 +117,108 @@
   .menu-page-footer a:hover {
     text-decoration: underline;
   }
-  .menu-list-section {
-    margin: 0;
-    padding: 0;
-    border-bottom: 1px solid var(--border);
-    list-style: none;
-  }
-  .menu-list-section__label {
-    margin: 0;
-    padding: 0.72rem 1.25rem;
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--muted);
-    background: color-mix(in srgb, var(--border) 35%, transparent);
-  }
-  /* Eine OV-Karte = eine .card wie überall */
-  .menu-ov-card .menu-list a.menu-list__admin-row {
-    background: color-mix(in srgb, var(--accent) 9%, transparent);
-    box-shadow: inset 3px 0 0 rgba(196, 30, 58, 0.45);
-  }
-  .menu-ov-card .menu-list a.menu-list__admin-row:not(:hover) {
-    border-bottom-color: rgba(196, 30, 58, 0.14);
-  }
-  .menu-ov-card .menu-ov-details__summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.65rem;
-    padding: 0.72rem 1.25rem;
-    cursor: pointer;
-    font-size: 1.02rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    color: var(--text);
-    list-style: none;
-    background: color-mix(in srgb, var(--border) 28%, transparent);
-    border-bottom: 1px solid var(--border);
-  }
-  .menu-ov-card .menu-ov-details__summary::-webkit-details-marker {
-    display: none;
-  }
-  .menu-ov-card .menu-ov-details__summary::after {
-    content: "";
-    flex-shrink: 0;
-    width: 0.55rem;
-    height: 0.55rem;
-    border-right: 2px solid var(--muted);
-    border-bottom: 2px solid var(--muted);
-    transform: rotate(45deg);
-    margin-top: -0.25rem;
-    opacity: 0.65;
-    transition: transform 0.15s ease;
-  }
-  .menu-ov-card .menu-ov-details[open] > .menu-ov-details__summary::after {
-    transform: rotate(225deg);
-    margin-top: 0.15rem;
-  }
-  .menu-ov-details__title {
-    min-width: 0;
-    flex: 1;
-  }
-  .menu-ov-card .menu-list li:last-child a {
-    border-bottom: none;
-  }
 </style>
 {% endblock %}
 {% block body %}
 {{ app_header('Menü') }}
 
+<div class="menu-page">
 {% if show_alle_termine | default(false) %}
-<div class="card card--flush">
-  <ul class="menu-list" role="list">
-    <li class="menu-list-section">
-      <h2 class="menu-list-section__label" id="menu-uebersicht-heading">Übersicht</h2>
-    </li>
-    <li><a href="{{ request.state.mandanten_prefix }}/termine/alle"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Alle Termine</span></span></a></li>
-  </ul>
+<div class="card card--flush menu-page-card">
+  <div class="menu-page-card__shell">
+    <section class="ics-popup__panel ics-popup__panel--accent menu-page-card__panel" aria-labelledby="menu-uebersicht-heading">
+      <h2 class="ics-popup__label" id="menu-uebersicht-heading">Übersicht</h2>
+      <ul class="menu-list" role="list">
+        <li><a href="{{ request.state.mandanten_prefix }}/termine/alle"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Alle Termine</span></span></a></li>
+      </ul>
+    </section>
+  </div>
 </div>
 {% endif %}
 
 {% for o in my_ovs %}
 {% set op = public_tenant_prefix(request, '/m/' ~ o.slug) %}
-<div class="card card--flush menu-ov-card">
-  <details
-    class="menu-ov-details"
-    data-ov-slug="{{ o.slug }}"
-    {% if (menu_ov_open or {}).get(o.slug, True) %}open{% endif %}
-  >
-    <summary class="menu-ov-details__summary" id="menu-ov-{{ o.slug }}-heading">
-      <span class="menu-ov-details__title">{{ o.display_name }}</span>
-    </summary>
-    <ul class="menu-list" role="list" aria-labelledby="menu-ov-{{ o.slug }}-heading">
-      <li><a href="{{ op }}/termine"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Termine</span></span></a></li>
-      {% if o.feature_fraktion %}
-      <li><a href="{{ op }}/fraktion/termine"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Fraktion</span></span></a></li>
-      {% endif %}
-      {% if o.feature_plakate | default(true) %}
-      <li><a href="{{ op }}/plakate"><span class="menu-list__main">{{ ico.svg_map_pin() }}<span>Plakate</span></span></a></li>
-      {% endif %}
-      {% if o.feature_sharepic | default(true) %}
-      <li><a href="{{ op }}/sharepic"><span class="menu-list__main">{{ ico.svg_image() }}<span>Sharepic</span></span></a></li>
-      {% endif %}
-      {% if o.is_admin %}
-      <li>
-        <a href="{{ op }}/admin/benutzer" class="menu-list__admin-row">
-          <span class="menu-list__main">{{ ico.svg_cog() }}<span>Administration</span></span>
-          {% if o.admin_pending_count %}<span class="menu-pending-badge" aria-label="{{ o.admin_pending_count }} ausstehend">{{ o.admin_pending_count }}</span>{% endif %}
-        </a>
-      </li>
-      {% endif %}
-    </ul>
-  </details>
+<div class="card card--flush menu-page-card">
+  <div class="menu-page-card__shell">
+    <section class="ics-popup__panel ics-popup__panel--accent menu-page-card__panel">
+      <details
+        class="menu-page-ov-details"
+        data-ov-slug="{{ o.slug }}"
+        {% if (menu_ov_open or {}).get(o.slug, True) %}open{% endif %}
+      >
+        <summary class="menu-page-ov-summary" id="menu-ov-{{ o.slug }}-heading">
+          <span class="ics-popup__label menu-page-ov-summary__title">{{ o.display_name }}</span>
+        </summary>
+        <ul class="menu-list" role="list" aria-labelledby="menu-ov-{{ o.slug }}-heading">
+          <li><a href="{{ op }}/termine"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Termine</span></span></a></li>
+          {% if o.feature_fraktion %}
+          <li><a href="{{ op }}/fraktion/termine"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Fraktion</span></span></a></li>
+          {% endif %}
+          {% if o.feature_plakate | default(true) %}
+          <li><a href="{{ op }}/plakate"><span class="menu-list__main">{{ ico.svg_map_pin() }}<span>Plakate</span></span></a></li>
+          {% endif %}
+          {% if o.feature_sharepic | default(true) %}
+          <li><a href="{{ op }}/sharepic"><span class="menu-list__main">{{ ico.svg_image() }}<span>Sharepic</span></span></a></li>
+          {% endif %}
+          {% if o.is_admin %}
+          <li>
+            <a href="{{ op }}/admin/benutzer" class="menu-list__admin-row">
+              <span class="menu-list__main">{{ ico.svg_cog() }}<span>Administration</span></span>
+              {% if o.admin_pending_count %}<span class="menu-pending-badge" aria-label="{{ o.admin_pending_count }} ausstehend">{{ o.admin_pending_count }}</span>{% endif %}
+            </a>
+          </li>
+          {% endif %}
+        </ul>
+      </details>
+    </section>
+  </div>
 </div>
 {% endfor %}
 
-<div class="card card--flush">
-  <ul class="menu-list" role="list">
-    <li class="menu-list-section">
-      <h2 class="menu-list-section__label" id="menu-verwaltung-heading">Konto</h2>
-    </li>
-    <li>
-      <a href="{{ public_tenant_prefix(request) }}/profil">
-        <span class="menu-list__main">{{ ico.svg_user() }}<span>Mein Konto</span></span>
-      </a>
-    </li>
-    <li><a href="{{ request.state.mandanten_prefix }}/logout" class="menu-link-logout"><span class="menu-list__main">{{ ico.svg_logout() }}<span>Ausloggen</span></span></a></li>
-  </ul>
+<div class="card card--flush menu-page-card">
+  <div class="menu-page-card__shell">
+    <section class="ics-popup__panel ics-popup__panel--accent menu-page-card__panel" aria-labelledby="menu-konto-heading">
+      <h2 class="ics-popup__label" id="menu-konto-heading">Konto</h2>
+      <ul class="menu-list" role="list">
+        <li>
+          <a href="{{ public_tenant_prefix(request) }}/profil">
+            <span class="menu-list__main">{{ ico.svg_user() }}<span>Mein Konto</span></span>
+          </a>
+        </li>
+        <li><a href="{{ request.state.mandanten_prefix }}/logout" class="menu-link-logout"><span class="menu-list__main">{{ ico.svg_logout() }}<span>Ausloggen</span></span></a></li>
+      </ul>
+    </section>
+  </div>
 </div>
 
 {% if show_superadmin_link | default(false) %}
-<div class="card card--flush">
-  <ul class="menu-list" role="list">
-    <li class="menu-list-section">
-      <h2 class="menu-list-section__label" id="menu-plattform-heading">Plattform</h2>
-    </li>
-    <li>
-      <a href="/admin/ortsverbaende">
-        <span class="menu-list__main">{{ ico.svg_menu() }}<span>Ortsverbände</span></span>
-      </a>
-    </li>
-    <li>
-      <a href="/admin/nutzer">
-        <span class="menu-list__main">{{ ico.svg_user_plus() }}<span>Nutzerverwaltung</span></span>
-      </a>
-    </li>
-  </ul>
+<div class="card card--flush menu-page-card">
+  <div class="menu-page-card__shell">
+    <section class="ics-popup__panel ics-popup__panel--accent menu-page-card__panel" aria-labelledby="menu-plattform-heading">
+      <h2 class="ics-popup__label" id="menu-plattform-heading">Plattform</h2>
+      <ul class="menu-list" role="list">
+        <li>
+          <a href="/admin/ortsverbaende">
+            <span class="menu-list__main">{{ ico.svg_menu() }}<span>Ortsverbände</span></span>
+          </a>
+        </li>
+        <li>
+          <a href="/admin/nutzer">
+            <span class="menu-list__main">{{ ico.svg_user_plus() }}<span>Nutzerverwaltung</span></span>
+          </a>
+        </li>
+      </ul>
+    </section>
+  </div>
 </div>
 {% endif %}
+</div>
 
 <script>
 (function () {
   var saveUrl = {{ menu_ov_card_save_url | tojson }};
   if (!saveUrl) return;
-  document.querySelectorAll(".menu-ov-card details.menu-ov-details").forEach(function (det) {
+  document.querySelectorAll(".menu-page-ov-details").forEach(function (det) {
     det.addEventListener("toggle", function () {
       var slug = det.getAttribute("data-ov-slug");
       if (!slug) return;
