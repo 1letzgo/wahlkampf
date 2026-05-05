@@ -16,6 +16,8 @@ MANIFEST_FILENAME = "manifest.json"
 MAX_SHAREPIC_TEMPLATES = 24
 
 ALLOWED_CT = frozenset({"image/jpeg", "image/png", "image/webp"})
+# Mit gültiger Dateiendung akzeptieren, wenn Browser/Proxy keinen oder einen generischen Typ sendet.
+CT_OK_WITH_EXTENSION_ONLY = frozenset({"", "application/octet-stream", "binary/octet-stream"})
 _EXT_MAP = {".jpg": ".jpg", ".jpeg": ".jpg", ".png": ".png", ".webp": ".webp"}
 
 
@@ -103,12 +105,30 @@ def list_templates(slug: str) -> list[dict]:
     return out
 
 
+def _normalized_upload_content_type(raw: str | None) -> str:
+    if not raw:
+        return ""
+    s = raw.split(";")[0].strip().lower()
+    if s == "image/jpg":
+        return "image/jpeg"
+    return s
+
+
 async def upload_template(slug: str, upload: UploadFile, label_raw: str | None) -> tuple[bool, str]:
     if not upload.filename:
         return False, "Keine Datei gewählt."
-    ct = (upload.content_type or "").strip()
+    ct = _normalized_upload_content_type(upload.content_type)
     ext = _safe_ext(upload.filename, ct or None)
-    if not ext or ct not in ALLOWED_CT:
+    if not ext:
+        return False, "Nur JPEG-, PNG- oder WebP-Bilder erlaubt (Dateiendung .jpg, .png, .webp)."
+
+    if ct in ALLOWED_CT:
+        pass
+    elif ct in CT_OK_WITH_EXTENSION_ONLY:
+        pass
+    elif ct.startswith("image/"):
+        return False, "Nur JPEG-, PNG- oder WebP-Bilder erlaubt."
+    elif ct:
         return False, "Nur JPEG-, PNG- oder WebP-Bilder erlaubt."
 
     d = ensure_templates_dir(slug)
@@ -138,8 +158,17 @@ async def upload_template(slug: str, upload: UploadFile, label_raw: str | None) 
         dest.unlink(missing_ok=True)
         return False, "Speichern fehlgeschlagen."
 
-    manifest.append({"id": uid, "file": fname, "label": label})
-    save_manifest(d, manifest)
+    if size == 0:
+        dest.unlink(missing_ok=True)
+        return False, "Die Datei war leer — bitte erneut hochladen."
+
+    try:
+        manifest.append({"id": uid, "file": fname, "label": label})
+        save_manifest(d, manifest)
+    except OSError:
+        dest.unlink(missing_ok=True)
+        return False, "Speichern der Vorlagenliste fehlgeschlagen (Schreibrechte?)."
+
     return True, ""
 
 
