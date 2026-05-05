@@ -472,6 +472,31 @@ header.site-header .header-brand:hover {
   }
 }
 
+/* Fallback: mobile Viewports immer nur Icon-Buttons im Header */
+@media (max-width: 767px) {
+  .site-header .header-toolbar .btn .btn-text {
+    display: none !important;
+  }
+
+  .site-header .header-toolbar .btn.btn-ico:not(.btn-xs) {
+    padding: 0.45rem !important;
+    min-width: 2.35rem !important;
+    min-height: 2.35rem !important;
+  }
+
+  .site-header .header-toolbar .btn.btn-ico.btn-xs {
+    padding: 0.4rem !important;
+    min-width: 2.2rem !important;
+    min-height: 2.2rem !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .site-header .header-toolbar .btn .btn-text {
+    display: inline !important;
+  }
+}
+
 .card {
   background: var(--card);
   border-radius: var(--radius);
