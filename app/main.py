@@ -1922,6 +1922,46 @@ def _filter_extern_gast_keys(extern_gast: Optional[List[str]]) -> list[str]:
     return sorted({str(x) for x in extern_gast if str(x) in EXTERNE_TEILNEHMER_KEYS})
 
 
+def _termin_sharepic_form_fields(
+    request: Optional[Request],
+    pdb: Optional[Session],
+    mandant_slug: str,
+) -> dict:
+    """Kontext für Sharepic→Terminbild im Formular (nur wenn Modul aktiv)."""
+    ms = (mandant_slug or "").strip().lower()
+    base = {
+        "termin_sharepic_enabled": False,
+        "termin_sharepic_mask_src": "",
+        "termin_sharepic_ov_display": ms or "",
+        "termin_sharepic_slogan_default": "",
+        "termin_sharepic_vorlage_url": "",
+    }
+    if not request or not pdb or not ms:
+        return base
+    if not is_mandant_feature_enabled(pdb, ms, FEATURE_SHAREPIC):
+        return base
+    ov = pdb.get(Ortsverband, ms)
+    ov_display = ((ov.display_name or "").strip() if ov else "") or ms
+    pfx = _app_path_prefix(request)
+    mp = getattr(request.state, "mandanten_prefix", "") or ""
+    slogan_default = f"Für {ov_display}.\nFür Dich."
+    vorlage_url = ""
+    ensure_sharepic_templates_dir(ms)
+    tpl = list_sharepic_templates(ms)
+    if tpl:
+        vorlage_url = f"{pfx}{mp}/media/{tpl[0]['rel_path']}"
+    base.update(
+        {
+            "termin_sharepic_enabled": True,
+            "termin_sharepic_mask_src": pfx + sharepic_mask_url(),
+            "termin_sharepic_ov_display": ov_display,
+            "termin_sharepic_slogan_default": slogan_default,
+            "termin_sharepic_vorlage_url": vorlage_url,
+        }
+    )
+    return base
+
+
 def _termin_form_context(
     *,
     user: AuthenticatedUser,
@@ -1931,6 +1971,7 @@ def _termin_form_context(
     pdb: Optional[Session] = None,
     mandant_slug: Optional[str] = None,
     termin_form_segment: str = "termine",
+    request: Optional[Request] = None,
 ) -> dict:
     if extern_gast is not None:
         auswahl = _filter_extern_gast_keys(extern_gast)
@@ -1951,7 +1992,7 @@ def _termin_form_context(
     )
     tseg_norm = termin_form_segment.strip().strip("/")
     show_externe_gaeste = tseg_norm != "fraktion/termine"
-    return {
+    out = {
         "user": user,
         "termin": termin,
         "error": error,
@@ -1969,6 +2010,8 @@ def _termin_form_context(
         ),
         "show_externe_gaeste": show_externe_gaeste,
     }
+    out.update(_termin_sharepic_form_fields(request, pdb, ms_ctx))
+    return out
 
 
 def _termin_list_rows(pdb: Session, mandant_slug: str, user: AuthenticatedUser) -> list[dict]:
@@ -2289,6 +2332,7 @@ def termin_new_form(
             pdb=pdb,
             mandant_slug=mandant_slug,
             termin_form_segment="termine",
+            request=request,
         ),
     )
 
@@ -2324,6 +2368,7 @@ async def termin_create(
                 pdb=pdb,
                 mandant_slug=mandant_slug,
                 termin_form_segment="termine",
+                request=request,
             ),
             status_code=400,
         )
@@ -2340,6 +2385,7 @@ async def termin_create(
                 pdb=pdb,
                 mandant_slug=mandant_slug,
                 termin_form_segment="termine",
+                request=request,
             ),
             status_code=400,
         )
@@ -2396,6 +2442,7 @@ async def termin_create(
                                 pdb=pdb,
                                 mandant_slug=mandant_slug,
                                 termin_form_segment="termine",
+                                request=request,
                             ),
                             status_code=400,
                         )
@@ -2423,6 +2470,7 @@ async def termin_create(
                     pdb=pdb,
                     mandant_slug=mandant_slug,
                     termin_form_segment="termine",
+                    request=request,
                 ),
                 status_code=400,
             )
@@ -2504,6 +2552,7 @@ def fraktion_termin_new_form(
             pdb=pdb,
             mandant_slug=mandant_slug,
             termin_form_segment="fraktion/termine",
+            request=request,
         ),
     )
 
@@ -2544,6 +2593,7 @@ async def fraktion_termin_create(
                 pdb=pdb,
                 mandant_slug=mandant_slug,
                 termin_form_segment="fraktion/termine",
+                request=request,
             ),
             status_code=400,
         )
@@ -2559,6 +2609,7 @@ async def fraktion_termin_create(
                 pdb=pdb,
                 mandant_slug=mandant_slug,
                 termin_form_segment="fraktion/termine",
+                request=request,
             ),
             status_code=400,
         )
@@ -2614,6 +2665,7 @@ async def fraktion_termin_create(
                                 pdb=pdb,
                                 mandant_slug=mandant_slug,
                                 termin_form_segment="fraktion/termine",
+                                request=request,
                             ),
                             status_code=400,
                         )
@@ -2640,6 +2692,7 @@ async def fraktion_termin_create(
                     pdb=pdb,
                     mandant_slug=mandant_slug,
                     termin_form_segment="fraktion/termine",
+                    request=request,
                 ),
                 status_code=400,
             )
@@ -2942,6 +2995,7 @@ def termin_edit_form(
             pdb=pdb,
             mandant_slug=mandant_slug,
             termin_form_segment=_termin_path_segment_from_request(request),
+            request=request,
         ),
     )
 
@@ -2999,6 +3053,7 @@ async def termin_edit_save(
                 pdb=pdb,
                 mandant_slug=mandant_slug,
                 termin_form_segment=_termin_path_segment_for_instance(t),
+                request=request,
             ),
             status_code=400,
         )
@@ -3015,6 +3070,7 @@ async def termin_edit_save(
                 pdb=pdb,
                 mandant_slug=mandant_slug,
                 termin_form_segment=_termin_path_segment_for_instance(t),
+                request=request,
             ),
             status_code=400,
         )
@@ -3078,6 +3134,7 @@ async def termin_edit_save(
                                 pdb=pdb,
                                 mandant_slug=mandant_slug,
                                 termin_form_segment=_termin_path_segment_for_instance(t),
+                                request=request,
                             ),
                             status_code=400,
                         )
@@ -3120,6 +3177,7 @@ async def termin_edit_save(
                     pdb=pdb,
                     mandant_slug=mandant_slug,
                     termin_form_segment=_termin_path_segment_for_instance(t),
+                    request=request,
                 ),
                 status_code=400,
             )
