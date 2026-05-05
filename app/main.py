@@ -3414,86 +3414,14 @@ def root_login_submit(
                 login_info=None,
                 status_code=403,
             )
+        prev_slug = (request.session.get("mandant_slug") or "").strip().lower()
+        approved_slugs = {slug for slug, _ in approved}
+        chosen_slug = prev_slug if prev_slug in approved_slugs else approved[0][0]
         request.session["user_id"] = pu.id
-        if len(approved) == 1:
-            slug = approved[0][0]
-            request.session["mandant_slug"] = slug
-            return RedirectResponse(f"/m/{slug}/menu", status_code=302)
-        request.session.pop("mandant_slug", None)
-        return RedirectResponse("/ov-auswahl", status_code=302)
+        request.session["mandant_slug"] = chosen_slug
+        return RedirectResponse(f"/m/{chosen_slug}/menu", status_code=302)
     finally:
         pdb.close()
-
-
-@app.get("/ov-auswahl", response_class=HTMLResponse)
-def root_ov_auswahl(request: Request):
-    if getattr(request.state, "hide_mandant_path_prefix", False):
-        return RedirectResponse("/menu", status_code=302)
-    user_id = request.session.get("user_id")
-    if not user_id:
-        return RedirectResponse("/", status_code=302)
-
-    from sqlalchemy.orm import sessionmaker
-
-    from app.platform_database import platform_engine
-
-    SessionP = sessionmaker(autocommit=False, autoflush=False, bind=platform_engine())
-    pdb = SessionP()
-    try:
-        approved = _approved_memberships_for_user(pdb, int(user_id))
-    finally:
-        pdb.close()
-    if not approved:
-        request.session.pop("user_id", None)
-        request.session.pop("mandant_slug", None)
-        return RedirectResponse("/", status_code=302)
-    if len(approved) == 1:
-        slug = approved[0][0]
-        request.session["mandant_slug"] = slug
-        return RedirectResponse(f"/m/{slug}/menu", status_code=302)
-    return templates.TemplateResponse(
-        request,
-        "ov_auswahl.html",
-        {"ov_choices": [{"slug": s, "display_name": d} for s, d in approved]},
-    )
-
-
-@app.post("/ov-auswahl", response_class=HTMLResponse)
-def root_ov_auswahl_submit(
-    request: Request,
-    ov_slug: Annotated[str, Form()],
-):
-    if getattr(request.state, "hide_mandant_path_prefix", False):
-        return RedirectResponse("/menu", status_code=302)
-    user_id = request.session.get("user_id")
-    if not user_id:
-        return RedirectResponse("/", status_code=302)
-    ms = (ov_slug or "").strip().lower()
-    if not ms:
-        return RedirectResponse("/ov-auswahl", status_code=302)
-
-    from sqlalchemy.orm import sessionmaker
-
-    from app.platform_database import platform_engine
-
-    SessionP = sessionmaker(autocommit=False, autoflush=False, bind=platform_engine())
-    pdb = SessionP()
-    try:
-        ok = (
-            pdb.query(OvMembership)
-            .filter(
-                OvMembership.user_id == int(user_id),
-                OvMembership.ov_slug == ms,
-                OvMembership.is_approved.is_(True),
-            )
-            .first()
-        )
-    finally:
-        pdb.close()
-    if not ok:
-        return RedirectResponse("/ov-auswahl", status_code=302)
-    request.session["mandant_slug"] = ms
-    return RedirectResponse(f"/m/{ms}/menu", status_code=302)
 
 
 @app.get("/registrierung", response_class=HTMLResponse)
@@ -3529,7 +3457,23 @@ def root(request: Request):
             return RedirectResponse("/menu", status_code=302)
         return RedirectResponse(f"/m/{slug}/menu", status_code=302)
     if user_id and not getattr(request.state, "hide_mandant_path_prefix", False):
-        return RedirectResponse("/ov-auswahl", status_code=302)
+        from sqlalchemy.orm import sessionmaker
+
+        from app.platform_database import platform_engine
+
+        SessionP = sessionmaker(autocommit=False, autoflush=False, bind=platform_engine())
+        pdb = SessionP()
+        try:
+            approved = _approved_memberships_for_user(pdb, int(user_id))
+        finally:
+            pdb.close()
+        if not approved:
+            request.session.pop("user_id", None)
+            request.session.pop("mandant_slug", None)
+        else:
+            slug = approved[0][0]
+            request.session["mandant_slug"] = slug
+            return RedirectResponse(f"/m/{slug}/menu", status_code=302)
     login_info = None
     if request.query_params.get("pending") == "1":
         login_info = "Dein Konto ist noch nicht freigegeben. Bitte warte auf einen Administrator."
