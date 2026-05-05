@@ -1934,7 +1934,7 @@ def _termin_sharepic_form_fields(
         "termin_sharepic_mask_src": "",
         "termin_sharepic_ov_display": ms or "",
         "termin_sharepic_slogan_default": "",
-        "termin_sharepic_vorlage_url": "",
+        "termin_sharepic_templates": [],
     }
     if not request or not pdb or not ms:
         return base
@@ -1945,18 +1945,23 @@ def _termin_sharepic_form_fields(
     pfx = _app_path_prefix(request)
     mp = getattr(request.state, "mandanten_prefix", "") or ""
     slogan_default = f"Für {ov_display}.\nFür Dich."
-    vorlage_url = ""
     ensure_sharepic_templates_dir(ms)
     tpl = list_sharepic_templates(ms)
-    if tpl:
-        vorlage_url = f"{pfx}{mp}/media/{tpl[0]['rel_path']}"
+    templates_ui = [
+        {
+            "id": t["id"],
+            "label": t["label"],
+            "url": f"{pfx}{mp}/media/{t['rel_path']}",
+        }
+        for t in tpl
+    ]
     base.update(
         {
             "termin_sharepic_enabled": True,
             "termin_sharepic_mask_src": pfx + sharepic_mask_url(),
             "termin_sharepic_ov_display": ov_display,
             "termin_sharepic_slogan_default": slogan_default,
-            "termin_sharepic_vorlage_url": vorlage_url,
+            "termin_sharepic_templates": templates_ui,
         }
     )
     return base

@@ -42,6 +42,12 @@
   .termin-form-card__anhang-list li {
     margin-bottom: 0.25rem;
   }
+  .termin-form-card__sharepic-select {
+    width: 100%;
+    max-width: 100%;
+    margin-top: 0.25rem;
+    box-sizing: border-box;
+  }
 </style>
 {% if termin_sharepic_enabled %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -183,17 +189,29 @@
       <ul id="termin-anhaenge-list" class="termin-form-card__anhang-list" aria-live="polite"></ul>
     </section>
 
-    <section class="ics-popup__panel" aria-label="{% if termin %}Neues Foto{% else %}Foto{% endif %}">
-      <label for="bild">{% if termin %}Neues Foto (optional, ersetzt das alte){% else %}Foto (optional, JPEG/PNG/WebP, max. {{ max_mb }} MB){% endif %}</label>
-      {% if termin_sharepic_enabled %}
-      <p class="muted" style="margin:0 0 0.5rem;font-size:0.88rem;">
-        Aus Titel, Ort und Datum ein Sharepic als JPEG erzeugen und hier als Terminfoto einsetzen — wirksam nach „Speichern“.
+    {% if termin_sharepic_enabled %}
+    <section class="ics-popup__panel ics-popup__panel--accent" aria-label="Sharepic Terminbild">
+      <h3 class="ics-popup__label">Sharepic als Terminbild</h3>
+      <p class="ics-popup__lead" style="margin-top:0;">
+        Aus Titel (mittlerer Balken), Ort und Datum ein JPEG erzeugen und als Terminfoto einsetzen — wirksam nach „Speichern“.
       </p>
+      <label for="termin-sharepic-vorlage">Hintergrundvorlage</label>
+      <select id="termin-sharepic-vorlage" autocomplete="off" class="termin-form-card__sharepic-select">
+        <option value="">Keine Vorlage (einfarbig)</option>
+        {% for t in termin_sharepic_templates %}
+        <option value="{{ t.url }}"{% if loop.first %} selected{% endif %}>{{ t.label }}</option>
+        {% endfor %}
+      </select>
+      <p class="muted termin-form-card__hint" style="margin:0.35rem 0 0.65rem;font-size:0.84rem;">Vorlagen verwaltet ihr unter Sharepic; ohne Auswahl nutzt das Bild einen neutralen Hintergrund.</p>
       <button type="button" id="termin-sharepic-generate-btn" class="btn btn-sm btn-ico btn-with-label" aria-label="Sharepic aus Eintrag erzeugen und als Foto setzen">
-        {{ ico.svg_image() }}<span class="btn-text">Sharepic als Terminbild</span>
+        {{ ico.svg_image() }}<span class="btn-text">Sharepic erzeugen &amp; als Terminfoto</span>
       </button>
       <p id="termin-sharepic-status" class="muted" style="margin:0.45rem 0 0;font-size:0.88rem;" hidden role="status"></p>
-      {% endif %}
+    </section>
+    {% endif %}
+
+    <section class="ics-popup__panel" aria-label="{% if termin %}Neues Foto{% else %}Foto{% endif %}">
+      <label for="bild">{% if termin %}Neues Foto (optional, ersetzt das alte){% else %}Foto (optional, JPEG/PNG/WebP, max. {{ max_mb }} MB){% endif %}</label>
       <input id="bild" name="bild" type="file" accept="image/jpeg,image/png,image/webp">
     </section>
 
@@ -261,19 +279,20 @@
 </script>
 {% if termin_sharepic_enabled %}
 <script src="{{ path_prefix }}/static/sharepic-generator.js"></script>
-<script type="application/json" id="termin-sharepic-config">{{ {"maskSrc": termin_sharepic_mask_src, "ovDisplay": termin_sharepic_ov_display, "slogan": termin_sharepic_slogan_default, "vorlageUrl": termin_sharepic_vorlage_url or "" } | tojson }}</script>
+<script type="application/json" id="termin-sharepic-config">{{ {"maskSrc": termin_sharepic_mask_src, "ovDisplay": termin_sharepic_ov_display, "slogan": termin_sharepic_slogan_default } | tojson }}</script>
 <script>
 (function () {
   var cfgEl = document.getElementById("termin-sharepic-config");
   var btn = document.getElementById("termin-sharepic-generate-btn");
   var statusEl = document.getElementById("termin-sharepic-status");
+  var vorlageSel = document.getElementById("termin-sharepic-vorlage");
   var bildInput = document.getElementById("bild");
   var titleEl = document.getElementById("title");
   var locationEl = document.getElementById("location");
   var datumEl = document.getElementById("datum");
   var startEl = document.getElementById("start_uhrzeit");
   var WG = window.WahlkampfSharepicGenerator;
-  if (!cfgEl || !btn || !bildInput || !WG || !WG.renderToBlob) return;
+  if (!cfgEl || !btn || !vorlageSel || !bildInput || !WG || !WG.renderToBlob) return;
   var cfg = {};
   try {
     cfg = JSON.parse(cfgEl.textContent || "{}");
@@ -332,7 +351,7 @@
       slogan: cfg.slogan || "",
       midText: midText,
       text2: text2,
-      backgroundImageUrl: (cfg.vorlageUrl || "").trim() || null,
+      backgroundImageUrl: (vorlageSel.value || "").trim() || null,
     }).then(function (blob) {
       var file = new File([blob], "termin-sharepic.jpg", { type: "image/jpeg" });
       var dt = new DataTransfer();
