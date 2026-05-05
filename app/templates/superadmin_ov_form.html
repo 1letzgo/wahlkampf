@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from '_ui_macros.html' import app_header with context %}
+{% from '_ui_macros.html' import app_header_toolbar with context %}
 {% import '_icons.html' as ico %}
 {% block title %}{% if is_new %}Neuer Ortsverband{% else %}OV bearbeiten{% endif %} — Wahlkampf{% endblock %}
 {% block head %}
@@ -7,13 +7,20 @@
 {% endblock %}
 {% block body %}
 {% set path_prefix = request.scope.get('root_path') or '' %}
-{{ app_header('Neuer Ortsverband' if is_new else 'Ortsverband bearbeiten') }}
-
-<div class="page-toolbar" aria-label="Navigation">
-  <a href="{{ path_prefix }}/admin/ortsverbaende" class="btn btn-sm btn-ico btn-with-label" aria-label="Zurück zur Liste der Ortsverbände">
+{% call app_header_toolbar('Neuer Ortsverband' if is_new else 'Ortsverband bearbeiten') %}
+  <a href="{{ path_prefix }}/admin/ortsverbaende" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Zurück zur Liste der Ortsverbände">
     {{ ico.svg_arrow_left() }}<span class="btn-text">Ortsverbände</span>
   </a>
-</div>
+  {% if is_new %}
+  <button type="submit" form="superadmin-ov-neu-form" class="btn btn-sm btn-ico btn-with-label" aria-label="Ortsverband anlegen">
+    {{ ico.svg_check() }}<span class="btn-text">Anlegen</span>
+  </button>
+  {% else %}
+  <button type="submit" form="superadmin-ov-edit-form" class="btn btn-sm btn-ico btn-with-label" aria-label="Änderungen speichern">
+    {{ ico.svg_check() }}<span class="btn-text">Speichern</span>
+  </button>
+  {% endif %}
+{% endcall %}
 
 <div class="admin-page">
   <div class="card card--flush admin-users-card">
@@ -40,19 +47,14 @@
       {% endif %}
 
       {% if is_new %}
-      <form method="post" action="/admin/ortsverbaende/neu">
+      <form id="superadmin-ov-neu-form" method="post" action="/admin/ortsverbaende/neu">
         <label for="ov-slug">Slug (URL-Pfad)</label>
         <input id="ov-slug" name="slug" type="text" required pattern="[a-z0-9][a-z0-9_-]{1,79}" placeholder="z. B. westerstede" autocomplete="off">
         <label for="ov-display">Anzeigename</label>
         <input id="ov-display" name="display_name" type="text" required maxlength="200" placeholder="Name im OV-Header">
-        <p style="margin-top: 1.25rem;">
-          <button type="submit" class="btn btn-ico btn-with-label" aria-label="Ortsverband anlegen">
-            {{ ico.svg_check() }}<span class="btn-text">Anlegen</span>
-          </button>
-        </p>
       </form>
       {% else %}
-      <form method="post" action="/admin/ortsverbaende/{{ ov.slug }}/bearbeiten">
+      <form id="superadmin-ov-edit-form" method="post" action="/admin/ortsverbaende/{{ ov.slug }}/bearbeiten">
         <label for="ov-display-edit">Anzeigename</label>
         <input id="ov-display-edit" name="display_name" type="text" value="{{ ov.display_name }}" required maxlength="200">
 
@@ -96,11 +98,6 @@
           {% endif %}
         </fieldset>
 
-        <p style="margin-top: 1.25rem;">
-          <button type="submit" class="btn btn-ico btn-with-label" aria-label="Änderungen speichern">
-            {{ ico.svg_check() }}<span class="btn-text">Speichern</span>
-          </button>
-        </p>
       </form>
 
       <footer style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border);">
