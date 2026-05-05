@@ -193,7 +193,7 @@
     <section class="ics-popup__panel ics-popup__panel--accent" aria-label="Sharepic Terminbild">
       <h3 class="ics-popup__label">Sharepic als Terminbild</h3>
       <p class="ics-popup__lead" style="margin-top:0;">
-        Aus Titel (mittlerer Balken), Ort und Datum ein JPEG erzeugen und als Terminfoto einsetzen — wirksam nach „Speichern“.
+        Aus Titel (mittlerer Balken) und Ort (unterer Text) ein JPEG erzeugen und als Terminfoto einsetzen — wirksam nach „Speichern“.
       </p>
       <label for="termin-sharepic-vorlage">Hintergrundvorlage</label>
       <select id="termin-sharepic-vorlage" autocomplete="off" class="termin-form-card__sharepic-select">
@@ -289,8 +289,6 @@
   var bildInput = document.getElementById("bild");
   var titleEl = document.getElementById("title");
   var locationEl = document.getElementById("location");
-  var datumEl = document.getElementById("datum");
-  var startEl = document.getElementById("start_uhrzeit");
   var WG = window.WahlkampfSharepicGenerator;
   if (!cfgEl || !btn || !vorlageSel || !bildInput || !WG || !WG.renderToBlob) return;
   var cfg = {};
@@ -298,28 +296,6 @@
     cfg = JSON.parse(cfgEl.textContent || "{}");
   } catch (e) {
     return;
-  }
-
-  function formatTextUnten(datumIso, startUhrzeit, ort) {
-    var loc = (ort || "").trim();
-    var line2 = "";
-    var iso = (datumIso || "").trim();
-    if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
-      var p = iso.split("-");
-      var y = parseInt(p[0], 10);
-      var m = parseInt(p[1], 10) - 1;
-      var day = parseInt(p[2], 10);
-      var d = new Date(y, m, day);
-      var wd = d.toLocaleDateString("de-DE", { weekday: "long" });
-      wd = wd.charAt(0).toUpperCase() + wd.slice(1);
-      var ds = d.toLocaleDateString("de-DE", { day: "numeric", month: "long", year: "numeric" });
-      line2 = wd + ", " + ds;
-      var tu = (startUhrzeit || "").trim();
-      if (tu) line2 += " – " + tu + " Uhr";
-    }
-    if (loc && line2) return loc + "\n" + line2;
-    if (loc) return loc;
-    return line2;
   }
 
   function showStatus(msg, isErr) {
@@ -342,7 +318,7 @@
     }
     var lim = typeof WG.MID_CHAR_LIMIT === "number" ? WG.MID_CHAR_LIMIT : 30;
     var midText = midRaw.length > lim ? midRaw.slice(0, lim) : midRaw;
-    var text2 = formatTextUnten(datumEl && datumEl.value, startEl && startEl.value, locationEl && locationEl.value);
+    var text2 = (locationEl && locationEl.value) ? locationEl.value.trim() : "";
     showStatus("");
     btn.disabled = true;
     WG.renderToBlob({
