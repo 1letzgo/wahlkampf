@@ -1,33 +1,9 @@
-{% import '_icons.html' as ico %}
+{% from '_termin_macros.html' import termin_signup_compact_buttons %}
 {% set twp = termin_web_prefix | default('termine') %}
 {% if not termin_vergangen %}
-{% if row.ich_teilnehme %}
-<span class="termin-zusage-badge btn btn-admin btn-sm btn-ico" role="status" title="Du hast zugesagt" aria-label="Du hast zugesagt">{{ ico.svg_check() }}</span>
-<form method="post" action="{{ mp }}/{{ twp }}/{{ termin_id }}/absagen" data-teilnahme-live style="margin:0;">
-  {% if return_to_list %}<input type="hidden" name="return_to" value="list">{% endif %}
-  <button type="submit" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Termin absagen">
-    {{ ico.svg_minus_circle() }}<span class="btn-text">Absage</span>
-  </button>
-</form>
-{% elif row.ich_abgesagt %}
-<form method="post" action="{{ mp }}/{{ twp }}/{{ termin_id }}/teilnehmen" data-teilnahme-live style="margin:0;">
-  {% if return_to_list %}<input type="hidden" name="return_to" value="list">{% endif %}
-  <button type="submit" class="btn btn-sm btn-ico btn-with-label" aria-label="Erneut zusagen">
-    {{ ico.svg_check() }}<span class="btn-text">Teilnehmen</span>
-  </button>
-</form>
-{% else %}
-<form method="post" action="{{ mp }}/{{ twp }}/{{ termin_id }}/teilnehmen" data-teilnahme-live style="margin:0;">
-  {% if return_to_list %}<input type="hidden" name="return_to" value="list">{% endif %}
-  <button type="submit" class="btn btn-sm btn-ico btn-with-label" aria-label="Am Termin teilnehmen">
-    {{ ico.svg_check() }}<span class="btn-text">Teilnehmen</span>
-  </button>
-</form>
-<form method="post" action="{{ mp }}/{{ twp }}/{{ termin_id }}/absagen" data-teilnahme-live style="margin:0;">
-  {% if return_to_list %}<input type="hidden" name="return_to" value="list">{% endif %}
-  <button type="submit" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Termin absagen">
-    {{ ico.svg_minus_circle() }}<span class="btn-text">Absage</span>
-  </button>
-</form>
-{% endif %}
+{{ termin_signup_compact_buttons(
+  row,
+  mp ~ '/' ~ twp ~ '/' ~ termin_id ~ '/teilnehmen',
+  mp ~ '/' ~ twp ~ '/' ~ termin_id ~ '/absagen',
+  return_to_list) }}
 {% endif %}

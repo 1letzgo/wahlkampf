@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from '_ui_macros.html' import app_header, public_tenant_prefix with context %}
-{% from '_termin_macros.html' import teilnehmer_liste %}
+{% from '_termin_macros.html' import teilnehmer_liste, termin_signup_compact_buttons %}
 {% import '_icons.html' as ico %}
 {% block title %}{{ page_title }} — Wahlkampf{% endblock %}
 
@@ -57,35 +57,11 @@
     <div class="termin-footer-actions">
       {% if not vergangen %}
       <div class="termin-footer-actions__signup">
-      {% if row.ich_teilnehme %}
-      <span class="termin-zusage-badge btn btn-admin btn-sm btn-ico" role="status" title="Du hast zugesagt" aria-label="Du hast zugesagt">{{ ico.svg_check() }}</span>
-      <form method="post" action="{{ public_tenant_prefix(request, owner_mp) }}/{{ twp }}/{{ t.id }}/absagen" data-teilnahme-live style="margin:0;">
-        <input type="hidden" name="return_to" value="list">
-        <button type="submit" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Termin absagen">
-          {{ ico.svg_minus_circle() }}<span class="btn-text">Absage</span>
-        </button>
-      </form>
-      {% elif row.ich_abgesagt %}
-      <form method="post" action="{{ public_tenant_prefix(request, owner_mp) }}/{{ twp }}/{{ t.id }}/teilnehmen" data-teilnahme-live style="margin:0;">
-        <input type="hidden" name="return_to" value="list">
-        <button type="submit" class="btn btn-sm btn-ico btn-with-label" aria-label="Erneut zusagen">
-          {{ ico.svg_check() }}<span class="btn-text">Teilnehmen</span>
-        </button>
-      </form>
-      {% else %}
-      <form method="post" action="{{ public_tenant_prefix(request, owner_mp) }}/{{ twp }}/{{ t.id }}/teilnehmen" data-teilnahme-live style="margin:0;">
-        <input type="hidden" name="return_to" value="list">
-        <button type="submit" class="btn btn-sm btn-ico btn-with-label" aria-label="Am Termin teilnehmen">
-          {{ ico.svg_check() }}<span class="btn-text">Teilnehmen</span>
-        </button>
-      </form>
-      <form method="post" action="{{ public_tenant_prefix(request, owner_mp) }}/{{ twp }}/{{ t.id }}/absagen" data-teilnahme-live style="margin:0;">
-        <input type="hidden" name="return_to" value="list">
-        <button type="submit" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Termin absagen">
-          {{ ico.svg_minus_circle() }}<span class="btn-text">Absage</span>
-        </button>
-      </form>
-      {% endif %}
+      {{ termin_signup_compact_buttons(
+        row,
+        public_tenant_prefix(request, owner_mp) ~ '/' ~ twp ~ '/' ~ t.id ~ '/teilnehmen',
+        public_tenant_prefix(request, owner_mp) ~ '/' ~ twp ~ '/' ~ t.id ~ '/absagen',
+        true) }}
       </div>
       {% else %}
       <span class="termin-footer-actions__hint muted">Termin vorbei — Anmeldung nicht mehr möglich.</span>
@@ -176,11 +152,6 @@
     flex-wrap: nowrap;
     align-items: center;
     gap: 0.4rem;
-    flex-shrink: 0;
-  }
-  .termin-footer-actions__signup .termin-zusage-badge {
-    cursor: default;
-    pointer-events: none;
     flex-shrink: 0;
   }
   .termin-footer-actions__tail {

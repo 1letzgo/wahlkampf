@@ -260,13 +260,63 @@ header.site-header .header-brand:hover {
   position: relative;
 }
 
-/* Terminliste/-detail Footer: gleiche Mindesthöhe (Zusage-Haken, Teilnehmen, Absage) */
-.termin-footer-actions__signup .btn.btn-sm.btn-ico:not(.btn-xs) {
-  box-sizing: border-box;
+/* Termin-Footer: zwei kompakte Icon-Buttons (grün Zusage / rot Absage) */
+.termin-signup-pair {
   display: inline-flex;
   align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.termin-signup-btn.btn.btn-sm.btn-ico {
+  box-sizing: border-box;
+  width: 2.35rem;
+  height: 2.35rem;
+  min-width: 2.35rem !important;
+  min-height: 2.35rem !important;
+  padding: 0 !important;
   justify-content: center;
-  min-height: 2.35rem;
+  border-radius: var(--radius-input);
+}
+
+.termin-signup-btn--teilnehmen {
+  background: transparent !important;
+  color: #1e7a4c !important;
+  border: 1px solid rgba(30, 122, 76, 0.42);
+}
+
+.termin-signup-btn--teilnehmen:hover {
+  background: rgba(30, 122, 76, 0.09) !important;
+}
+
+.termin-signup-btn--teilnehmen-active {
+  background: #1e7a4c !important;
+  color: #fff !important;
+  border-color: #16633d !important;
+}
+
+.termin-signup-btn--teilnehmen-active:hover {
+  background: #16633d !important;
+}
+
+.termin-signup-btn--absage {
+  background: transparent !important;
+  color: var(--accent) !important;
+  border: 1px solid rgba(196, 30, 58, 0.38);
+}
+
+.termin-signup-btn--absage:hover {
+  background: rgba(196, 30, 58, 0.07) !important;
+}
+
+.termin-signup-btn--absage-active {
+  background: #7a1e2e !important;
+  color: #fff !important;
+  border-color: #5c1622 !important;
+}
+
+.termin-signup-btn--absage-active:hover {
+  background: #5c1622 !important;
 }
 
 .btn-pending-badge {
@@ -353,11 +403,12 @@ header.site-header .header-brand:hover {
     display: none !important;
   }
 
-  /* Termin-Karten-Footer: kompakte Touch-Ziele, gleiche Höhe wie Nachbarn */
-  .termin-footer-actions__signup .btn.btn-sm.btn-ico:not(.btn-xs) {
-    padding: 0.42rem 0.7rem;
-    min-width: unset;
-    min-height: 2.35rem;
+  .termin-signup-btn.btn.btn-sm.btn-ico {
+    padding: 0 !important;
+    min-width: 2.35rem !important;
+    min-height: 2.35rem !important;
+    width: 2.35rem;
+    height: 2.35rem;
   }
 }
 
