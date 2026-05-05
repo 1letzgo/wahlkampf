@@ -186,15 +186,9 @@
       <input id="location" name="location" type="text" maxlength="300" value="{{ termin.location if termin else '' }}">
     </section>
 
-    <section class="ics-popup__panel" aria-label="Beschreibung und Ablauf">
+    <section class="ics-popup__panel" aria-label="Beschreibung">
       <label for="description">Text / Beschreibung</label>
       <textarea id="description" name="description">{{ termin.description if termin else '' }}</textarea>
-
-      <label for="vorbereitung">Vorbereitung</label>
-      <textarea id="vorbereitung" name="vorbereitung" placeholder="Material, Aufgaben vor dem Termin …">{{ termin.vorbereitung if termin else '' }}</textarea>
-
-      <label for="nachbereitung">Nachbereitung</label>
-      <textarea id="nachbereitung" name="nachbereitung" placeholder="To-dos, Ergebnisse nach dem Termin …">{{ termin.nachbereitung if termin else '' }}</textarea>
     </section>
 
     <section class="ics-popup__panel" aria-label="Externe Gäste">

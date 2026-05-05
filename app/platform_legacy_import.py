@@ -121,8 +121,6 @@ def migrate_legacy_into_platform_if_needed(db_platform: Session) -> None:
                         mandant_slug=ms,
                         title=str(r["title"]),
                         description=str(r.get("description") or ""),
-                        vorbereitung=str(r.get("vorbereitung") or ""),
-                        nachbereitung=str(r.get("nachbereitung") or ""),
                         location=str(r.get("location") or ""),
                         starts_at=_parse_dt(r.get("starts_at")) or datetime.utcnow(),
                         ends_at=_parse_dt(r.get("ends_at")),

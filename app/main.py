@@ -376,6 +376,7 @@ def _termin_row_for_viewing_ov(
     viewing_ms: str,
     kommentar_count: int,
     ov_labels: dict[str, str],
+    always_show_ov_display_name: bool = False,
 ) -> dict:
     row = _termin_row_from_instance(pdb, t, user, kommentar_count=kommentar_count)
     ms_t = t.mandant_slug.strip().lower()
@@ -383,9 +384,12 @@ def _termin_row_for_viewing_ov(
     row["owner_mandanten_prefix"] = f"/m/{ms_t}"
     row["viewing_mandanten_prefix"] = f"/m/{vw}"
     row["mandanten_prefix"] = f"/m/{vw}"
-    row["ov_display_name"] = (
-        ov_labels.get(ms_t, ms_t) if ms_t != vw else ""
-    )
+    if always_show_ov_display_name:
+        row["ov_display_name"] = ov_labels.get(ms_t, ms_t)
+    else:
+        row["ov_display_name"] = (
+            ov_labels.get(ms_t, ms_t) if ms_t != vw else ""
+        )
     row["kann_verwalten"] = _can_manage_termin_cross_ov(pdb, user, t)
     return row
 
@@ -1767,6 +1771,7 @@ def _termin_list_rows_multi(
             viewing_ms=vm,
             kommentar_count=counts.get(t.id, 0),
             ov_labels=labels,
+            always_show_ov_display_name=True,
         )
         for t in rows
     ]
@@ -1898,8 +1903,6 @@ async def termin_create(
     datum: Annotated[date, Form()],
     start_uhrzeit: Annotated[str, Form()],
     description: Annotated[str, Form()] = "",
-    vorbereitung: Annotated[str, Form()] = "",
-    nachbereitung: Annotated[str, Form()] = "",
     location: Annotated[str, Form()] = "",
     end_uhrzeit: Annotated[str, Form()] = "",
     extern_gast: Annotated[Optional[List[str]], Form()] = None,
@@ -1937,8 +1940,6 @@ async def termin_create(
         mandant_slug=ms_low,
         title=title.strip(),
         description=description.strip(),
-        vorbereitung=vorbereitung.strip(),
-        nachbereitung=nachbereitung.strip(),
         location=location.strip(),
         starts_at=st,
         ends_at=en,
@@ -2284,8 +2285,6 @@ async def termin_edit_save(
     datum: Annotated[date, Form()],
     start_uhrzeit: Annotated[str, Form()],
     description: Annotated[str, Form()] = "",
-    vorbereitung: Annotated[str, Form()] = "",
-    nachbereitung: Annotated[str, Form()] = "",
     location: Annotated[str, Form()] = "",
     end_uhrzeit: Annotated[str, Form()] = "",
     bild_entfernen: Annotated[str, Form()] = "",
@@ -2333,8 +2332,6 @@ async def termin_edit_save(
 
     t.title = title.strip()
     t.description = description.strip()
-    t.vorbereitung = vorbereitung.strip()
-    t.nachbereitung = nachbereitung.strip()
     t.location = location.strip()
     t.starts_at = st
     t.ends_at = en

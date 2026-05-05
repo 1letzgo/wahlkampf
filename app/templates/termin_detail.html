@@ -425,24 +425,6 @@
           </section>
           {% endif %}
 
-          <section class="ics-popup__panel" aria-label="Vorbereitung">
-            <h3 class="ics-popup__label">Vorbereitung</h3>
-            {% if t.vorbereitung %}
-            <p class="termin-panel-body">{{ t.vorbereitung }}</p>
-            {% else %}
-            <p class="muted termin-panel-body" style="font-size:.9rem;">Keine Angaben.</p>
-            {% endif %}
-          </section>
-
-          <section class="ics-popup__panel" aria-label="Nachbereitung">
-            <h3 class="ics-popup__label">Nachbereitung</h3>
-            {% if t.nachbereitung %}
-            <p class="termin-panel-body">{{ t.nachbereitung }}</p>
-            {% else %}
-            <p class="muted termin-panel-body" style="font-size:.9rem;">Keine Angaben.</p>
-            {% endif %}
-          </section>
-
           {% if termin_anhaenge|length %}
           <section class="ics-popup__panel" aria-label="Dateianhänge">
             <h3 class="ics-popup__label">Dateien</h3>

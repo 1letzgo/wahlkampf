@@ -39,10 +39,6 @@ def build_ics_calendar(
         desc_parts: list[str] = []
         if t.description:
             desc_parts.append(t.description)
-        if t.vorbereitung:
-            desc_parts.append(f"Vorbereitung:\n{t.vorbereitung}")
-        if t.nachbereitung:
-            desc_parts.append(f"Nachbereitung:\n{t.nachbereitung}")
         ext_names = externe_teilnehmer_labels(
             externe_teilnehmer_decode(t.externe_teilnehmer_json),
         )

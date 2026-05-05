@@ -75,8 +75,6 @@ class Termin(PlatformBase):
     )
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text, default="")
-    vorbereitung: Mapped[str] = mapped_column(Text, default="")
-    nachbereitung: Mapped[str] = mapped_column(Text, default="")
     location: Mapped[str] = mapped_column(String(300), default="")
     starts_at: Mapped[datetime] = mapped_column(DateTime, index=True)
     ends_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)

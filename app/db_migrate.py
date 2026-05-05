@@ -9,6 +9,7 @@ from pathlib import Path
 from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine.url import make_url
+from sqlalchemy.exc import OperationalError
 
 from app.config import BASE_DIR, mandant_dir, sqlite_database_path, upload_dir_for_slug
 
@@ -39,8 +40,6 @@ def migrate_termine_created_by_nullable_sqlite(engine: Engine) -> None:
               mandant_slug VARCHAR(80) NOT NULL,
               title VARCHAR(200) NOT NULL,
               description TEXT NOT NULL DEFAULT '',
-              vorbereitung TEXT NOT NULL DEFAULT '',
-              nachbereitung TEXT NOT NULL DEFAULT '',
               location VARCHAR(300) NOT NULL DEFAULT '',
               starts_at DATETIME NOT NULL,
               ends_at DATETIME,
@@ -54,12 +53,12 @@ def migrate_termine_created_by_nullable_sqlite(engine: Engine) -> None:
             """
     copy_sql = """
             INSERT INTO termine__wk_rebuild (
-              id, mandant_slug, title, description, vorbereitung, nachbereitung,
+              id, mandant_slug, title, description,
               location, starts_at, ends_at, image_path, externe_teilnehmer_json,
               created_by_id, created_at
             )
             SELECT
-              id, mandant_slug, title, description, vorbereitung, nachbereitung,
+              id, mandant_slug, title, description,
               location, starts_at, ends_at, image_path, externe_teilnehmer_json,
               created_by_id, created_at
             FROM termine
@@ -172,6 +171,25 @@ def run_platform_sqlite_migrations(engine: Engine) -> None:
     migrate_termin_teilnahme_status_sqlite(engine)
     migrate_termine_promoted_all_ovs_sqlite(engine)
     migrate_termine_attachments_json_sqlite(engine)
+    migrate_termine_drop_vorbereitung_nachbereitung_sqlite(engine)
+
+
+def migrate_termine_drop_vorbereitung_nachbereitung_sqlite(engine: Engine) -> None:
+    """Entfernt Spalten vorbereitung/nachbereitung (Kommentare übernehmen den Zweck). SQLite ≥3.35."""
+    if engine.dialect.name != "sqlite":
+        return
+    insp = inspect(engine)
+    if not insp.has_table("termine"):
+        return
+    cols = {c["name"] for c in insp.get_columns("termine")}
+    for name in ("vorbereitung", "nachbereitung"):
+        if name not in cols:
+            continue
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(f'ALTER TABLE termine DROP COLUMN "{name}"'))
+        except OperationalError:
+            break
 
 
 def migrate_termine_attachments_json_sqlite(engine: Engine) -> None:
