@@ -394,6 +394,23 @@ header.site-header .header-brand:hover {
     display: inline !important;
   }
 
+  /* Header: nie „btn-with-label“-Mobilregel — sonst Zeilenumbruch & volle Beschriftung */
+  .site-header .header-toolbar .btn .btn-text {
+    display: none !important;
+  }
+
+  .site-header .header-toolbar .btn.btn-ico.btn-with-label:not(.btn-xs) {
+    padding: 0.45rem !important;
+    min-width: 2.35rem !important;
+    min-height: 2.35rem !important;
+  }
+
+  .site-header .header-toolbar .btn.btn-ico.btn-with-label.btn-xs {
+    padding: 0.4rem !important;
+    min-width: 2.2rem !important;
+    min-height: 2.2rem !important;
+  }
+
   .btn-ico.btn-with-label:not(.btn-xs) {
     padding: 0.5rem 0.85rem;
     min-width: unset;
@@ -447,8 +464,30 @@ header.site-header .header-brand:hover {
   }
 }
 
-/* Header-Navigation: Touch-Geräte nur Icon, Desktop mit Text */
-@media (hover: none) and (pointer: coarse) {
+/*
+ * Header-Toolbar: bis Tablet-Breite nur Icons (sonst Querformat-iPhone >767px mit Text).
+ * Ab Desktop-Breite wieder Beschriftung — eine Zeile, kein Umbrechen der Marke + Buttons.
+ */
+@media (max-width: 1024px) {
+  .site-header .header-inner {
+    flex-wrap: nowrap;
+    gap: 0.45rem;
+  }
+
+  .site-header .header-brand {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .site-header .header-toolbar {
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+    gap: 0.35rem;
+  }
+
   .site-header .header-toolbar .btn .btn-text {
     display: none !important;
   }
@@ -466,32 +505,7 @@ header.site-header .header-brand:hover {
   }
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .site-header .header-toolbar .btn .btn-text {
-    display: inline !important;
-  }
-}
-
-/* Fallback: mobile Viewports immer nur Icon-Buttons im Header */
-@media (max-width: 767px) {
-  .site-header .header-toolbar .btn .btn-text {
-    display: none !important;
-  }
-
-  .site-header .header-toolbar .btn.btn-ico:not(.btn-xs) {
-    padding: 0.45rem !important;
-    min-width: 2.35rem !important;
-    min-height: 2.35rem !important;
-  }
-
-  .site-header .header-toolbar .btn.btn-ico.btn-xs {
-    padding: 0.4rem !important;
-    min-width: 2.2rem !important;
-    min-height: 2.2rem !important;
-  }
-}
-
-@media (min-width: 768px) {
+@media (min-width: 1025px) {
   .site-header .header-toolbar .btn .btn-text {
     display: inline !important;
   }
