@@ -48,13 +48,25 @@
     margin-top: 0.25rem;
     box-sizing: border-box;
   }
+  .termin-form-card__form {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .termin-form-card__grund-panel {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
   .termin-form-card__zeit-grid {
     display: grid;
     gap: 0.75rem;
     grid-template-columns: 1fr;
+    max-width: 100%;
+    overflow-x: hidden;
   }
   .termin-form-card__zeit-grid > div {
     min-width: 0;
+    max-width: 100%;
   }
   @media (min-width: 521px) {
     .termin-form-card__zeit-grid {
@@ -63,12 +75,26 @@
   }
   .termin-form-card__date-input-wrap {
     min-width: 0;
+    max-width: 100%;
+    width: 100%;
+    overflow-x: hidden;
   }
   .termin-form-card__date-input-wrap input[type="date"] {
     display: block;
     width: 100%;
     max-width: 100%;
     min-width: 0;
+    box-sizing: border-box;
+  }
+  .termin-form-card__date-input-wrap input[type="date"]::-webkit-datetime-edit,
+  .termin-form-card__date-input-wrap input[type="date"]::-webkit-datetime-edit-fields-wrapper {
+    max-width: 100%;
+  }
+  @media (max-width: 520px) {
+    .termin-form-card__date-input-wrap input[type="date"] {
+      -webkit-appearance: none;
+      appearance: none;
+    }
   }
   .termin-sharepic-preview-wrap {
     margin-top: 0.85rem;
@@ -147,7 +173,7 @@
     </section>
     {% endif %}
 
-    <section class="ics-popup__panel ics-popup__panel--accent" aria-label="Grunddaten">
+    <section class="ics-popup__panel ics-popup__panel--accent termin-form-card__grund-panel" aria-label="Grunddaten">
       <label for="title">Titel</label>
       <input id="title" name="title" type="text" required maxlength="200" value="{{ termin.title if termin else '' }}">
 
