@@ -61,6 +61,9 @@
 
     <footer class="ics-popup__foot">
       <div class="termin-form-card__actions">
+        <a href="{{ public_tenant_prefix(request) }}/logout" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Ausloggen">
+          {{ ico.svg_logout() }}<span class="btn-text">Ausloggen</span>
+        </a>
         <a href="{{ public_tenant_prefix(request) }}/menu" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Abbrechen">
           {{ ico.svg_x() }}<span class="btn-text">Abbrechen</span>
         </a>
