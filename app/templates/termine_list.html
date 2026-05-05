@@ -40,7 +40,7 @@
           {% if t.link_url %}
           <section class="ics-popup__panel termin-card-list__panel-link" aria-label="Link">
             <h3 class="ics-popup__label">Link</h3>
-            <p class="termin-card-list__link"><a href="{{ t.link_url }}" target="_blank" rel="noopener noreferrer">{{ t.link_url }}</a></p>
+            <p class="termin-card-list__link"><a href="{{ t.link_url }}" target="_blank" rel="noopener noreferrer" title="{{ t.link_url }}" aria-label="Link öffnen: {{ t.link_url }}">&lt;&lt; LINK &gt;&gt;</a></p>
           </section>
           {% endif %}
           <section class="ics-popup__panel termin-card-list__panel-teilnehmer{% if not t.description and not t.link_url %} ics-popup__panel--accent{% endif %}" aria-label="Teilnehmer">
