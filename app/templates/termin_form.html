@@ -48,9 +48,20 @@
     margin-top: 0.25rem;
     box-sizing: border-box;
   }
+  .termin-form-card__zeit-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: 1fr;
+  }
+  .termin-form-card__zeit-grid > div {
+    min-width: 0;
+  }
+  @media (min-width: 521px) {
+    .termin-form-card__zeit-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
   .termin-form-card__date-input-wrap {
-    width: 100%;
-    max-width: 100%;
     min-width: 0;
   }
   .termin-form-card__date-input-wrap input[type="date"] {
@@ -140,12 +151,11 @@
       <label for="title">Titel</label>
       <input id="title" name="title" type="text" required maxlength="200" value="{{ termin.title if termin else '' }}">
 
-      <div class="termin-form-card__date-input-wrap">
-        <label for="datum">Datum</label>
-        <input id="datum" name="datum" type="date" required value="{{ termin.starts_at.strftime('%Y-%m-%d') if termin else '' }}">
-      </div>
-
-      <div class="row2">
+      <div class="termin-form-card__zeit-grid">
+        <div class="termin-form-card__date-input-wrap">
+          <label for="datum">Datum</label>
+          <input id="datum" name="datum" type="date" required value="{{ termin.starts_at.strftime('%Y-%m-%d') if termin else '' }}">
+        </div>
         <div>
           <label for="start_uhrzeit">Beginn (HH:MM)</label>
           <input id="start_uhrzeit" name="start_uhrzeit" type="text" placeholder="09:30" required value="{{ termin.starts_at.strftime('%H:%M') if termin else '' }}">
