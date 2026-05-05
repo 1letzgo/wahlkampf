@@ -60,8 +60,6 @@ body {
   min-height: 100vh;
   min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
-  display: flex;
-  flex-direction: column;
 }
 
 a {
@@ -80,12 +78,7 @@ a:hover {
   padding-right: max(1rem, env(safe-area-inset-right, 0px));
   padding-bottom: max(3rem, calc(1.25rem + env(safe-area-inset-bottom, 0px)));
   padding-left: max(1rem, env(safe-area-inset-left, 0px));
-  flex: 1 1 auto;
   width: 100%;
-}
-
-body:has(nav.site-footer-nav) .wrap {
-  padding-bottom: max(1rem, calc(0.65rem + env(safe-area-inset-bottom, 0px)));
 }
 
 header.site-header {
@@ -178,72 +171,85 @@ header.site-header .header-brand:hover {
   max-width: 100%;
 }
 
-/* Sticky Footer-Nav (Tenant): im Fluss unter .wrap, klebt am unteren Viewport beim Scrollen */
+/* Feste Tabbar unten (Tenant): immer sichtbar wie iOS-TabBar */
 nav.site-footer-nav {
-  position: sticky;
+  position: fixed;
+  left: 0;
+  right: 0;
   bottom: 0;
-  flex-shrink: 0;
-  width: 100%;
   z-index: 99;
   margin: 0;
   padding: 0;
-  padding-top: 0.45rem;
-  padding-bottom: max(0.45rem, env(safe-area-inset-bottom, 0px));
+  padding-top: 0.2rem;
+  padding-bottom: max(0.2rem, env(safe-area-inset-bottom, 0px));
   background: var(--accent);
-  box-shadow: 0 -6px 14px rgba(0, 0, 0, 0.12);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.12);
 }
 
 .site-footer-nav__inner {
   max-width: 720px;
   margin-left: auto;
   margin-right: auto;
-  padding-left: max(1rem, env(safe-area-inset-left, 0px));
-  padding-right: max(1rem, env(safe-area-inset-right, 0px));
+  padding-left: max(0.35rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.35rem, env(safe-area-inset-right, 0px));
   display: flex;
   flex-direction: row;
   align-items: stretch;
-  justify-content: center;
-  gap: 0.25rem;
+  justify-content: space-evenly;
+  gap: 0;
   box-sizing: border-box;
+  min-height: 2.55rem;
 }
 
 .site-footer-nav__link {
   flex: 1;
-  max-width: 12rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.12rem;
-  min-height: 2.75rem;
-  padding: 0.35rem 0.65rem 0.42rem;
-  border-radius: var(--radius-input);
-  color: #fff !important;
+  gap: 0.05rem;
+  padding: 0.18rem 0.35rem 0.22rem;
+  border-radius: 7px;
+  color: rgba(255, 255, 255, 0.82) !important;
   text-decoration: none !important;
-  font-size: 0.68rem;
-  font-weight: 650;
-  line-height: 1.2;
-  letter-spacing: 0.02em;
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: 0.015em;
+  max-width: none;
   -webkit-tap-highlight-color: transparent;
 }
 
 .site-footer-nav__link:hover {
-  background: rgba(255, 255, 255, 0.14);
-  text-decoration: none !important;
   color: #fff !important;
+  text-decoration: none !important;
+}
+
+.site-footer-nav__link:active {
+  opacity: 0.92;
 }
 
 .site-footer-nav__link.is-active {
-  background: rgba(255, 255, 255, 0.22);
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.site-footer-nav__ico {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
 }
 
 .site-footer-nav__ico .ico {
-  width: 1.38rem;
-  height: 1.38rem;
+  width: 1.15rem;
+  height: 1.15rem;
 }
 
 .site-footer-nav__lbl {
   display: block;
+  margin-top: 0.06rem;
 }
 
 .btn {
