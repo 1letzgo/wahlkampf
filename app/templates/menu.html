@@ -39,7 +39,6 @@
   .menu-ov-card .menu-ov-details__summary {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 0.65rem;
     margin: 0;
     padding: 0.72rem 1.25rem;
@@ -56,8 +55,54 @@
   .menu-ov-card .menu-ov-details__summary::-webkit-details-marker {
     display: none;
   }
-  .menu-ov-card .menu-ov-details__summary::after {
-    content: "";
+  .menu-ov-summary__controls {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+  }
+  .menu-ov-admin-chip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: none !important;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .menu-ov-admin-chip:hover {
+    background: rgba(196, 30, 58, 0.09);
+    color: var(--accent-dim);
+  }
+  .menu-ov-admin-chip:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .menu-ov-admin-chip .ico {
+    width: 1.2rem;
+    height: 1.2rem;
+    flex-shrink: 0;
+  }
+  .menu-ov-admin-chip .menu-pending-badge {
+    position: absolute;
+    top: -0.12rem;
+    right: -0.12rem;
+    min-width: 1rem;
+    height: 1rem;
+    padding: 0 0.28rem;
+    font-size: 0.6rem;
+    font-weight: 700;
+    line-height: 1rem;
+  }
+  .menu-ov-details__chevron {
     flex-shrink: 0;
     width: 0.5rem;
     height: 0.5rem;
@@ -68,7 +113,7 @@
     opacity: 0.55;
     transition: transform 0.15s ease;
   }
-  .menu-ov-card .menu-ov-details[open] > .menu-ov-details__summary::after {
+  .menu-ov-card .menu-ov-details[open] > .menu-ov-details__summary .menu-ov-details__chevron {
     transform: rotate(225deg);
     margin-top: 0.12rem;
   }
@@ -105,6 +150,15 @@
   >
     <summary class="menu-ov-details__summary" id="menu-ov-{{ o.slug }}-heading">
       <span class="menu-ov-details__title">{{ o.display_name }}</span>
+      <span class="menu-ov-summary__controls">
+        {% if o.is_admin %}
+        <a href="{{ op }}/admin/benutzer" class="menu-ov-admin-chip" onclick="event.stopPropagation();" aria-label="Administration{% if o.admin_pending_count %} — {{ o.admin_pending_count }} ausstehend{% endif %}">
+          {{ ico.svg_cog() }}
+          {% if o.admin_pending_count %}<span class="menu-pending-badge" aria-hidden="true">{{ o.admin_pending_count }}</span>{% endif %}
+        </a>
+        {% endif %}
+        <span class="menu-ov-details__chevron" aria-hidden="true"></span>
+      </span>
     </summary>
     <ul class="menu-list" role="list" aria-labelledby="menu-ov-{{ o.slug }}-heading">
       <li><a href="{{ op }}/termine"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Termine</span></span></a></li>
@@ -116,14 +170,6 @@
       {% endif %}
       {% if o.feature_sharepic | default(true) %}
       <li><a href="{{ op }}/sharepic"><span class="menu-list__main">{{ ico.svg_image() }}<span>Sharepic</span></span></a></li>
-      {% endif %}
-      {% if o.is_admin %}
-      <li>
-        <a href="{{ op }}/admin/benutzer">
-          <span class="menu-list__main">{{ ico.svg_cog() }}<span>Administration</span></span>
-          {% if o.admin_pending_count %}<span class="menu-pending-badge" aria-label="{{ o.admin_pending_count }} ausstehend">{{ o.admin_pending_count }}</span>{% endif %}
-        </a>
-      </li>
       {% endif %}
     </ul>
   </details>
