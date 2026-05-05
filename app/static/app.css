@@ -821,6 +821,12 @@ dialog.popup-dialog::backdrop {
   color: var(--muted);
 }
 
+/* Gleicher Rhythmus wie .termin-card-list__desc — sonst UA-Margin auf <p> */
+.termin-card-list__link {
+  margin: 0;
+  line-height: 1.45;
+}
+
 .ics-popup__foot {
   margin-top: 1.1rem;
   padding-top: 0.95rem;
