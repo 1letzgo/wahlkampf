@@ -16,6 +16,31 @@
     gap: 0.5rem;
     justify-content: flex-end;
   }
+  .profil-logout-card__head {
+    margin: 0;
+    padding: 0.72rem 1.25rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: color-mix(in srgb, var(--border) 35%, transparent);
+    border-bottom: 1px solid var(--border);
+  }
+  .profil-logout-card__body {
+    padding: 0.95rem 1.25rem 1.05rem;
+  }
+  .profil-logout-card__hint {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.88rem;
+    line-height: 1.4;
+  }
+  .profil-logout-card__actions {
+    margin-top: 0.75rem;
+    display: flex;
+    justify-content: flex-end;
+  }
 </style>
 {% endblock %}
 {% block body %}
@@ -72,13 +97,15 @@
   </form>
 </div>
 
-<div class="card card--flush">
-  <ul class="menu-list" role="list">
-    <li>
-      <a href="{{ public_tenant_prefix(request) }}/logout" class="menu-link-logout" aria-label="Ausloggen">
-        <span class="menu-list__main">{{ ico.svg_logout() }}<span>Ausloggen</span></span>
+<div class="card card--flush profil-logout-card">
+  <h2 class="profil-logout-card__head">Sitzung</h2>
+  <div class="profil-logout-card__body">
+    <p class="profil-logout-card__hint">Melde dich sicher vom aktuellen Gerät ab.</p>
+    <div class="profil-logout-card__actions">
+      <a href="{{ public_tenant_prefix(request) }}/logout" class="btn btn-ghost btn-sm btn-ico btn-with-label menu-link-logout" aria-label="Ausloggen">
+        {{ ico.svg_logout() }}<span class="btn-text">Ausloggen</span>
       </a>
-    </li>
-  </ul>
+    </div>
+  </div>
 </div>
 {% endblock %}
