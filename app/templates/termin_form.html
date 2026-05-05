@@ -193,7 +193,7 @@
     <section class="ics-popup__panel ics-popup__panel--accent" aria-label="Sharepic Terminbild">
       <h3 class="ics-popup__label">Sharepic als Terminbild</h3>
       <p class="ics-popup__lead" style="margin-top:0;">
-        Aus Titel (mittlerer Balken) und Ort (unterer Text) ein JPEG erzeugen und als Terminfoto einsetzen — wirksam nach „Speichern“.
+        Datum und Uhrzeit erscheinen oben rechts (wie der frühere Slogan-Bereich), der Titel im mittleren roten Balken, der Ort unten — dann JPEG erzeugen; wirksam nach „Speichern“.
       </p>
       <label for="termin-sharepic-vorlage">Hintergrundvorlage</label>
       <select id="termin-sharepic-vorlage" autocomplete="off" class="termin-form-card__sharepic-select">
@@ -289,6 +289,8 @@
   var bildInput = document.getElementById("bild");
   var titleEl = document.getElementById("title");
   var locationEl = document.getElementById("location");
+  var datumEl = document.getElementById("datum");
+  var startEl = document.getElementById("start_uhrzeit");
   var WG = window.WahlkampfSharepicGenerator;
   if (!cfgEl || !btn || !vorlageSel || !bildInput || !WG || !WG.renderToBlob) return;
   var cfg = {};
@@ -296,6 +298,37 @@
     cfg = JSON.parse(cfgEl.textContent || "{}");
   } catch (e) {
     return;
+  }
+
+  function formatDatumZeile(iso) {
+    var s = (iso || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
+    var p = s.split("-");
+    var y = parseInt(p[0], 10);
+    var m = parseInt(p[1], 10) - 1;
+    var day = parseInt(p[2], 10);
+    var d = new Date(y, m, day);
+    var wd = d.toLocaleDateString("de-DE", { weekday: "long" });
+    wd = wd.charAt(0).toUpperCase() + wd.slice(1);
+    var ds = d.toLocaleDateString("de-DE", { day: "numeric", month: "long", year: "numeric" });
+    return wd + ", " + ds;
+  }
+
+  function formatUhrzeitZeile(startUhrzeit) {
+    var tu = (startUhrzeit || "").trim();
+    if (!tu) return "";
+    tu = tu.replace(/\s*uhr\s*$/i, "").trim();
+    return tu ? tu + " Uhr" : "";
+  }
+
+  function buildTerminSlogan(datumIso, startUhrzeit, fallback) {
+    var line1 = formatDatumZeile(datumIso);
+    var line2 = formatUhrzeitZeile(startUhrzeit);
+    var parts = [];
+    if (line1) parts.push(line1);
+    if (line2) parts.push(line2);
+    if (parts.length) return parts.join("\n");
+    return (fallback || "").trim();
   }
 
   function showStatus(msg, isErr) {
@@ -318,13 +351,14 @@
     }
     var lim = typeof WG.MID_CHAR_LIMIT === "number" ? WG.MID_CHAR_LIMIT : 30;
     var midText = midRaw.length > lim ? midRaw.slice(0, lim) : midRaw;
+    var slogan = buildTerminSlogan(datumEl && datumEl.value, startEl && startEl.value, cfg.slogan);
     var text2 = (locationEl && locationEl.value) ? locationEl.value.trim() : "";
     showStatus("");
     btn.disabled = true;
     WG.renderToBlob({
       maskSrc: maskSrc,
       ovDisplayName: cfg.ovDisplay || "",
-      slogan: cfg.slogan || "",
+      slogan: slogan,
       midText: midText,
       text2: text2,
       backgroundImageUrl: (vorlageSel.value || "").trim() || null,
