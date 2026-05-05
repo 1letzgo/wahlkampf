@@ -205,7 +205,7 @@
 </style>
 {% endblock %}
 {% block body %}
-{% call app_header_toolbar('Termine') %}
+{% call app_header_toolbar('Fraktion - Termine' if twp == 'fraktion/termine' else 'Termine') %}
   <button type="button" class="btn btn-ghost btn-sm btn-ico btn-with-label" id="ics-open" aria-label="Kalender abonnieren">
     {{ ico.svg_calendar() }}<span class="btn-text">Abonnieren</span>
   </button>

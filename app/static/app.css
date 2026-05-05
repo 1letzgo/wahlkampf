@@ -412,6 +412,23 @@ header.site-header .header-brand:hover {
     min-height: unset;
   }
 
+  /* Header-Navigation: mobil nur Icon, kein Text */
+  .site-header .header-toolbar .btn-ico.btn-with-label .btn-text {
+    display: none !important;
+  }
+
+  .site-header .header-toolbar .btn-ico.btn-with-label:not(.btn-xs) {
+    padding: 0.45rem !important;
+    min-width: 2.35rem !important;
+    min-height: 2.35rem !important;
+  }
+
+  .site-header .header-toolbar .btn-ico.btn-with-label.btn-xs {
+    padding: 0.4rem !important;
+    min-width: 2.2rem !important;
+    min-height: 2.2rem !important;
+  }
+
   /* Volle Breite + gut erkennbare Beschriftung auf kleinen Screens */
   .btn-ico.btn-with-label.btn-block:not(.btn-xs) {
     width: 100%;
@@ -434,6 +451,12 @@ header.site-header .header-brand:hover {
     min-height: 2.35rem !important;
     width: 2.35rem;
     height: 2.35rem;
+  }
+}
+
+@media (min-width: 641px) {
+  .site-header .header-toolbar .btn-ico.btn-with-label .btn-text {
+    display: inline !important;
   }
 }
 
