@@ -443,6 +443,17 @@
             {% endif %}
           </section>
 
+          {% if termin_anhaenge|length %}
+          <section class="ics-popup__panel" aria-label="Dateianhänge">
+            <h3 class="ics-popup__label">Dateien</h3>
+            <ul style="margin:0;padding-left:1.15rem;line-height:1.5;font-size:0.95rem;">
+              {% for a in termin_anhaenge %}
+              <li><a href="{{ owner_mp }}/media/{{ a.path }}" download>{{ a.name }}</a></li>
+              {% endfor %}
+            </ul>
+          </section>
+          {% endif %}
+
           {% set _tn = row.teilnehmer|length + row.teilnehmer_extern|length %}
           <section class="ics-popup__panel termin-card-list__panel-teilnehmer{% if not t.description %} ics-popup__panel--accent{% endif %}" aria-label="Teilnehmer">
             <div data-live-teilnehmer-inner>

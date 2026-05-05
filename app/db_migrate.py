@@ -171,6 +171,26 @@ def run_platform_sqlite_migrations(engine: Engine) -> None:
     migrate_termine_created_by_nullable_sqlite(engine)
     migrate_termin_teilnahme_status_sqlite(engine)
     migrate_termine_promoted_all_ovs_sqlite(engine)
+    migrate_termine_attachments_json_sqlite(engine)
+
+
+def migrate_termine_attachments_json_sqlite(engine: Engine) -> None:
+    """JSON-Liste von Dateianhängen (Pfad unter uploads + Anzeigename)."""
+    if engine.dialect.name != "sqlite":
+        return
+    insp = inspect(engine)
+    if not insp.has_table("termine"):
+        return
+    cols = {c["name"] for c in insp.get_columns("termine")}
+    if "attachments_json" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE termine ADD COLUMN attachments_json "
+                "TEXT NOT NULL DEFAULT '[]'"
+            ),
+        )
 
 
 def migrate_termine_promoted_all_ovs_sqlite(engine: Engine) -> None:

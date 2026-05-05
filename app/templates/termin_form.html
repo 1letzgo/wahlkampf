@@ -112,15 +112,30 @@
     gap: 0.5rem;
     justify-content: flex-end;
   }
+  .termin-form-card__anhang-list {
+    margin: 0.35rem 0 0;
+    padding-left: 1.15rem;
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+  .termin-form-card__anhang-list li {
+    margin-bottom: 0.25rem;
+  }
 </style>
 {% endblock %}
 {% block body %}
 {{ app_header('Termin bearbeiten' if termin else 'Neuer Termin') }}
 
 <div class="page-toolbar" aria-label="Navigation">
-  <a href="{% if termin %}{{ mp }}/termine/{{ termin.id }}{% else %}{{ mp }}/termine{% endif %}" class="btn btn-sm btn-ghost btn-ico btn-with-label" aria-label="{% if termin %}Zur Terminansicht{% else %}Zur Terminliste{% endif %}">
-    {{ ico.svg_arrow_left() }}<span class="btn-text">{% if termin %}Zurück{% else %}Termine{% endif %}</span>
+  {% if termin %}
+  <a href="{{ mp }}/termine/{{ termin.id }}" class="btn btn-sm btn-danger btn-ico btn-with-label" aria-label="Zur Terminansicht">
+    {{ ico.svg_arrow_left() }}<span class="btn-text">Zurück</span>
   </a>
+  {% else %}
+  <a href="{{ mp }}/termine" class="btn btn-sm btn-ghost btn-ico btn-with-label" aria-label="Zur Terminliste">
+    {{ ico.svg_arrow_left() }}<span class="btn-text">Termine</span>
+  </a>
+  {% endif %}
 </div>
 
 <div class="card card--flush termin-form-card">
@@ -146,7 +161,6 @@
         <input type="checkbox" name="promoted_all_ovs" value="1"{% if promoted_all_ovs_checked %} checked{% endif %}>
         In allen Ortsverbänden anzeigen
       </label>
-      <p class="muted" style="margin:0.5rem 0 0; font-size:.85rem;">Zusätzlich in den Terminlisten aller anderen Verbände sichtbar (nur Kreis).</p>
     </section>
     {% endif %}
 
@@ -206,6 +220,28 @@
     </section>
     {% endif %}
 
+    {% if termin and termin_anhaenge|length %}
+    <section class="ics-popup__panel" aria-label="Dateianhänge">
+      <h3 class="ics-popup__label">Dateianhänge entfernen</h3>
+      <div class="termin-form-card__guest-list">
+        {% for a in termin_anhaenge %}
+        <label>
+          <input type="checkbox" name="anhang_entfernen" value="{{ loop.index0 }}">
+          {{ a.name }}
+        </label>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="ics-popup__panel" aria-label="Dateianhänge hinzufügen">
+      <h3 class="ics-popup__label">{% if termin %}Weitere Dateien{% else %}Dateianhänge{% endif %}</h3>
+      <p class="ics-popup__lead" style="margin-top:0;">Beliebige Dateitypen, bis {{ max_attachment_mb }} MB pro Datei — einzeln vor dem Speichern wieder entfernbar.</p>
+      <label for="termin-anhaenge-input">Dateien auswählen (mehrere möglich)</label>
+      <input id="termin-anhaenge-input" name="anhaenge" type="file" multiple>
+      <ul id="termin-anhaenge-list" class="termin-form-card__anhang-list" aria-live="polite"></ul>
+    </section>
+
     <section class="ics-popup__panel" aria-label="{% if termin %}Neues Foto{% else %}Foto{% endif %}">
       <label for="bild">{% if termin %}Neues Foto (optional, ersetzt das alte){% else %}Foto (optional, JPEG/PNG/WebP, max. {{ max_mb }} MB){% endif %}</label>
       <input id="bild" name="bild" type="file" accept="image/jpeg,image/png,image/webp">
@@ -223,4 +259,44 @@
     </footer>
   </form>
 </div>
+<script>
+(function () {
+  var input = document.getElementById("termin-anhaenge-input");
+  var listEl = document.getElementById("termin-anhaenge-list");
+  if (!input || !listEl) return;
+  var dt = new DataTransfer();
+
+  function sync() {
+    input.files = dt.files;
+    listEl.innerHTML = "";
+    Array.from(dt.files).forEach(function (file, idx) {
+      var li = document.createElement("li");
+      li.appendChild(document.createTextNode(file.name + " "));
+      var rm = document.createElement("button");
+      rm.type = "button";
+      rm.className = "btn btn-xs btn-ghost";
+      rm.setAttribute("aria-label", "Auswahl entfernen");
+      rm.textContent = "\u00d7";
+      rm.addEventListener("click", function () {
+        var nd = new DataTransfer();
+        Array.from(dt.files).forEach(function (f, i) {
+          if (i !== idx) nd.items.add(f);
+        });
+        dt = nd;
+        sync();
+      });
+      li.appendChild(rm);
+      listEl.appendChild(li);
+    });
+  }
+
+  input.addEventListener("change", function () {
+    Array.from(input.files).forEach(function (f) {
+      dt.items.add(f);
+    });
+    input.value = "";
+    sync();
+  });
+})();
+</script>
 {% endblock %}

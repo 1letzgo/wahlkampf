@@ -88,6 +88,7 @@ class Termin(PlatformBase):
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     promoted_all_ovs: Mapped[bool] = mapped_column(Boolean, default=False)
+    attachments_json: Mapped[str] = mapped_column(Text, default="[]")
 
     creator: Mapped[Optional["PlatformUser"]] = relationship()
     teilnahmen: Mapped[List["TerminTeilnahme"]] = relationship(

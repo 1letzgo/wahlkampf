@@ -67,6 +67,12 @@ from app.settings_store import (
 )
 from app.superadmin_web import router as superadmin_router
 from app.tenant_assets import sharepic_mask_url
+from app.termin_attachments import (
+    attachments_decode,
+    attachments_encode,
+    MAX_TERMIN_ATTACHMENT_BYTES,
+    save_attachment_upload,
+)
 from app.termin_extern import (
     EXTERNE_TEILNEHMER_KEYS,
     EXTERNE_TEILNEHMER_OPTIONS,
@@ -353,6 +359,49 @@ def _unlink_upload(rel: Optional[str], upload_root: Path) -> None:
         p.unlink(missing_ok=True)
     except OSError:
         pass
+
+
+def _as_upload_file_list(v: UploadFile | List[UploadFile] | None) -> List[UploadFile]:
+    if v is None:
+        return []
+    if isinstance(v, list):
+        return v
+    return [v]
+
+
+def _form_str_list(v: List[str] | str | None) -> List[str]:
+    if v is None:
+        return []
+    if isinstance(v, str):
+        return [v] if v else []
+    return [str(x) for x in v]
+
+
+async def _termin_append_attachments(
+    uploads: List[UploadFile],
+    *,
+    termin_id: int,
+    upload_root: Path,
+    existing: List[dict[str, str]],
+) -> tuple[List[dict[str, str]], Optional[str]]:
+    items = list(existing)
+    added: List[dict[str, str]] = []
+    try:
+        for uf in uploads:
+            if not uf.filename:
+                continue
+            it = await save_attachment_upload(
+                uf,
+                termin_id=termin_id,
+                upload_root=upload_root,
+            )
+            added.append(it)
+            items.append(it)
+    except ValueError as e:
+        for it in added:
+            _unlink_upload(it["path"], upload_root)
+        return existing, str(e)
+    return items, None
 
 
 def _safe_ext(filename: Optional[str], content_type: Optional[str]) -> str:
@@ -1511,11 +1560,16 @@ def _termin_form_context(
     show_promoted = bool(
         pdb is not None and ks and ms_ctx == ks and ist_kreis_admin(pdb, user)
     )
+    termin_anhaenge = (
+        attachments_decode(termin.attachments_json) if termin is not None else []
+    )
     return {
         "user": user,
         "termin": termin,
         "error": error,
         "max_mb": MAX_UPLOAD_MB,
+        "max_attachment_mb": MAX_TERMIN_ATTACHMENT_BYTES // (1024 * 1024),
+        "termin_anhaenge": termin_anhaenge,
         "externe_optionen": EXTERNE_TEILNEHMER_OPTIONS,
         "externe_auswahl": auswahl,
         "show_promoted_all_ovs_checkbox": show_promoted,
@@ -1799,6 +1853,7 @@ async def termin_create(
     end_uhrzeit: Annotated[str, Form()] = "",
     extern_gast: Annotated[Optional[List[str]], Form()] = None,
     bild: Annotated[Optional[UploadFile], File()] = None,
+    anhaenge: Annotated[Optional[List[UploadFile]], File()] = None,
     promoted_all_ovs: Annotated[str | None, Form()] = None,
 ):
     err = _parse_times(start_uhrzeit, end_uhrzeit)
@@ -1874,6 +1929,31 @@ async def termin_create(
             t.image_path = dest_name
             pdb.add(t)
 
+    uploads = _as_upload_file_list(anhaenge)
+    if uploads:
+        items, aerr = await _termin_append_attachments(
+            uploads,
+            termin_id=t.id,
+            upload_root=_upload_root(request),
+            existing=attachments_decode(t.attachments_json),
+        )
+        if aerr:
+            return templates.TemplateResponse(
+                request,
+                "termin_form.html",
+                _termin_form_context(
+                    user=user,
+                    termin=None,
+                    error=aerr,
+                    extern_gast=extern_gast,
+                    pdb=pdb,
+                    mandant_slug=mandant_slug,
+                ),
+                status_code=400,
+            )
+        t.attachments_json = attachments_encode(items)
+        pdb.add(t)
+
     pdb.commit()
     return RedirectResponse(f"{_mp(request)}/termine/{t.id}", status_code=302)
 
@@ -1899,6 +1979,7 @@ def termin_detail(
             "row": row,
             "termin_vergangen": termin_vergangen,
             "termin_kommentare": kommentare,
+            "termin_anhaenge": attachments_decode(row["termin"].attachments_json),
         },
     )
 
@@ -2159,6 +2240,8 @@ async def termin_edit_save(
     bild_entfernen: Annotated[str, Form()] = "",
     extern_gast: Annotated[Optional[List[str]], Form()] = None,
     bild: Annotated[Optional[UploadFile], File()] = None,
+    anhang_entfernen: Annotated[Optional[List[str]], Form()] = None,
+    anhaenge: Annotated[Optional[List[UploadFile]], File()] = None,
     promoted_all_ovs: Annotated[str | None, Form()] = None,
 ):
     ms = mandant_slug.strip().lower()
@@ -2250,6 +2333,47 @@ async def termin_edit_save(
             _unlink_upload(t.image_path, upload_root)
             t.image_path = dest_name
 
+    raw_attach = attachments_decode(t.attachments_json)
+    remove_set = {
+        int(x)
+        for x in _form_str_list(anhang_entfernen)
+        if str(x).strip().isdigit()
+    }
+    kept_attach: List[dict[str, str]] = []
+    for idx, it in enumerate(raw_attach):
+        if idx in remove_set:
+            _unlink_upload(it["path"], upload_root)
+        else:
+            kept_attach.append(it)
+
+    uploads_a = _as_upload_file_list(anhaenge)
+    if uploads_a:
+        kept_attach2, aerr = await _termin_append_attachments(
+            uploads_a,
+            termin_id=t.id,
+            upload_root=upload_root,
+            existing=kept_attach,
+        )
+        if aerr:
+            pdb.rollback()
+            pdb.refresh(t)
+            return templates.TemplateResponse(
+                request,
+                "termin_form.html",
+                _termin_form_context(
+                    user=user,
+                    termin=t,
+                    error=aerr,
+                    extern_gast=extern_gast,
+                    pdb=pdb,
+                    mandant_slug=mandant_slug,
+                ),
+                status_code=400,
+            )
+        kept_attach = kept_attach2
+
+    t.attachments_json = attachments_encode(kept_attach)
+
     pdb.add(t)
     pdb.commit()
     return RedirectResponse(f"{_mp(request)}/termine/{termin_id}", status_code=302)
@@ -2304,6 +2428,8 @@ def termin_delete_do(
         )
     upload_root = upload_dir_for_slug(t.mandant_slug.strip().lower())
     _unlink_upload(t.image_path, upload_root)
+    for it in attachments_decode(t.attachments_json):
+        _unlink_upload(it.get("path"), upload_root)
     pdb.delete(t)
     pdb.commit()
     return RedirectResponse(f"{_mp(request)}/termine", status_code=302)
