@@ -1,0 +1,19 @@
+{% if request.state.mandanten_prefix %}
+{% from '_ui_macros.html' import public_tenant_prefix, tenant_footer_home_href %}
+{% import '_icons.html' as ico %}
+{% set path_rs = request.url.path.rstrip('/') %}
+{% set home_active = path_rs.endswith('/menu') %}
+{% set konto_active = path_rs.endswith('/profil') %}
+<nav class="site-footer-nav" aria-label="Hauptnavigation unten">
+  <div class="site-footer-nav__inner">
+    <a href="{{ tenant_footer_home_href(request) }}" class="site-footer-nav__link{% if home_active %} is-active{% endif %}">
+      <span class="site-footer-nav__ico" aria-hidden="true">{{ ico.svg_home() }}</span>
+      <span class="site-footer-nav__lbl">Home</span>
+    </a>
+    <a href="{{ public_tenant_prefix(request) }}/profil" class="site-footer-nav__link{% if konto_active %} is-active{% endif %}">
+      <span class="site-footer-nav__ico" aria-hidden="true">{{ ico.svg_user() }}</span>
+      <span class="site-footer-nav__lbl">Konto</span>
+    </a>
+  </div>
+</nav>
+{% endif %}

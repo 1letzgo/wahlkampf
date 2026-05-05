@@ -18,6 +18,11 @@
   {%- endif -%}
 {%- endmacro %}
 
+{# Root-Pfad + Mandanten-Menü (nur sinnvoll mit gesetztem mandanten_prefix). #}
+{% macro tenant_footer_home_href(request) -%}
+  {{- (request.scope.get('root_path') or '').rstrip('/') ~ (request.state.mandanten_prefix | default('', true)) ~ '/menu' -}}
+{%- endmacro %}
+
 {% macro app_header(title, brand_href=None) %}
 <header class="site-header">
   <div class="header-inner">

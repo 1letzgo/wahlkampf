@@ -17,30 +17,43 @@
   {% include '_ics_surface_styles.html' %}
   {% block head %}{% endblock %}
 </head>
-<body{% if request.state.show_app_shell_nav %} class="has-app-shell-tabbar"{% endif %}>
+<body>
   <div class="wrap">
     {% block body %}{% endblock %}
   </div>
-  {% if request.state.show_app_shell_nav %}
-  {% include '_app_shell_nav.html' %}
-  {% endif %}
+  {% include '_app_footer_nav.html' %}
   <script>
     (function () {
-      function syncWrapHeaderPad() {
-        var header = document.querySelector("header.site-header");
+      function gapPx(rem) {
+        return rem * (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16);
+      }
+      function syncWrapChromePad() {
         var wrap = document.querySelector(".wrap");
-        if (!header || !wrap) return;
-        var gapRem = 1.5;
-        var gapPx = gapRem * parseFloat(getComputedStyle(document.documentElement).fontSize) || 24;
-        wrap.style.paddingTop = Math.ceil(header.getBoundingClientRect().height + gapPx) + "px";
+        if (!wrap) return;
+        var header = document.querySelector("header.site-header");
+        if (header) {
+          wrap.style.paddingTop =
+            Math.ceil(header.getBoundingClientRect().height + gapPx(1.5)) + "px";
+        }
+        var footerNav = document.querySelector("nav.site-footer-nav");
+        if (footerNav) {
+          wrap.style.paddingBottom =
+            Math.ceil(footerNav.getBoundingClientRect().height + gapPx(1.25)) + "px";
+        } else {
+          wrap.style.paddingBottom = "";
+        }
       }
       function init() {
-        syncWrapHeaderPad();
-        requestAnimationFrame(syncWrapHeaderPad);
-        window.addEventListener("resize", syncWrapHeaderPad);
+        syncWrapChromePad();
+        requestAnimationFrame(syncWrapChromePad);
+        window.addEventListener("resize", syncWrapChromePad);
         var header = document.querySelector("header.site-header");
         if (header && typeof ResizeObserver !== "undefined") {
-          new ResizeObserver(syncWrapHeaderPad).observe(header);
+          new ResizeObserver(syncWrapChromePad).observe(header);
+        }
+        var footerNav = document.querySelector("nav.site-footer-nav");
+        if (footerNav && typeof ResizeObserver !== "undefined") {
+          new ResizeObserver(syncWrapChromePad).observe(footerNav);
         }
       }
       if (document.readyState === "loading") {

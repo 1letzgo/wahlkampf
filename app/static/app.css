@@ -170,6 +170,74 @@ header.site-header .header-brand:hover {
   max-width: 100%;
 }
 
+/* Fixe Fußleiste (Tenant): gleiches Rot wie Header, zentrierte Schiene wie .header-inner */
+nav.site-footer-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 99;
+  margin: 0;
+  padding: 0;
+  padding-top: 0.45rem;
+  padding-bottom: max(0.45rem, env(safe-area-inset-bottom, 0px));
+  background: var(--accent);
+  box-shadow: 0 -6px 14px rgba(0, 0, 0, 0.12);
+}
+
+.site-footer-nav__inner {
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: max(1rem, env(safe-area-inset-left, 0px));
+  padding-right: max(1rem, env(safe-area-inset-right, 0px));
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0.25rem;
+  box-sizing: border-box;
+}
+
+.site-footer-nav__link {
+  flex: 1;
+  max-width: 12rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.12rem;
+  min-height: 2.75rem;
+  padding: 0.35rem 0.65rem 0.42rem;
+  border-radius: var(--radius-input);
+  color: #fff !important;
+  text-decoration: none !important;
+  font-size: 0.68rem;
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.site-footer-nav__link:hover {
+  background: rgba(255, 255, 255, 0.14);
+  text-decoration: none !important;
+  color: #fff !important;
+}
+
+.site-footer-nav__link.is-active {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.site-footer-nav__ico .ico {
+  width: 1.38rem;
+  height: 1.38rem;
+}
+
+.site-footer-nav__lbl {
+  display: block;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -857,75 +925,4 @@ dialog.popup-dialog::backdrop {
   flex-wrap: wrap;
   gap: 0.5rem;
   justify-content: flex-end;
-}
-
-/* Feste untere Tab-Leiste (eingeloggt im OV-Kontext) */
-body.has-app-shell-tabbar .wrap {
-  padding-bottom: calc(3.35rem + env(safe-area-inset-bottom, 0px));
-}
-
-.app-shell-tabbar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 90;
-  display: flex;
-  flex-wrap: nowrap;
-  justify-content: center;
-  align-items: center;
-  gap: 2rem;
-  max-width: 720px;
-  margin: 0 auto;
-  min-height: 3rem;
-  padding: 0.28rem 0.75rem calc(0.32rem + env(safe-area-inset-bottom, 0px));
-  padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
-  padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
-  box-sizing: border-box;
-  background: var(--card);
-  border-top: 1px solid var(--border);
-  box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.06);
-}
-
-.app-shell-tabbar__item {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.06rem;
-  min-width: 3.25rem;
-  max-width: 5rem;
-  padding: 0.15rem 0.45rem;
-  border-radius: var(--radius-input);
-  font-size: 0.62rem;
-  font-weight: 650;
-  line-height: 1.15;
-  letter-spacing: 0.02em;
-  color: var(--muted);
-  text-decoration: none !important;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.app-shell-tabbar__item .ico {
-  width: 1.12rem;
-  height: 1.12rem;
-  opacity: 0.88;
-}
-
-.app-shell-tabbar__item:hover {
-  color: var(--text);
-}
-
-.app-shell-tabbar__item:hover .ico {
-  opacity: 1;
-}
-
-.app-shell-tabbar__item.is-active {
-  color: var(--accent);
-}
-
-.app-shell-tabbar__item.is-active .ico {
-  opacity: 1;
-  color: var(--accent);
 }
