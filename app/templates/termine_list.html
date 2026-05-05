@@ -90,10 +90,11 @@
           'imagePath': owner_mp ~ '/media/' ~ t.image_path,
           'filename': 'termin-' ~ (t.id | string) ~ '.jpg'
         } %}
-        <button type="button" class="btn btn-sm btn-ghost btn-ico termin-bild-share-btn" aria-label="Terminbild teilen" title="Terminbild teilen"
-          data-share-payload="{{ termin_list_share_payload | tojson | e }}">
+        <button type="button" class="btn btn-sm btn-ghost btn-ico termin-list-bild-share-btn" aria-label="Terminbild teilen" title="Terminbild teilen"
+          data-share-json-id="termin-list-share-json-{{ t.id }}">
           {{ ico.svg_share() }}
         </button>
+        <script type="application/json" id="termin-list-share-json-{{ t.id }}">{{ termin_list_share_payload | tojson }}</script>
         {% endif %}
         {% set nk = row.kommentar_count|default(0) %}
         <a href="{{ owner_mp }}/{{ twp }}/{{ t.id }}" class="btn btn-sm btn-ghost btn-ico termin-footer-komment-bubble" title="Kommentare" aria-label="Kommentare: {{ nk }}">
@@ -416,14 +417,16 @@
   }
 
   document.body.addEventListener("click", function (ev) {
-    var btn = ev.target.closest(".termin-bild-share-btn");
+    var btn = ev.target.closest(".termin-list-bild-share-btn");
     if (!btn) return;
-    var raw = btn.getAttribute("data-share-payload");
-    if (!raw) return;
+    var jsonId = btn.getAttribute("data-share-json-id");
+    if (!jsonId) return;
+    var metaEl = document.getElementById(jsonId);
+    if (!metaEl) return;
 
     var meta = {};
     try {
-      meta = JSON.parse(raw);
+      meta = JSON.parse(metaEl.textContent || "{}");
     } catch (e) {
       return;
     }
