@@ -46,7 +46,7 @@
     border-bottom: 1px solid var(--border);
   }
   .profil-ov-card__body {
-    padding: 0.95rem 1.25rem 1.05rem;
+    padding: 0;
   }
   .profil-ov-memberships {
     margin: 0;
@@ -128,7 +128,7 @@
 
 <div class="card card--flush profil-ov-card">
   <h2 class="profil-ov-card__head">Ortsverbände</h2>
-  <div class="profil-ov-card__body">
+  <div class="profil-ov-card__body ics-popup__form">
     <section class="ics-popup__panel ics-popup__panel--accent" aria-label="Deine Ortsverbände">
       <h3 class="ics-popup__label">Deine Ortsverbände</h3>
     {% if profile_memberships %}
