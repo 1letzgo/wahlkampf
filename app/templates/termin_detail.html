@@ -299,12 +299,30 @@
       {% if t.image_path or row.kann_verwalten %}
       <div class="termin-footer-actions__admin">
         {% if t.image_path %}
-        <button type="button" class="btn btn-sm btn-ghost btn-ico termin-bild-share-btn" aria-label="Terminbild teilen" title="Terminbild teilen"
-          data-share-path="{{ owner_mp }}/media/{{ t.image_path }}"
-          data-share-title="{{ t.title | e }}"
-          data-share-filename="termin-{{ t.id }}.jpg">
+        {% set termin_share_detail_path = owner_mp ~ '/' ~ twp ~ '/' ~ (t.id | string) %}
+        {% set termin_detail_url = request.url.scheme ~ '://' ~ request.url.netloc ~ termin_share_detail_path %}
+        {% set share_text = t.title ~ '\n\nWann: ' ~ t.starts_at.strftime('%d.%m.%Y') ~ ', ' ~ t.starts_at.strftime('%H:%M') ~ ('–' ~ t.ends_at.strftime('%H:%M') if t.ends_at else '') ~ ' Uhr' %}
+        {% if t.location %}
+        {% set share_text = share_text ~ '\n\nOrt: ' ~ t.location %}
+        {% endif %}
+        {% if t.link_url %}
+        {% set share_text = share_text ~ '\n\nLink: ' ~ t.link_url %}
+        {% endif %}
+        {% if t.description %}
+        {% set desc_trim = t.description | trim %}
+        {% set share_text = share_text ~ '\n\n' ~ (desc_trim[:450] ~ ('…' if desc_trim | length > 450 else '')) %}
+        {% endif %}
+        {% set share_text = share_text ~ '\n\n' ~ termin_detail_url %}
+        <button type="button" class="btn btn-sm btn-ghost btn-ico termin-bild-share-btn" aria-label="Terminbild teilen" title="Terminbild teilen">
           {{ ico.svg_share() }}
         </button>
+        <script type="application/json" id="termin-bild-share-meta">{{ {
+          'title': t.title,
+          'text': share_text,
+          'detailUrl': termin_detail_url,
+          'imagePath': owner_mp ~ '/media/' ~ t.image_path,
+          'filename': 'termin-' ~ (t.id | string) ~ '.jpg'
+        } | tojson }}</script>
         {% endif %}
         {% if row.kann_verwalten %}
         <a href="{{ owner_mp }}/{{ twp }}/{{ t.id }}/bearbeiten" class="btn btn-sm btn-ghost btn-ico" aria-label="Termin bearbeiten" title="Bearbeiten">
@@ -731,21 +749,31 @@
 <script>
 (function () {
   var btn = document.querySelector(".termin-bild-share-btn");
-  if (!btn || !btn.getAttribute("data-share-path")) return;
+  var metaEl = document.getElementById("termin-bild-share-meta");
+  if (!btn || !metaEl) return;
+  var meta = {};
+  try {
+    meta = JSON.parse(metaEl.textContent || "{}");
+  } catch (e) {
+    return;
+  }
+  var path = (meta.imagePath || "").trim();
+  if (!path) return;
 
   function absoluteUrl(pathRaw) {
-    var path = (pathRaw || "").trim();
-    if (!path) return "";
-    if (path.charAt(0) !== "/") path = "/" + path;
-    return window.location.origin + path;
+    var p = (pathRaw || "").trim();
+    if (!p) return "";
+    if (p.charAt(0) !== "/") p = "/" + p;
+    return window.location.origin + p;
   }
 
   btn.addEventListener("click", function () {
-    var path = btn.getAttribute("data-share-path") || "";
-    var title = (btn.getAttribute("data-share-title") || "Termin").trim();
-    var fname = (btn.getAttribute("data-share-filename") || "termin.jpg").trim();
-    var absUrl = absoluteUrl(path);
-    if (!absUrl) return;
+    var title = (meta.title || "Termin").trim();
+    var bodyText = (meta.text || title).trim();
+    var detailUrl = (meta.detailUrl || "").trim() || absoluteUrl(path);
+    var fname = (meta.filename || "termin.jpg").trim();
+    var absImgUrl = absoluteUrl(path);
+    if (!absImgUrl) return;
 
     btn.disabled = true;
 
@@ -762,19 +790,30 @@
         var base = fname.replace(/\.(jpe?g|png|webp)$/i, "") || "termin";
         var file = new File([blob], base + ext, { type: mime });
 
+        function shareFiles(extraText) {
+          var payload = { files: [file], title: title };
+          if (extraText) payload.text = extraText;
+          try {
+            if (navigator.canShare && navigator.canShare(payload)) {
+              return navigator.share(payload);
+            }
+          } catch (e) {}
+          return navigator.share({ files: [file], title: title });
+        }
+
         var canFiles = false;
         try {
           canFiles = !!(navigator.share && navigator.canShare && navigator.canShare({ files: [file] }));
         } catch (e) {}
 
         if (canFiles) {
-          return navigator.share({ files: [file], title: title }).catch(function (err) {
+          return shareFiles(bodyText).catch(function (err) {
             if (err && err.name === "AbortError") return;
-            throw err;
+            return shareFiles("");
           });
         }
         if (navigator.share) {
-          return navigator.share({ title: title, text: title, url: absUrl }).catch(function (err) {
+          return navigator.share({ title: title, text: bodyText, url: detailUrl }).catch(function (err) {
             if (err && err.name === "AbortError") return;
             throw err;
           });
@@ -782,16 +821,17 @@
         throw new Error("no-share");
       })
       .catch(function () {
+        var fallbackText = bodyText || detailUrl || absImgUrl;
         if (navigator.clipboard && navigator.clipboard.writeText) {
-          return navigator.clipboard.writeText(absUrl).then(function () {
+          return navigator.clipboard.writeText(fallbackText).then(function () {
             var prev = btn.getAttribute("title") || "";
-            btn.setAttribute("title", "Link kopiert");
+            btn.setAttribute("title", "Text kopiert");
             window.setTimeout(function () {
               btn.setAttribute("title", prev || "Terminbild teilen");
             }, 2000);
           });
         }
-        window.prompt("Link zum Bild kopieren:", absUrl);
+        window.prompt("Kopieren:", fallbackText);
       })
       .finally(function () {
         btn.disabled = false;

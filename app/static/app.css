@@ -675,10 +675,21 @@ textarea {
   resize: vertical;
 }
 
+/* Date-/Datetime-Native-Widgets haben oft eine hohe Mindestbreite (bes. WebKit);
+ * ohne max-/min-width sprengen sie schmale Panels (z. B. Terminformular mobil). */
+input[type="date"] {
+  max-width: 100%;
+  min-width: 0;
+}
+
 .row2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.75rem;
+}
+
+.row2 > div {
+  min-width: 0;
 }
 
 @media (max-width: 520px) {
