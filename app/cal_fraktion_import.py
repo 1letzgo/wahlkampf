@@ -100,8 +100,54 @@ def _norm_url_token(u: str) -> str:
     return u.strip().rstrip(").,]>;")
 
 
-def extract_description_and_link_from_ics_description(raw: str) -> tuple[str, str | None]:
-    """Entfernt ALLRIS-Boilerplate aus DESCRIPTION und liefert optional den Sitzungs-Link."""
+def _ris_link_detail_score(url: str) -> int:
+    """Höher = sitzungsspezifischer Link (to010/SILFDNR) vor Monatskalender si010_e."""
+    if not url:
+        return 0
+    u = url.lower()
+    q = urlparse(url).query.lower()
+    if "to010.asp" in u and "silfdnr=" in q:
+        return 400
+    if "silfdnr=" in q or "volfdnr=" in q:
+        return 350
+    if "si010" in u and "dd=" in q:
+        return 120
+    # Nur Monat/Jahr = Kalenderübersicht (mehrere Termine teilen oft dieselbe URL)
+    if "si010_e.asp" in u and "mm=" in q and "yy=" in q:
+        return 25
+    if "si010" in u:
+        return 40
+    if "ris." in u and "/bi/" in u:
+        return 15
+    return 5
+
+
+def _pick_best_http_url(urls: list[str]) -> str | None:
+    if not urls:
+        return None
+    return max(urls, key=_ris_link_detail_score)
+
+
+def _allris_synthesize_to010_from_uid(uid_raw: str, reference_http_url: str | None) -> str | None:
+    """UID wie ALLRIS-Sitzung-426 → to010.asp?SILFDNR=426 (wenn Referenz-Host aus Feed)."""
+    m = re.match(r"(?i)^ALLRIS-Sitzung-(\d+)\s*$", (uid_raw or "").strip())
+    if not m:
+        return None
+    silfdnr = m.group(1)
+    ref = reference_http_url or ""
+    if ref:
+        p = urlparse(ref)
+        if p.scheme in ("http", "https") and p.netloc:
+            return f"{p.scheme}://{p.netloc}/bi/to010.asp?SILFDNR={silfdnr}"
+    return None
+
+
+def extract_description_and_link_from_ics_description(
+    raw: str,
+    *,
+    calendar_uid: str = "",
+) -> tuple[str, str | None]:
+    """Entfernt ALLRIS-Boilerplate aus DESCRIPTION und liefert den besten Sitzungs-Link."""
     text = (raw or "").strip()
     if not text:
         return "", None
@@ -110,19 +156,13 @@ def extract_description_and_link_from_ics_description(raw: str) -> tuple[str, st
         _norm_url_token(m.group(0))
         for m in re.finditer(r"https?://[^\s<>]+", text, flags=re.I)
     ]
-    link: str | None = None
-    for u in urls:
-        ul = u.lower()
-        if "si010_e.asp" in ul or "/bi/si010" in ul:
-            link = u
-            break
-    if link is None:
-        for u in reversed(urls):
-            if "ris." in u.lower() and "/bi/" in u.lower():
-                link = u
-                break
-    if link is None and urls:
-        link = urls[-1]
+    link_pick = _pick_best_http_url(urls)
+    if link_pick is None or _ris_link_detail_score(link_pick) <= 25:
+        synth = _allris_synthesize_to010_from_uid(calendar_uid, link_pick or (urls[0] if urls else None))
+        if synth:
+            link_pick = synth[:2000]
+
+    link = link_pick
 
     lines = text.splitlines()
     out: list[str] = []
@@ -139,15 +179,21 @@ def extract_description_and_link_from_ics_description(raw: str) -> tuple[str, st
             if i < len(lines):
                 cand = _norm_url_token(lines[i].strip())
                 if cand.lower().startswith("http"):
-                    if link is None:
-                        link = cand
+                    # Link kommt bereits aus URLs/UID-Synthese — Zeile nur entfernen
                     i += 1
                     continue
             continue
         if link and st.lower().startswith("http"):
-            if _norm_url_token(st).lower() == _norm_url_token(link).lower():
+            cu = _norm_url_token(st).lower()
+            # Alle im Text vorkommenden RIS-URLs aus Beschreibung entfernen (auch wenn wir auf to010 synthetisiert haben)
+            for u in urls:
+                if cu == _norm_url_token(u).lower():
+                    i += 1
+                    break
+            else:
+                out.append(lines[i])
                 i += 1
-                continue
+            continue
         out.append(lines[i])
         i += 1
 
@@ -155,6 +201,13 @@ def extract_description_and_link_from_ics_description(raw: str) -> tuple[str, st
     desc = re.sub(r"\n{3,}", "\n\n", desc)
     if link and len(link) > 2000:
         link = link[:2000]
+
+    # Falls Boilerplate keine URL hatte, aber UID synthetisierbar: nur wenn noch kein starker Link
+    if (link is None or _ris_link_detail_score(link) <= 25) and urls:
+        synth2 = _allris_synthesize_to010_from_uid(calendar_uid, urls[0])
+        if synth2:
+            link = synth2[:2000]
+
     return desc, link
 
 
@@ -187,17 +240,22 @@ def parse_vevents_from_ics(raw: bytes) -> list[dict]:
         title = _prop_as_str(component, "summary", 200) or "(Kalender)"
         location = _prop_as_str(component, "location", 300)
         desc_raw = _prop_as_str(component, "description", 20000)
-        desc_clean, link_from_desc = extract_description_and_link_from_ics_description(desc_raw)
+        desc_clean, link_from_desc = extract_description_and_link_from_ics_description(
+            desc_raw,
+            calendar_uid=uid,
+        )
 
         link_prop = _prop_as_str(component, "url", 2000).strip()
-        link_final: str | None = None
+        link_cands: list[str] = []
         for cand in (link_prop, link_from_desc):
             if not cand:
                 continue
-            p = urlparse(cand)
+            p = urlparse(cand.strip())
             if p.scheme in ("http", "https") and p.netloc:
-                link_final = cand[:2000]
-                break
+                link_cands.append(_norm_url_token(cand.strip()))
+        link_final = _pick_best_http_url(link_cands)
+        if link_final:
+            link_final = link_final[:2000]
 
         out.append(
             {
