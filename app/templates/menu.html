@@ -76,10 +76,6 @@
     min-width: 0;
     flex: 1;
   }
-  .menu-ov-card .menu-list a.menu-list__admin-row {
-    background: color-mix(in srgb, var(--accent) 7%, transparent);
-    box-shadow: inset 3px 0 0 rgba(196, 30, 58, 0.35);
-  }
   .menu-ov-card .menu-list li:last-child a {
     border-bottom: none;
   }
@@ -123,7 +119,7 @@
       {% endif %}
       {% if o.is_admin %}
       <li>
-        <a href="{{ op }}/admin/benutzer" class="menu-list__admin-row">
+        <a href="{{ op }}/admin/benutzer">
           <span class="menu-list__main">{{ ico.svg_cog() }}<span>Administration</span></span>
           {% if o.admin_pending_count %}<span class="menu-pending-badge" aria-label="{{ o.admin_pending_count }} ausstehend">{{ o.admin_pending_count }}</span>{% endif %}
         </a>
