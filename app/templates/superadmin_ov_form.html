@@ -4,6 +4,27 @@
 {% block title %}{% if is_new %}Neuer Ortsverband{% else %}OV bearbeiten{% endif %} — Wahlkampf{% endblock %}
 {% block head %}
 {% include '_admin_shell_styles.html' %}
+<style>
+  .sharepic-vorlage-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem;
+    margin-bottom: 0.65rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  }
+  .sharepic-vorlage-row:last-child { border-bottom: none; margin-bottom: 0; }
+  .sharepic-vorlage-thumb {
+    width: 4.5rem;
+    height: 3rem;
+    object-fit: cover;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .sharepic-vorlage-meta { flex: 1 1 140px; min-width: 0; font-weight: 600; font-size: 0.9rem; }
+</style>
 {% endblock %}
 {% block body %}
 {% set path_prefix = request.scope.get('root_path') or '' %}
@@ -73,6 +94,43 @@
             <input type="checkbox" name="feature_fraktion" value="1" {% if feature_fraktion %}checked{% endif %}>
             Fraktion (eigene Terminliste, vertrauliche Sitzungen)
           </label>
+        </fieldset>
+
+        {% if vorlage_success %}<div class="success" style="margin-top: 1rem;">{{ vorlage_success }}</div>{% endif %}
+        {% if vorlage_error %}<div class="error" style="margin-top: 1rem;">{{ vorlage_error }}</div>{% endif %}
+
+        <fieldset style="margin-top: 1rem; border: 1px solid var(--border); border-radius: var(--radius); padding: 0.85rem 1rem;">
+          <legend class="ics-popup__label" style="padding: 0 0.35rem;">Sharepic-Hintergrundvorlagen</legend>
+          <p class="muted" style="margin: 0 0 0.65rem; font-size: 0.84rem;">
+            Bilder für den Sharepic-Generator dieses Ortsverbands (unter „Sharepic“ als Auswahl). JPEG, PNG oder WebP, bis {{ max_upload_mb }} MB pro Datei, höchstens {{ sharepic_vorlagen_max }} Vorlagen.
+          </p>
+          {% if sharepic_vorlagen %}
+          {% for v in sharepic_vorlagen %}
+          <div class="sharepic-vorlage-row">
+            <img class="sharepic-vorlage-thumb" src="{{ v.url }}" alt="">
+            <span class="sharepic-vorlage-meta">{{ v.label }}</span>
+            <form method="post" action="{{ path_prefix }}/admin/ortsverbaende/{{ ov.slug }}/sharepic-vorlage-loeschen" style="margin:0;">
+              <input type="hidden" name="template_id" value="{{ v.id }}">
+              <button type="submit" class="btn btn-sm btn-danger btn-ico btn-with-label" aria-label="Vorlage {{ v.label }} entfernen">
+                {{ ico.svg_trash() }}<span class="btn-text">Entfernen</span>
+              </button>
+            </form>
+          </div>
+          {% endfor %}
+          {% else %}
+          <p class="muted" style="margin: 0 0 0.65rem;">Noch keine Vorlagen.</p>
+          {% endif %}
+          <form method="post" action="{{ path_prefix }}/admin/ortsverbaende/{{ ov.slug }}/sharepic-vorlage-hochladen" enctype="multipart/form-data" style="margin-top: 0.85rem; padding-top: 0.85rem; border-top: 1px solid var(--border);">
+            <label for="sharepic-vorlage-datei">Neue Vorlage</label>
+            <input id="sharepic-vorlage-datei" name="vorlage_datei" type="file" accept="image/jpeg,image/png,image/webp" required>
+            <label for="sharepic-vorlage-name" style="margin-top: 0.65rem;">Bezeichnung (optional)</label>
+            <input id="sharepic-vorlage-name" name="vorlage_bezeichnung" type="text" maxlength="120" placeholder="z. B. Marktplatz, Rathaus">
+            <p style="margin: 0.75rem 0 0;">
+              <button type="submit" class="btn btn-sm btn-ico btn-with-label" aria-label="Sharepic-Vorlage hochladen">
+                {{ ico.svg_check() }}<span class="btn-text">Hochladen</span>
+              </button>
+            </p>
+          </form>
         </fieldset>
 
         <fieldset style="margin-top: 1rem; border: 1px solid var(--border); border-radius: var(--radius); padding: 0.85rem 1rem;">

@@ -85,7 +85,18 @@
     </header>
 
     <section class="ics-popup__panel ics-popup__panel--accent" aria-label="Foto">
-      <label for="sharepic-photo" class="ics-popup__label">Foto</label>
+      <span class="ics-popup__label">Foto</span>
+      {% if sharepic_vorlagen %}
+      <label for="sharepic-vorlage-wahl" class="ics-popup__label sharepic-label-spaced">Hintergrundvorlage</label>
+      <p class="muted sharepic-hint" style="margin:-0.35rem 0 0.45rem;">Vom Ortsverband hochgeladen — Zoom und Verschieben wie bei einem eigenen Foto.</p>
+      <select id="sharepic-vorlage-wahl" aria-label="Sharepic-Hintergrundvorlage wählen">
+        <option value="">— Keine Vorlage / eigenes Foto —</option>
+        {% for v in sharepic_vorlagen %}
+        <option value="{{ v.url }}">{{ v.label }}</option>
+        {% endfor %}
+      </select>
+      {% endif %}
+      <label for="sharepic-photo" class="ics-popup__label sharepic-label-spaced">{% if sharepic_vorlagen %}Eigenes Foto (Datei){% else %}Aus Datei laden{% endif %}</label>
       <input id="sharepic-photo" type="file" accept="image/jpeg,image/png,image/webp">
       <div class="sharepic-zoom-row">
         <label for="sharepic-zoom" style="margin:0; font-weight:600;">Zoom</label>
@@ -527,33 +538,66 @@
   };
   maskImg.src = MASK_SRC;
 
-  document.getElementById("sharepic-photo").addEventListener("change", function (e) {
+  function applyLoadedPhoto(im) {
+    userImg = im;
+    resetPhotoView();
+    updateCanvasClass();
+    scheduleRedraw();
+  }
+
+  function clearPhotoDisplay() {
+    userImg = null;
+    resetPhotoView();
+    updateCanvasClass();
+    scheduleRedraw();
+  }
+
+  function loadPhotoFromUrl(url) {
+    if (!url) {
+      clearPhotoDisplay();
+      return;
+    }
+    var im = new Image();
+    im.crossOrigin = "anonymous";
+    im.onload = function () {
+      applyLoadedPhoto(im);
+    };
+    im.onerror = function () {
+      clearPhotoDisplay();
+      console.error("Sharepic-Vorlage konnte nicht geladen werden:", url);
+    };
+    im.src = url;
+  }
+
+  var sharepicPhotoInput = document.getElementById("sharepic-photo");
+  var vorlageSelectEl = document.getElementById("sharepic-vorlage-wahl");
+
+  sharepicPhotoInput.addEventListener("change", function (e) {
+    if (vorlageSelectEl) vorlageSelectEl.value = "";
     var f = e.target.files && e.target.files[0];
     if (!f) {
-      userImg = null;
-      resetPhotoView();
-      updateCanvasClass();
-      scheduleRedraw();
+      clearPhotoDisplay();
       return;
     }
     var url = URL.createObjectURL(f);
     var im = new Image();
     im.onload = function () {
       URL.revokeObjectURL(url);
-      userImg = im;
-      resetPhotoView();
-      updateCanvasClass();
-      scheduleRedraw();
+      applyLoadedPhoto(im);
     };
     im.onerror = function () {
       URL.revokeObjectURL(url);
-      userImg = null;
-      resetPhotoView();
-      updateCanvasClass();
-      scheduleRedraw();
+      clearPhotoDisplay();
     };
     im.src = url;
   });
+
+  if (vorlageSelectEl) {
+    vorlageSelectEl.addEventListener("change", function () {
+      sharepicPhotoInput.value = "";
+      loadPhotoFromUrl(vorlageSelectEl.value);
+    });
+  }
 
   document.getElementById("sharepic-zoom").addEventListener("input", setZoomFromUI);
   document.getElementById("sharepic-reset-view").addEventListener("click", function () {

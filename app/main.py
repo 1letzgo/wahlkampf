@@ -76,6 +76,8 @@ from app.settings_store import (
     verify_ics_token,
 )
 from app.superadmin_web import router as superadmin_router
+from app.sharepic_templates import ensure_templates_dir as ensure_sharepic_templates_dir
+from app.sharepic_templates import list_templates as list_sharepic_templates
 from app.tenant_assets import sharepic_mask_url
 from app.termin_attachments import (
     attachments_decode,
@@ -272,6 +274,17 @@ def _mp(request: Request) -> str:
 def _upload_root(request: Request) -> Path:
     slug = request.path_params["mandant_slug"].strip().lower()
     return upload_dir_for_slug(slug)
+
+
+def _sharepic_vorlagen_for_creator(request: Request, mandant_slug: str) -> list[dict]:
+    ms = mandant_slug.strip().lower()
+    ensure_sharepic_templates_dir(ms)
+    pfx = _app_path_prefix(request)
+    mp = getattr(request.state, "mandanten_prefix", "") or ""
+    out: list[dict] = []
+    for t in list_sharepic_templates(ms):
+        out.append({"label": t["label"], "url": f"{pfx}{mp}/media/{t['rel_path']}"})
+    return out
 
 
 def _app_path_prefix(request: Request) -> str:
@@ -1269,6 +1282,7 @@ def sharepic_creator(
             "mask_src_suffix": sharepic_mask_url(),
             "sharepic_ov_display_name": ov_display,
             "sharepic_slogan_default": f"Für {ov_display}.\nFür Dich.",
+            "sharepic_vorlagen": _sharepic_vorlagen_for_creator(request, mandant_slug),
         },
     )
 

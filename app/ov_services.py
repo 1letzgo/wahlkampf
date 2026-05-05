@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import MANDANTEN_ROOT, mandant_dir, upload_dir_for_slug
 from app.database import discard_mandant_engine
 from app.platform_models import MandantAppSetting, MandantPlakat, OvMembership, Ortsverband, Termin
+from app.sharepic_templates import SHAREPIC_TEMPLATE_SUBDIR
 
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{1,79}$")
 
@@ -33,6 +34,7 @@ def provision_ortsverband_storage(slug: str) -> None:
     ud = upload_dir_for_slug(slug)
     ud.mkdir(parents=True, exist_ok=True)
     (ud / "plakate").mkdir(parents=True, exist_ok=True)
+    (ud / SHAREPIC_TEMPLATE_SUBDIR).mkdir(parents=True, exist_ok=True)
 
 
 def delete_ortsverband_completely(db_platform: Session, slug: str) -> None:
