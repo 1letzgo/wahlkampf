@@ -392,8 +392,8 @@
 {{ app_header('Termine') }}
 
 <div class="page-toolbar" aria-label="Navigation">
-  <a href="{{ request.state.mandanten_prefix }}/termine" class="btn btn-sm btn-ico btn-with-label" aria-label="Zur Terminliste">
-    {{ ico.svg_arrow_left() }}<span class="btn-text">Termine</span>
+  <a href="{{ request.state.mandanten_prefix }}/{{ twp }}" class="btn btn-sm btn-ico btn-with-label" aria-label="Zur Terminliste">
+    {{ ico.svg_arrow_left() }}<span class="btn-text">{% if twp == 'fraktion/termine' %}Fraktion{% else %}Termine{% endif %}</span>
   </a>
 </div>
 

@@ -130,6 +130,7 @@ def _sync_ov_memberships_superadmin(
     user_id: int,
     member_slugs: List[str],
     admin_slugs: set[str],
+    fraktion_slugs: set[str],
 ) -> None:
     """OV-Zuordnungen aus Superadmin-Sicht: immer freigegeben (`is_approved=True`)."""
     member_set = {s.strip().lower() for s in member_slugs if s and s.strip()}
@@ -142,6 +143,7 @@ def _sync_ov_memberships_superadmin(
         }
     member_set &= valid
     admin_set = {s.strip().lower() for s in admin_slugs} & member_set
+    fraktion_set = {s.strip().lower() for s in fraktion_slugs} & member_set
 
     rows = db.query(OvMembership).filter(OvMembership.user_id == user_id).all()
     by_slug = {m.ov_slug.strip().lower(): m for m in rows}
@@ -150,6 +152,7 @@ def _sync_ov_memberships_superadmin(
         if m:
             m.is_approved = True
             m.is_admin = slug in admin_set
+            m.fraktion_member = slug in fraktion_set
             db.add(m)
         else:
             db.add(
@@ -158,6 +161,7 @@ def _sync_ov_memberships_superadmin(
                     ov_slug=slug,
                     is_admin=slug in admin_set,
                     is_approved=True,
+                    fraktion_member=slug in fraktion_set,
                 )
             )
     for m in by_slug.values():
@@ -402,6 +406,7 @@ def superadmin_user_edit_submit(
     password_new2: Annotated[str, Form()] = "",
     ov_member: Annotated[Optional[List[str]], Form()] = None,
     ov_admin: Annotated[Optional[List[str]], Form()] = None,
+    ov_fraktion: Annotated[Optional[List[str]], Form()] = None,
 ):
     pu = db.get(PlatformUser, user_id)
     if not pu:
@@ -478,8 +483,10 @@ def superadmin_user_edit_submit(
 
     members = _form_ov_slug_list(ov_member)
     admins_raw = _form_ov_slug_list(ov_admin)
+    fraktion_raw = _form_ov_slug_list(ov_fraktion)
     admin_set = set(admins_raw)
-    _sync_ov_memberships_superadmin(db, pu.id, members, admin_set)
+    fraktion_set = set(fraktion_raw)
+    _sync_ov_memberships_superadmin(db, pu.id, members, admin_set, fraktion_set)
 
     db.add(pu)
     db.commit()

@@ -1934,7 +1934,8 @@ def _termin_list_rows_multi(
     for t in rows_ordered:
         if t.id in seen:
             continue
-        if not termin_sichtbar_instance(pdb, t, vm, user):
+        owner_ms = t.mandant_slug.strip().lower()
+        if not termin_sichtbar_instance(pdb, t, owner_ms, user):
             continue
         seen.add(t.id)
         rows.append(t)

@@ -22,6 +22,7 @@
   .superadmin-user-form .superadmin-ov-grid th { font-weight: 700; color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; }
   .superadmin-user-form .superadmin-ov-grid input[type="checkbox"] { width: 1.1rem; height: 1.1rem; }
   .superadmin-user-form .superadmin-ov-grid .col-check { width: 2.75rem; text-align: center; }
+  .superadmin-user-form .superadmin-ov-grid .col-fraktion { width: 5rem; text-align: center; }
   .superadmin-user-form .superadmin-ov-grid .col-admin { width: 6rem; text-align: center; }
 </style>
 {% endblock %}
@@ -68,7 +69,7 @@
 
         <section class="ics-popup__panel" style="margin-bottom: 1rem;">
           <h3 class="ics-popup__label">Mitgliedschaften</h3>
-          <p class="muted" style="margin:0 0 0.5rem;">Mitglied · durch Superadmin immer freigegeben · optional Mandanten-Administrator</p>
+          <p class="muted" style="margin:0 0 0.5rem;">Mitglied · durch Superadmin immer freigegeben · optional Mandanten-Administrator · optional Fraktionsmitglied (Untergruppe im OV)</p>
           {% if not ovs %}
           <p class="muted">Keine Mandanten angelegt.</p>
           {% else %}
@@ -77,6 +78,7 @@
               <tr>
                 <th scope="col">OV</th>
                 <th scope="col" class="col-check">Mitglied</th>
+                <th scope="col" class="col-fraktion">Fraktion</th>
                 <th scope="col" class="col-admin">Admin</th>
               </tr>
             </thead>
@@ -87,6 +89,9 @@
                 <td><strong>{{ ov.display_name or ov.slug }}</strong><br><code class="muted" style="font-size:0.8rem;">{{ ov.slug }}</code></td>
                 <td class="col-check">
                   <input type="checkbox" name="ov_member" value="{{ ov.slug }}" class="js-sa-ov-member" data-slug="{{ ov.slug }}"{% if m %} checked{% endif %}>
+                </td>
+                <td class="col-fraktion">
+                  <input type="checkbox" name="ov_fraktion" value="{{ ov.slug }}" class="js-sa-ov-fraktion" data-slug="{{ ov.slug }}"{% if m and m.fraktion_member %} checked{% endif %}{% if not m %} disabled{% endif %} aria-label="Fraktionsmitglied {{ ov.slug }}">
                 </td>
                 <td class="col-admin">
                   <input type="checkbox" name="ov_admin" value="{{ ov.slug }}" class="js-sa-ov-admin" data-slug="{{ ov.slug }}"{% if m and m.is_admin %} checked{% endif %}{% if not m %} disabled{% endif %}>
@@ -122,9 +127,14 @@
         var row = mem.closest("tr");
         if (!row) return;
         var adm = row.querySelector(".js-sa-ov-admin");
+        var fr = row.querySelector(".js-sa-ov-fraktion");
         if (!adm) return;
         adm.disabled = !mem.checked;
         if (!mem.checked) adm.checked = false;
+        if (fr) {
+          fr.disabled = !mem.checked;
+          if (!mem.checked) fr.checked = false;
+        }
       }
       mem.addEventListener("change", sync);
       sync();
