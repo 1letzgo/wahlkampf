@@ -140,7 +140,7 @@
       <fieldset style="margin-top: 1rem; border: 1px solid var(--border); border-radius: var(--radius); padding: 0.85rem 1rem;">
         <legend class="ics-popup__label" style="padding: 0 0.35rem;">Sharepic-Hintergrundvorlagen</legend>
         <p class="muted" style="margin: 0 0 0.65rem; font-size: 0.84rem;">
-          Bilder für den Sharepic-Generator dieses Ortsverbands (unter „Sharepic“ als Auswahl). JPEG, PNG oder WebP, bis {{ max_upload_mb }} MB pro Datei, höchstens {{ sharepic_vorlagen_max }} Vorlagen.
+          Bilder für den Sharepic-Generator dieses Ortsverbands (unter „Sharepic“ als Auswahl). JPEG oder PNG, bis {{ max_upload_mb }} MB pro Datei, höchstens {{ sharepic_vorlagen_max }} Vorlagen.
         </p>
         {% if sharepic_vorlagen %}
         {% for v in sharepic_vorlagen %}
@@ -160,7 +160,7 @@
         {% endif %}
         <form method="post" action="{{ path_prefix }}/admin/ortsverbaende/{{ ov.slug }}/sharepic-vorlage-hochladen" enctype="multipart/form-data" style="margin-top: 0.85rem; padding-top: 0.85rem; border-top: 1px solid var(--border);">
           <label for="sharepic-vorlage-datei">Neue Vorlage</label>
-          <input id="sharepic-vorlage-datei" name="vorlage_datei" type="file" accept="image/jpeg,image/png,image/webp" required>
+          <input id="sharepic-vorlage-datei" name="vorlage_datei" type="file" accept="image/jpeg,image/png" required>
           <label for="sharepic-vorlage-name" style="margin-top: 0.65rem;">Bezeichnung (optional)</label>
           <input id="sharepic-vorlage-name" name="vorlage_bezeichnung" type="text" maxlength="120" placeholder="z. B. Marktplatz, Rathaus">
           <p style="margin: 0.75rem 0 0;">

@@ -15,10 +15,10 @@ SHAREPIC_TEMPLATE_SUBDIR = "sharepic-vorlagen"
 MANIFEST_FILENAME = "manifest.json"
 MAX_SHAREPIC_TEMPLATES = 24
 
-ALLOWED_CT = frozenset({"image/jpeg", "image/png", "image/webp"})
+ALLOWED_CT = frozenset({"image/jpeg", "image/png"})
 # Mit gültiger Dateiendung akzeptieren, wenn Browser/Proxy keinen oder einen generischen Typ sendet.
 CT_OK_WITH_EXTENSION_ONLY = frozenset({"", "application/octet-stream", "binary/octet-stream"})
-_EXT_MAP = {".jpg": ".jpg", ".jpeg": ".jpg", ".png": ".png", ".webp": ".webp"}
+_EXT_MAP = {".jpg": ".jpg", ".jpeg": ".jpg", ".png": ".png"}
 
 
 def _safe_ext(filename: str | None, content_type: str | None) -> str:
@@ -30,8 +30,6 @@ def _safe_ext(filename: str | None, content_type: str | None) -> str:
         return ".jpg"
     if content_type == "image/png":
         return ".png"
-    if content_type == "image/webp":
-        return ".webp"
     return ""
 
 
@@ -120,16 +118,16 @@ async def upload_template(slug: str, upload: UploadFile, label_raw: str | None) 
     ct = _normalized_upload_content_type(upload.content_type)
     ext = _safe_ext(upload.filename, ct or None)
     if not ext:
-        return False, "Nur JPEG-, PNG- oder WebP-Bilder erlaubt (Dateiendung .jpg, .png, .webp)."
+        return False, "Nur JPEG- oder PNG-Bilder erlaubt (Dateiendung .jpg, .png)."
 
     if ct in ALLOWED_CT:
         pass
     elif ct in CT_OK_WITH_EXTENSION_ONLY:
         pass
     elif ct.startswith("image/"):
-        return False, "Nur JPEG-, PNG- oder WebP-Bilder erlaubt."
+        return False, "Nur JPEG- oder PNG-Bilder erlaubt."
     elif ct:
-        return False, "Nur JPEG-, PNG- oder WebP-Bilder erlaubt."
+        return False, "Nur JPEG- oder PNG-Bilder erlaubt."
 
     d = ensure_templates_dir(slug)
     manifest = load_manifest(d)

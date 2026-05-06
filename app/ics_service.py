@@ -131,12 +131,19 @@ def termine_for_user_teilnahmen(db: Session, user_id: int, mandant_slug: str) ->
 def termine_zugesagt_multi_mandanten(
     db: Session, user_id: int, mandant_slugs: list[str]
 ) -> list[Termin]:
+    """Persönlicher 'Zugesagt'-Feed.
+
+    Spec: Termine + Fraktionssitzungen aller OVs, in denen der Nutzer Mitglied
+    ist; vertrauliche Fraktionstermine nur für Fraktionsmitglieder.
+    """
     if not mandant_slugs:
         return []
     slugs = [s.strip().lower() for s in mandant_slugs]
     ks = kreis_ov_slug()
     mandanten_cond = func.lower(Termin.mandant_slug).in_(slugs)
-    if ks:
+    if ks and ks not in slugs:
+        # Nicht-Mitglieder des Kreis sehen ausschließlich Kreis-Termine, die
+        # explizit als "für alle OVs" beworben sind (zusätzlich zu eigenen OVs).
         mandanten_cond = or_(
             mandanten_cond,
             and_(
@@ -155,7 +162,6 @@ def termine_zugesagt_multi_mandanten(
         .order_by(Termin.starts_at.asc())
         .all()
     )
-    raw = _termine_without_disabled_fraktion_ov(db, raw)
     return filter_termine_fraktion_ics(db, raw, calendar_owner_user_id=user_id)
 
 
@@ -165,12 +171,17 @@ def all_termine_multi_mandanten(
     *,
     calendar_owner_user_id: int,
 ) -> list[Termin]:
+    """Persönlicher 'ALLE'-Feed.
+
+    Spec: alle Termine + Fraktionssitzungen aller OVs, in denen der Nutzer
+    Mitglied ist; vertrauliche Fraktionstermine nur für Fraktionsmitglieder.
+    """
     if not mandant_slugs:
         return []
     slugs = [s.strip().lower() for s in mandant_slugs]
     ks = kreis_ov_slug()
     mandanten_cond = func.lower(Termin.mandant_slug).in_(slugs)
-    if ks:
+    if ks and ks not in slugs:
         mandanten_cond = or_(
             mandanten_cond,
             and_(
@@ -184,7 +195,6 @@ def all_termine_multi_mandanten(
         .order_by(Termin.starts_at.asc())
         .all()
     )
-    raw = _termine_without_disabled_fraktion_ov(db, raw)
     return filter_termine_fraktion_ics(
         db, raw, calendar_owner_user_id=calendar_owner_user_id
     )
