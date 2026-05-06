@@ -7,36 +7,25 @@
 {% include '_admin_data_table_styles.html' %}
 {% endblock %}
 {% block body %}
-{{ app_header('Administration') }}
+{{ app_header('Verbände verwalten') }}
 
 <div class="admin-page">
+  {% if admin_tabs and admin_tabs|length > 1 %}
+  <nav class="termin-tablist admin-users-ov-tablist" aria-label="Ortsverband wechseln">
+    {% for t in admin_tabs %}
+    <a
+      href="{{ t.benutzer_href }}"
+      class="termin-tab admin-users-ov-tab"
+      role="tab"
+      aria-selected="{{ 'true' if t.id == current_admin_tab_id else 'false' }}"
+      {% if t.id == current_admin_tab_id %}aria-current="page"{% endif %}
+    >{{ t.label }}{% if t.admin_pending_count %} ({{ t.admin_pending_count }}){% endif %}</a>
+    {% endfor %}
+  </nav>
+  {% endif %}
+
   <div class="card card--flush admin-users-card">
     <div class="admin-users-shell">
-      <header class="ics-popup__head">
-        <div class="ics-popup__head-icon" aria-hidden="true">{{ ico.svg_cog() }}</div>
-        <div>
-          <h2 class="ics-popup__h">Benutzer</h2>
-          <p class="ics-popup__lead">
-            Mitgliedschaft in diesem OV steuern: freischalten, Admin-Rechte, Zugriff nur hier entziehen (globales Konto bleibt).
-            Plattform-Superadmins erscheinen in jedem OV zur Übersicht ohne OV-Aktionen.
-          </p>
-        </div>
-      </header>
-
-      {% if admin_tabs and admin_tabs|length > 1 %}
-      <nav class="termin-tablist admin-users-ov-tablist" aria-label="Ortsverband wechseln">
-        {% for t in admin_tabs %}
-        <a
-          href="{{ t.benutzer_href }}"
-          class="termin-tab admin-users-ov-tab"
-          role="tab"
-          aria-selected="{{ 'true' if t.id == current_admin_tab_id else 'false' }}"
-          {% if t.id == current_admin_tab_id %}aria-current="page"{% endif %}
-        >{{ t.label }}{% if t.admin_pending_count %} ({{ t.admin_pending_count }}){% endif %}</a>
-        {% endfor %}
-      </nav>
-      {% endif %}
-
       {% if pending_users %}
       <section class="ics-popup__panel ics-popup__panel--accent" aria-label="Offene Freigaben" style="margin-top:0; margin-bottom:1rem;">
         <h3 class="ics-popup__label">Offene Mitgliedschaftsanfragen ({{ pending_users|length }})</h3>
