@@ -65,8 +65,8 @@
 {% endblock %}
 {% block body %}
 {% call app_header_toolbar('Plakate') %}
-  <button type="button" class="btn btn-sm btn-ico btn-with-label" id="plakate-add-current" aria-label="Plakat am aktuellen Standort setzen">
-    {{ ico.svg_plus() }}<span class="btn-text">Plakat hier</span>
+  <button type="button" class="btn btn-ghost btn-sm btn-ico btn-with-label" id="plakate-add-current" aria-label="Neues Plakat am aktuellen Standort">
+    {{ ico.svg_plus() }}<span class="btn-text">Neues Plakat</span>
   </button>
   <button type="button" class="btn btn-ghost btn-sm btn-ico btn-with-label" id="plakate-locate" aria-label="Mein Standort auf der Karte anzeigen">
     {{ ico.svg_map_pin() }}<span class="btn-text">Mein Standort</span>
@@ -276,41 +276,7 @@
         var lat = pos.coords.latitude;
         var lng = pos.coords.longitude;
         map.setView([lat, lng], 16);
-        var fd = new FormData();
-        fd.set("lat", String(lat));
-        fd.set("lng", String(lng));
-        fetch(plakateApiPath("api/hinzufuegen"), {
-          method: "POST",
-          body: fd,
-          credentials: "same-origin",
-          headers: { Accept: "application/json" },
-        })
-          .then(function (r) {
-            var ct = (r.headers.get("content-type") || "").toLowerCase();
-            if (!ct.includes("application/json")) {
-              return r.text().then(function () {
-                throw new Error(
-                  r.status >= 400 ? "HTTP " + r.status : "Unerwartete Antwort vom Server.",
-                );
-              });
-            }
-            return r.json().then(function (j) {
-              if (!r.ok) {
-                var d = j.detail;
-                var err = "Fehler";
-                if (typeof d === "string") err = d;
-                else if (Array.isArray(d) && d[0] && d[0].msg) err = d[0].msg;
-                throw new Error(err);
-              }
-              return j;
-            });
-          })
-          .then(function (j) {
-            applyData(j.plakate);
-          })
-          .catch(function (err) {
-            alert(err.message || "Speichern fehlgeschlagen.");
-          });
+        setPreview(lat, lng);
       },
       function () {
         alert("Standort konnte nicht ermittelt werden (Berechtigung prüfen).");
