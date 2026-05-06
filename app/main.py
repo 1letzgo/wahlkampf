@@ -1697,6 +1697,8 @@ def admin_benutzer_list(
     all_users = _ov_user_rows_for_admin(pdb, mandant_slug)
     pending_users = [u for u in all_users if (not u.shadow_superadmin and not u.is_approved)]
     ms = mandant_slug.strip().lower()
+    admin_tabs = _build_admin_hub_tabs(pdb, request, user)
+    current_admin_tab_id = _admin_hub_tab_id(ms)
     return templates.TemplateResponse(
         request,
         "admin_benutzer.html",
@@ -1704,6 +1706,8 @@ def admin_benutzer_list(
             "user": user,
             "users": all_users,
             "pending_users": pending_users,
+            "admin_tabs": admin_tabs,
+            "current_admin_tab_id": current_admin_tab_id,
             "admin_count": _admin_count(pdb, mandant_slug),
             "feature_fraktion": is_mandant_feature_enabled(pdb, ms, FEATURE_FRAKTION),
         },
