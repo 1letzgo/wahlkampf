@@ -903,9 +903,9 @@ dialog.popup-dialog::backdrop {
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  background: transparent;
+  background: transparent !important;
   border: none;
-  border-radius: var(--radius-input) var(--radius-input) 0 0;
+  border-radius: 0;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
   padding: 0.55rem 0.85rem 0.6rem;
@@ -924,7 +924,7 @@ dialog.popup-dialog::backdrop {
 }
 
 .termin-tab:hover:not([aria-selected="true"]) {
-  background: rgba(255, 255, 255, 0.42);
+  background: transparent;
 }
 
 .termin-tab:focus-visible {
@@ -936,7 +936,7 @@ dialog.popup-dialog::backdrop {
 .termin-tab[aria-selected="true"] {
   color: var(--text);
   font-weight: 600;
-  background: var(--card);
+  background: transparent !important;
   border-bottom-color: var(--accent);
   z-index: 1;
 }
