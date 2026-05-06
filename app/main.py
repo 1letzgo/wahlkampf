@@ -1698,6 +1698,7 @@ def admin_benutzer_list(
     user: AdminUser,
 ):
     all_users = _ov_user_rows_for_admin(pdb, mandant_slug)
+    pending_users = [u for u in all_users if (not u.shadow_superadmin and not u.is_approved)]
     ms = mandant_slug.strip().lower()
     return templates.TemplateResponse(
         request,
@@ -1705,6 +1706,7 @@ def admin_benutzer_list(
         {
             "user": user,
             "users": all_users,
+            "pending_users": pending_users,
             "admin_count": _admin_count(pdb, mandant_slug),
             "feature_fraktion": is_mandant_feature_enabled(pdb, ms, FEATURE_FRAKTION),
         },

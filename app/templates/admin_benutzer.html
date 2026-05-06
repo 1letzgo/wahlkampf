@@ -23,6 +23,25 @@
         </div>
       </header>
 
+      {% if pending_users %}
+      <section class="ics-popup__panel ics-popup__panel--accent" aria-label="Offene Freigaben" style="margin-top:0; margin-bottom:1rem;">
+        <h3 class="ics-popup__label">Offene Mitgliedschaftsanfragen ({{ pending_users|length }})</h3>
+        <div class="admin-users-action-stack">
+          {% for u in pending_users %}
+          <form method="post" action="{{ request.state.mandanten_prefix }}/admin/benutzer/{{ u.id }}/freigeben" class="admin-users-action-form" style="margin:0; display:flex; flex-wrap:wrap; gap:.5rem; align-items:center;">
+            <span style="font-weight:600;">{{ u.display_name or u.username }}</span>
+            {% if u.username != u.display_name and u.display_name %}
+            <span class="muted" style="font-size:0.85rem;">{{ u.username }}</span>
+            {% endif %}
+            <button type="submit" class="btn btn-sm btn-ico btn-with-label" aria-label="Nutzer {{ u.display_name or u.username }} freigeben">
+              {{ ico.svg_check() }}<span class="btn-text">Freigeben</span>
+            </button>
+          </form>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
       <div class="admin-users-table-wrap">
         <table class="admin-users-table admin-users-table--tenant-benutzer">
           <colgroup>
