@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% from '_ui_macros.html' import app_header_toolbar with context %}
+{% import '_icons.html' as ico %}
+{% block title %}{{ page_title }} — Wahlkampf{% endblock %}
+
+{% block body %}
+{% call app_header_toolbar(page_title) %}
+{% endcall %}
+
+<div class="card card--flush">
+  <div class="termin-tablist" role="tablist" aria-label="Administration je Ortsverband">
+    {% for t in admin_tabs %}
+    <button type="button" class="termin-tab" role="tab" id="admin-tabhead-{{ loop.index0 }}" aria-selected="{{ 'true' if t.id == default_tab_id else 'false' }}" aria-controls="admin-panel-{{ loop.index0 }}" data-tab="{{ t.id }}">{{ t.label }}{% if t.admin_pending_count %} ({{ t.admin_pending_count }}){% endif %}</button>
+    {% endfor %}
+  </div>
+
+  {% for t in admin_tabs %}
+  <div id="admin-panel-{{ loop.index0 }}" class="termin-tab-panel" role="tabpanel" aria-labelledby="admin-tabhead-{{ loop.index0 }}" tabindex="0" data-tab="{{ t.id }}"{% if t.id != default_tab_id %} hidden{% endif %}>
+    {% if t.admin_pending_count %}
+    <p class="info" style="margin-top:0;">
+      {% if t.admin_pending_count == 1 %}
+      Es liegt eine ausstehende Mitgliedschaftsanfrage vor.
+      {% else %}
+      Es liegen {{ t.admin_pending_count }} ausstehende Mitgliedschaftsanfragen vor.
+      {% endif %}
+    </p>
+    {% endif %}
+    <p class="muted" style="margin-bottom:0;">Mitgliedschaften freigeben und Administratoren dieses Ortsverbands verwalten.</p>
+    <p style="margin-top:1rem;">
+      <a href="{{ t.benutzer_href }}" class="btn btn-ico btn-with-label btn-block" aria-label="Benutzer und Freigaben für {{ t.label }}">
+        {{ ico.svg_user() }}<span class="btn-text">Benutzer &amp; Freigaben</span>
+      </a>
+    </p>
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+  (function () {
+    var tablist = document.querySelector(".termin-tablist");
+    if (!tablist) return;
+    var tabs = tablist.querySelectorAll(".termin-tab");
+    var panels = {};
+    document.querySelectorAll(".termin-tab-panel").forEach(function (p) {
+      var id = p.getAttribute("data-tab");
+      if (id) panels[id] = p;
+    });
+    function activate(id) {
+      if (!id || !panels[id]) return;
+      tabs.forEach(function (t) {
+        var sel = t.getAttribute("data-tab") === id;
+        t.setAttribute("aria-selected", sel ? "true" : "false");
+      });
+      Object.keys(panels).forEach(function (key) {
+        var p = panels[key];
+        if (!p) return;
+        if (key === id) p.removeAttribute("hidden");
+        else p.setAttribute("hidden", "");
+      });
+      try {
+        var u = new URL(window.location.href);
+        u.searchParams.set("tab", id);
+        history.replaceState({}, "", u.toString());
+      } catch (e) {}
+    }
+    tabs.forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        activate(tab.getAttribute("data-tab"));
+      });
+    });
+    var sp = new URLSearchParams(window.location.search);
+    var req = sp.get("tab");
+    if (req && panels[req]) activate(req);
+    else activate({{ default_tab_id | tojson }});
+  })();
+</script>
+{% endblock %}

@@ -866,20 +866,26 @@ dialog.popup-dialog::backdrop {
   min-width: 5.25rem;
 }
 
-/* Terminliste: Tab-Leiste */
+/* Terminliste: Tab-Leiste — eine Zeile, horizontal scrollbar (kein Umbruch) */
 .termin-tablist {
   display: flex;
+  flex-flow: row nowrap;
+  align-items: stretch;
   gap: 0.25rem;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   margin: 0 0 1rem;
   padding: 0.35rem 0.65rem 0;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
   box-shadow: var(--shadow-inset-panel), 0 0 0 1px rgba(196, 30, 58, 0.04);
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
 }
 
 .termin-toolbar-panels {
@@ -895,7 +901,7 @@ dialog.popup-dialog::backdrop {
   font: inherit;
   cursor: pointer;
   color: var(--muted);
-  flex-shrink: 0;
+  flex: 0 0 auto;
   white-space: nowrap;
 }
 

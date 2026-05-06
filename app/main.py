@@ -635,18 +635,22 @@ def _my_ovs_menu_items(
                 )
                 .count()
             )
+        feature_fraktion = is_mandant_feature_enabled(pdb, slug, FEATURE_FRAKTION)
+        feature_plakate = is_mandant_feature_enabled(pdb, slug, FEATURE_PLAKATE)
+        feature_sharepic = is_mandant_feature_enabled(pdb, slug, FEATURE_SHAREPIC)
         out_members.append(
             {
                 "slug": slug,
                 "display_name": dn,
                 "is_admin": is_adm,
                 "admin_pending_count": pend,
-                "feature_plakate": is_mandant_feature_enabled(pdb, slug, FEATURE_PLAKATE),
-                "feature_sharepic": is_mandant_feature_enabled(pdb, slug, FEATURE_SHAREPIC),
-                "feature_fraktion": is_mandant_feature_enabled(pdb, slug, FEATURE_FRAKTION),
+                "feature_plakate": feature_plakate,
+                "feature_sharepic": feature_sharepic,
+                "feature_fraktion": feature_fraktion,
+                "has_menu_entries": bool(feature_fraktion or feature_plakate or feature_sharepic),
                 "termine_fraktion_tab_query": (
                     urlencode({"tab": _termin_tab_fraktion_id(slug)})
-                    if is_mandant_feature_enabled(pdb, slug, FEATURE_FRAKTION)
+                    if feature_fraktion
                     else ""
                 ),
             },
@@ -1026,14 +1030,19 @@ def app_menu(
     pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
 ):
+    my_ovs_items = _my_ovs_menu_items(pdb, mandant_slug, user.id, user.username)
     return templates.TemplateResponse(
         request,
         "menu.html",
         {
             "user": user,
             "show_superadmin_link": is_superadmin_username(user.username),
-            "my_ovs": _my_ovs_menu_items(pdb, mandant_slug, user.id, user.username),
+            "my_ovs": my_ovs_items,
             "show_alle_termine": _menu_show_alle_termine(pdb, user),
+            "show_administration_card": any(o["is_admin"] for o in my_ovs_items),
+            "administration_pending_total": sum(
+                o["admin_pending_count"] for o in my_ovs_items if o["is_admin"]
+            ),
             "menu_ov_open": _menu_ov_open_map_for_user(pdb, user),
             "menu_ov_card_save_url": f"{_mp(request)}/menu/ov-card-open",
         },
@@ -1594,6 +1603,86 @@ def _ov_user_rows_for_admin(pdb: Session, mandant_slug: str) -> list:
         key=lambda r: ((r.display_name or r.username).lower(), r.username.lower()),
     )
     return regular + shadows
+
+
+def _admin_hub_tab_id(ov_slug: str) -> str:
+    return "adm-" + quote(ov_slug.strip().lower(), safe="")
+
+
+def _build_admin_hub_tabs(
+    pdb: Session,
+    request: Request,
+    user: AuthenticatedUser,
+) -> list[dict[str, Any]]:
+    sup = is_superadmin_username(user.username)
+    rows = (
+        pdb.query(OvMembership, Ortsverband)
+        .join(Ortsverband, OvMembership.ov_slug == Ortsverband.slug)
+        .filter(
+            OvMembership.user_id == user.id,
+            OvMembership.is_approved.is_(True),
+        )
+        .order_by(func.lower(Ortsverband.display_name), OvMembership.ov_slug.asc())
+        .all()
+    )
+    tabs: list[dict[str, Any]] = []
+    for m, ov in rows:
+        slug = ov.slug.strip().lower()
+        if not (bool(m.is_admin) or sup):
+            continue
+        dn = (ov.display_name or "").strip() or slug.replace("-", " ").replace("_", " ").title()
+        pend = (
+            pdb.query(OvMembership)
+            .filter(
+                OvMembership.ov_slug == slug,
+                OvMembership.is_approved.is_(False),
+            )
+            .count()
+        )
+        tabs.append(
+            {
+                "id": _admin_hub_tab_id(slug),
+                "slug": slug,
+                "label": dn,
+                "admin_pending_count": pend,
+                "benutzer_href": _href_under_ov(request, slug, "admin/benutzer"),
+            },
+        )
+    return tabs
+
+
+def _admin_hub_resolve_default_tab(tabs: list[dict[str, Any]], requested_tab: str | None) -> str:
+    ids = [t["id"] for t in tabs]
+    if not ids:
+        return ""
+    rt = (requested_tab or "").strip()
+    if rt and rt in ids:
+        return rt
+    return ids[0]
+
+
+@tenant_router.get("/administration", response_class=HTMLResponse)
+def administration_hub(
+    mandant_slug: str,
+    request: Request,
+    pdb: Annotated[Session, Depends(get_platform_db)],
+    user: CurrentUser,
+    tab: Annotated[str | None, Query()] = None,
+):
+    admin_tabs = _build_admin_hub_tabs(pdb, request, user)
+    if not admin_tabs:
+        return RedirectResponse(f"{_mp(request)}/menu", status_code=302)
+    default_tab_id = _admin_hub_resolve_default_tab(admin_tabs, tab)
+    return templates.TemplateResponse(
+        request,
+        "administration_hub.html",
+        {
+            "user": user,
+            "admin_tabs": admin_tabs,
+            "default_tab_id": default_tab_id,
+            "page_title": "Administration",
+        },
+    )
 
 
 @tenant_router.get("/admin/benutzer", response_class=HTMLResponse)

@@ -104,6 +104,7 @@
 {% endif %}
 
 {% for o in my_ovs %}
+{% if o.has_menu_entries %}
 {% set op = public_tenant_prefix(request, '/m/' ~ o.slug) %}
 <div class="card card--flush menu-ov-card">
   <details
@@ -125,17 +126,26 @@
       {% if o.feature_sharepic | default(true) %}
       <li><a href="{{ op }}/sharepic"><span class="menu-list__main">{{ ico.svg_image() }}<span>Sharepic</span></span></a></li>
       {% endif %}
-      {% if o.is_admin %}
-      <li>
-        <a href="{{ op }}/admin/benutzer">
-          <span class="menu-list__main">{{ ico.svg_user() }}<span>Administration</span>{% if o.admin_pending_count %}<span class="menu-admin-pending-hint" aria-label="{{ o.admin_pending_count }} ausstehend">({{ o.admin_pending_count }})</span>{% endif %}</span>
-        </a>
-      </li>
-      {% endif %}
     </ul>
   </details>
 </div>
+{% endif %}
 {% endfor %}
+
+{% if show_administration_card | default(false) %}
+<div class="card card--flush">
+  <ul class="menu-list" role="list">
+    <li class="menu-list-section">
+      <h2 class="menu-list-section__label" id="menu-admin-hub-heading">Administration</h2>
+    </li>
+    <li>
+      <a href="{{ request.state.mandanten_prefix }}/administration">
+        <span class="menu-list__main">{{ ico.svg_user() }}<span>Verbände verwalten</span>{% if administration_pending_total | default(0) %}<span class="menu-admin-pending-hint" aria-label="{{ administration_pending_total }} ausstehend">({{ administration_pending_total }})</span>{% endif %}</span>
+      </a>
+    </li>
+  </ul>
+</div>
+{% endif %}
 
 {% if show_superadmin_link | default(false) %}
 <div class="card card--flush">
