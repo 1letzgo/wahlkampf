@@ -129,27 +129,20 @@
 {% endif %}
 {% endfor %}
 
-{% if show_administration_card | default(false) %}
+{% if (show_administration_card | default(false)) or (show_superadmin_link | default(false)) %}
 <div class="card card--flush">
   <ul class="menu-list" role="list">
     <li class="menu-list-section">
       <h2 class="menu-list-section__label" id="menu-admin-hub-heading">Administration</h2>
     </li>
+    {% if show_administration_card | default(false) %}
     <li>
       <a href="{{ request.state.mandanten_prefix }}/administration">
-        <span class="menu-list__main">{{ ico.svg_user() }}<span>Verband verwalten</span>{% if administration_pending_total | default(0) %}<span class="menu-admin-pending-hint" aria-label="{{ administration_pending_total }} ausstehend">({{ administration_pending_total }})</span>{% endif %}</span>
+        <span class="menu-list__main">{{ ico.svg_user() }}<span>Mitglieder verwalten</span>{% if administration_pending_total | default(0) %}<span class="menu-admin-pending-hint" aria-label="{{ administration_pending_total }} ausstehend">({{ administration_pending_total }})</span>{% endif %}</span>
       </a>
     </li>
-  </ul>
-</div>
-{% endif %}
-
-{% if show_superadmin_link | default(false) %}
-<div class="card card--flush">
-  <ul class="menu-list" role="list">
-    <li class="menu-list-section">
-      <h2 class="menu-list-section__label" id="menu-plattform-heading">Plattform</h2>
-    </li>
+    {% endif %}
+    {% if show_superadmin_link | default(false) %}
     <li>
       <a href="/admin/ortsverbaende">
         <span class="menu-list__main">{{ ico.svg_menu() }}<span>Ortsverbände</span></span>
@@ -160,6 +153,7 @@
         <span class="menu-list__main">{{ ico.svg_user_plus() }}<span>Nutzerverwaltung</span></span>
       </a>
     </li>
+    {% endif %}
   </ul>
 </div>
 {% endif %}
