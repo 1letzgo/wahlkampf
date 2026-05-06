@@ -29,6 +29,12 @@
 {% block body %}
 {{ app_header('Nutzerverwaltung') }}
 
+<div class="page-toolbar" aria-label="Navigation">
+  <a href="/admin/nutzer" class="btn btn-sm btn-ico btn-with-label" aria-label="Zurück zur Nutzerliste">
+    {{ ico.svg_arrow_left() }}<span class="btn-text">Nutzer</span>
+  </a>
+</div>
+
 <div class="admin-page superadmin-user-form">
   <div class="card card--flush admin-users-card">
     <div class="admin-users-shell">
