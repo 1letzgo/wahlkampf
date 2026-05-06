@@ -16,8 +16,8 @@
   var MASK_OV_TEXT_TOP_Y = 114;
 
   var SLOGAN_MAX_LINES = 3;
-  var SLOGAN_RIGHT_PAD = 8;
-  var SLOGAN_MAX_WIDTH_FRAC = 0.62;
+  var SLOGAN_RIGHT_PAD = 20;
+  var SLOGAN_MAX_WIDTH_FRAC = 0.48;
   var MID_MAX_LINES = 1;
   var MID_CHAR_LIMIT = 30;
   var TEXT2_LH = 50;
@@ -214,20 +214,13 @@
     ctx.fillStyle = FILL;
     ctx.textAlign = "right";
     ctx.textBaseline = "top";
-    var explicitLines = raw
-      .split(/\n/)
-      .map(function (s) {
-        return s.trim();
-      })
-      .filter(Boolean);
-    var useExplicit = explicitLines.length >= 2;
     var fs = 46;
     var lh;
     var lines;
     for (; fs >= 22; fs -= 2) {
       lh = Math.round(fs * 1.1);
       ctx.font = '700 ' + fs + 'px "Open Sans", system-ui, sans-serif';
-      lines = useExplicit ? explicitLines : textToLines(ctx, raw, maxW, SLOGAN_MAX_LINES);
+      lines = textToLines(ctx, raw, maxW, SLOGAN_MAX_LINES);
       var blockH = lines.length * lh;
       var ok = blockH <= L.headerBottom - 10;
       if (ok) {
@@ -239,7 +232,7 @@
     }
     lh = Math.round(fs * 1.1);
     ctx.font = '700 ' + fs + 'px "Open Sans", system-ui, sans-serif';
-    lines = useExplicit ? explicitLines : textToLines(ctx, raw, maxW, SLOGAN_MAX_LINES);
+    lines = textToLines(ctx, raw, maxW, SLOGAN_MAX_LINES);
     var blockH = lines.length * lh;
     var y0 = Math.max(4, Math.round((L.headerBottom - blockH) / 2) - 10);
     for (var i = 0; i < lines.length; i++) {
