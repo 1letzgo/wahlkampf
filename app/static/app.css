@@ -870,13 +870,20 @@ dialog.popup-dialog::backdrop {
 .termin-tablist {
   display: flex;
   gap: 0.25rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
   margin: 0 0 1rem;
   padding: 0.35rem 0.65rem 0;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
   box-shadow: var(--shadow-inset-panel), 0 0 0 1px rgba(196, 30, 58, 0.04);
+}
+
+.termin-toolbar-panels {
+  display: contents;
 }
 
 .termin-tab {
@@ -888,6 +895,8 @@ dialog.popup-dialog::backdrop {
   font: inherit;
   cursor: pointer;
   color: var(--muted);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .termin-tab:hover {

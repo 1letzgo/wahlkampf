@@ -139,7 +139,7 @@
     <li class="menu-list-section">
       <h2 class="menu-list-section__label" id="menu-uebersicht-heading">Übersicht</h2>
     </li>
-    <li><a href="{{ request.state.mandanten_prefix }}/termine/alle"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Alle Termine</span></span></a></li>
+    <li><a href="{{ request.state.mandanten_prefix }}/termine?tab=alle"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Alle Termine</span></span></a></li>
   </ul>
 </div>
 {% endif %}
@@ -165,9 +165,9 @@
       </span>
     </summary>
     <ul class="menu-list" role="list" aria-labelledby="menu-ov-{{ o.slug }}-heading">
-      <li><a href="{{ op }}/termine"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Termine</span></span></a></li>
+      <li><a href="{{ op }}/termine?{{ o.termine_ov_tab_query }}"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Termine</span></span></a></li>
       {% if o.feature_fraktion %}
-      <li><a href="{{ op }}/fraktion/termine"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Fraktion</span></span></a></li>
+      <li><a href="{{ op }}/termine?{{ o.termine_fraktion_tab_query }}"><span class="menu-list__main">{{ ico.svg_calendar() }}<span>Fraktion</span></span></a></li>
       {% endif %}
       {% if o.feature_plakate | default(true) %}
       <li><a href="{{ op }}/plakate"><span class="menu-list__main">{{ ico.svg_map_pin() }}<span>Plakate</span></span></a></li>

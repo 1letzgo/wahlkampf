@@ -230,12 +230,24 @@
 {% endblock %}
 
 {% block body %}
+{% if termin_has_any %}
 {% call app_header_toolbar(page_title) %}
-  {% if show_neuer_termin_button %}
-  <a href="{{ neuer_termin_href | default(request.state.mandanten_prefix ~ '/termine/neu') }}" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="{{ neuer_termin_button_label | default('Neuer Termin') }}">
-    {{ ico.svg_plus() }}<span class="btn-text">{{ neuer_termin_button_label | default('Neuer Termin') }}</span>
-  </a>
-  {% endif %}
+  <div class="termin-toolbar-panels">
+    {% for t in termin_tabs %}
+    <div class="termin-toolbar-panel" data-toolbar-tab="{{ t.id }}"{% if t.id != default_tab_id %} hidden{% endif %}>
+      {% if t.show_neuer_termin_button %}
+      <a href="{{ t.neuer_termin_href }}" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="{{ t.neuer_termin_button_label }}">
+        {{ ico.svg_plus() }}<span class="btn-text">{{ t.neuer_termin_button_label }}</span>
+      </a>
+      {% endif %}
+      {% if t.show_neue_sitzung_button %}
+      <a href="{{ t.neue_sitzung_href }}" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="{{ t.neue_sitzung_button_label }}">
+        {{ ico.svg_plus() }}<span class="btn-text">{{ t.neue_sitzung_button_label }}</span>
+      </a>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
   <button type="button" class="btn btn-ghost btn-sm btn-ico btn-with-label" id="ics-open" aria-label="Kalender abonnieren">
     {{ ico.svg_calendar() }}<span class="btn-text">Abonnieren</span>
   </button>
@@ -349,43 +361,71 @@
     });
   })();
 </script>
+{% else %}
+{% call app_header_toolbar(page_title) %}
+{% endcall %}
+{% endif %}
 
-{% if not termin_upcoming and not termin_past %}
-<p class="muted">{% if show_neuer_termin_button %}Noch keine Termine — <a href="{{ neuer_termin_href | default(request.state.mandanten_prefix ~ '/termine/neu') }}">ersten Termin anlegen</a>.{% else %}Noch keine Termine in deinen Verbänden.{% endif %}</p>
+{% if not termin_has_any %}
+<p class="muted">{% if termin_multi_ov_mode %}Noch keine Termine in deinen Verbänden.{% elif termin_fallback_neu_href %}Noch keine Termine — <a href="{{ termin_fallback_neu_href }}">ersten Termin anlegen</a>.{% else %}Noch keine Termine.{% endif %}</p>
 {% else %}
 <div class="termin-tablist" role="tablist" aria-label="Terminansicht">
-  <button type="button" class="termin-tab" id="tab-kommend" role="tab" aria-selected="true" aria-controls="termin-panel-kommend" data-tab="kommend">Aktuelle Termine</button>
-  <button type="button" class="termin-tab" id="tab-vergangen" role="tab" aria-selected="false" aria-controls="termin-panel-vergangen" data-tab="vergangen">Archiv{% if termin_past|length %} ({{ termin_past|length }}){% endif %}</button>
-</div>
-
-<div id="termin-panel-kommend" class="termin-tab-panel" role="tabpanel" aria-labelledby="tab-kommend" tabindex="0">
-  {% if not termin_upcoming %}
-  <p class="muted">{% if show_neuer_termin_button %}Keine aktuellen Termine — <a href="{{ neuer_termin_href | default(request.state.mandanten_prefix ~ '/termine/neu') }}">Termin anlegen</a> oder unter „Archiv“ nachsehen.{% else %}Keine aktuellen Termine — unter „Archiv“ nachsehen.{% endif %}</p>
-  {% endif %}
-  {% for row in termin_upcoming %}
-  {{ termin_karte(row, vergangen=False) }}
+  {% for t in termin_tabs %}
+  <button type="button" class="termin-tab" role="tab" id="termin-tabhead-{{ loop.index0 }}" aria-selected="{{ 'true' if t.id == default_tab_id else 'false' }}" aria-controls="termin-panel-{{ loop.index0 }}" data-tab="{{ t.id }}">{{ t.label }}{% if t.kind == 'archiv' and t.termin_past|length %} ({{ t.termin_past|length }}){% endif %}</button>
   {% endfor %}
 </div>
 
-<div id="termin-panel-vergangen" class="termin-tab-panel" role="tabpanel" aria-labelledby="tab-vergangen" tabindex="0" hidden>
-  {% if not termin_past %}
-  <p class="muted">Keine Termine im Archiv.</p>
+{% for t in termin_tabs %}
+<div id="termin-panel-{{ loop.index0 }}" class="termin-tab-panel" role="tabpanel" aria-labelledby="termin-tabhead-{{ loop.index0 }}" tabindex="0" data-tab="{{ t.id }}"{% if t.id != default_tab_id %} hidden{% endif %}>
+  {% if t.kind == 'archiv' %}
+    {% if not t.termin_past %}
+    <p class="muted">Keine Termine im Archiv.</p>
+    {% endif %}
+    {% for row in t.termin_past %}
+    {{ termin_karte(row, vergangen=True) }}
+    {% endfor %}
+  {% else %}
+    {% if not t.termin_upcoming %}
+    <p class="muted">
+      {% if t.kind == 'ov' %}
+      Keine aktuellen Termine — <a href="{{ t.neuer_termin_href }}">Termin anlegen</a> oder unter „Archiv“ nachsehen.
+      {% elif t.kind == 'alle' %}
+      Keine aktuellen Termine — unter „Archiv“ nachsehen.
+      {% elif t.kind == 'fraktion' %}
+      {% if t.show_neue_sitzung_button and t.neue_sitzung_href %}
+      Keine aktuellen Fraktionstermine — <a href="{{ t.neue_sitzung_href }}">Sitzung anlegen</a> oder unter „Archiv“ nachsehen.
+      {% else %}
+      Keine aktuellen Fraktionstermine — unter „Archiv“ nachsehen.
+      {% endif %}
+      {% else %}
+      Keine aktuellen Termine — unter „Archiv“ nachsehen.
+      {% endif %}
+    </p>
+    {% endif %}
+    {% for row in t.termin_upcoming %}
+    {{ termin_karte(row, vergangen=False) }}
+    {% endfor %}
   {% endif %}
-  {% for row in termin_past %}
-  {{ termin_karte(row, vergangen=True) }}
-  {% endfor %}
 </div>
+{% endfor %}
 
 <script>
   (function () {
     var tablist = document.querySelector(".termin-tablist");
     if (!tablist) return;
     var tabs = tablist.querySelectorAll(".termin-tab");
-    var panels = {
-      kommend: document.getElementById("termin-panel-kommend"),
-      vergangen: document.getElementById("termin-panel-vergangen"),
-    };
+    var panels = {};
+    document.querySelectorAll(".termin-tab-panel").forEach(function (p) {
+      var id = p.getAttribute("data-tab");
+      if (id) panels[id] = p;
+    });
+    var toolbars = {};
+    document.querySelectorAll(".termin-toolbar-panel").forEach(function (el) {
+      var id = el.getAttribute("data-toolbar-tab");
+      if (id) toolbars[id] = el;
+    });
     function activate(id) {
+      if (!id || !panels[id]) return;
       tabs.forEach(function (t) {
         var sel = t.getAttribute("data-tab") === id;
         t.setAttribute("aria-selected", sel ? "true" : "false");
@@ -393,18 +433,30 @@
       Object.keys(panels).forEach(function (key) {
         var p = panels[key];
         if (!p) return;
-        if (key === id) {
-          p.removeAttribute("hidden");
-        } else {
-          p.setAttribute("hidden", "");
-        }
+        if (key === id) p.removeAttribute("hidden");
+        else p.setAttribute("hidden", "");
       });
+      Object.keys(toolbars).forEach(function (key) {
+        var tb = toolbars[key];
+        if (!tb) return;
+        if (key === id) tb.removeAttribute("hidden");
+        else tb.setAttribute("hidden", "");
+      });
+      try {
+        var u = new URL(window.location.href);
+        u.searchParams.set("tab", id);
+        history.replaceState({}, "", u.toString());
+      } catch (e) {}
     }
     tabs.forEach(function (tab) {
       tab.addEventListener("click", function () {
         activate(tab.getAttribute("data-tab"));
       });
     });
+    var sp = new URLSearchParams(window.location.search);
+    var req = sp.get("tab");
+    if (req && panels[req]) activate(req);
+    else activate({{ default_tab_id | tojson }});
   })();
 </script>
 <script>

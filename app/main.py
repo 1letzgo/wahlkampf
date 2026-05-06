@@ -6,7 +6,7 @@ import logging
 import re
 import uuid
 from contextlib import asynccontextmanager
-from urllib.parse import urlencode, urlparse
+from urllib.parse import quote, urlencode, urlparse
 from datetime import date, datetime, time
 from pathlib import Path
 from types import SimpleNamespace
@@ -467,16 +467,7 @@ def _termin_path_segment_from_request(request: Request) -> str:
 
 def _menu_show_alle_termine(pdb: Session, user: AuthenticatedUser) -> bool:
     slugs = _approved_ov_slugs_for_user_feeds(pdb, user)
-    if len(slugs) > 1:
-        return True
-    if len(slugs) == 1:
-        sole = slugs[0]
-        return user_is_fraktionsmitglied(pdb, user.id, sole) and is_mandant_feature_enabled(
-            pdb,
-            sole,
-            FEATURE_FRAKTION,
-        )
-    return False
+    return len(slugs) >= 1
 
 
 def _termin_row_for_viewing_ov(
@@ -653,6 +644,12 @@ def _my_ovs_menu_items(
                 "feature_plakate": is_mandant_feature_enabled(pdb, slug, FEATURE_PLAKATE),
                 "feature_sharepic": is_mandant_feature_enabled(pdb, slug, FEATURE_SHAREPIC),
                 "feature_fraktion": is_mandant_feature_enabled(pdb, slug, FEATURE_FRAKTION),
+                "termine_ov_tab_query": urlencode({"tab": _termin_tab_ov_id(slug)}),
+                "termine_fraktion_tab_query": (
+                    urlencode({"tab": _termin_tab_fraktion_id(slug)})
+                    if is_mandant_feature_enabled(pdb, slug, FEATURE_FRAKTION)
+                    else ""
+                ),
             },
         )
     return out_members
@@ -2244,37 +2241,244 @@ def _split_termine_upcoming_past(rows: list[dict]) -> tuple[list[dict], list[dic
     return upcoming, past
 
 
+def _merge_unique_past_rows(parts: list[list[dict]]) -> list[dict]:
+    seen: dict[int, dict] = {}
+    for rows in parts:
+        for r in rows:
+            tid = r["termin"].id
+            if tid not in seen:
+                seen[tid] = r
+    out = list(seen.values())
+    out.sort(key=lambda r: r["termin"].starts_at, reverse=True)
+    return out
+
+
+def _termin_tab_ov_id(ov_slug: str) -> str:
+    return "ov-" + quote(ov_slug.strip().lower(), safe="")
+
+
+def _termin_tab_fraktion_id(ov_slug: str) -> str:
+    return "fraktion-" + quote(ov_slug.strip().lower(), safe="")
+
+
+def _href_under_ov(request: Request, ov_slug: str, path_suffix: str) -> str:
+    rp = _app_path_prefix(request)
+    s = ov_slug.strip().lower()
+    rel = path_suffix.lstrip("/")
+    return f"{rp}/m/{s}/{rel}"
+
+
+def _termin_tabs_resolve_default(tabs: list[dict[str, Any]], requested_tab: str | None) -> str:
+    ids = [t["id"] for t in tabs]
+    if not ids:
+        return ""
+    rt = (requested_tab or "").strip()
+    if rt and rt in ids:
+        return rt
+    return ids[0]
+
+
+def _build_termin_tabs_for_user(
+    pdb: Session,
+    mandant_slug: str,
+    request: Request,
+    user: AuthenticatedUser,
+    *,
+    requested_tab: str | None,
+) -> tuple[list[dict[str, Any]], str, bool]:
+    """Tab-Metadaten für die zentrale Terminseite; letzter Return: termin_has_any."""
+    vm = mandant_slug.strip().lower()
+    slugs = _approved_ov_slugs_for_user_feeds(pdb, user)
+    tabs: list[dict[str, Any]] = []
+
+    def _empty_toolbar() -> dict[str, Any]:
+        return {
+            "show_neuer_termin_button": False,
+            "neuer_termin_href": None,
+            "show_neue_sitzung_button": False,
+            "neue_sitzung_href": None,
+            "neuer_termin_button_label": "Neuer Termin",
+            "neue_sitzung_button_label": "Neue Sitzung",
+        }
+
+    if not slugs:
+        ov = pdb.query(Ortsverband).filter(Ortsverband.slug == vm).first()
+        label_vm = ((ov.display_name or "").strip() or vm) if ov else vm
+        rows = _termin_list_rows(pdb, mandant_slug, user)
+        up, past = _split_termine_upcoming_past(rows)
+        ov_id = _termin_tab_ov_id(vm)
+        tb = _empty_toolbar()
+        tb["show_neuer_termin_button"] = True
+        tb["neuer_termin_href"] = _href_under_ov(request, vm, "termine/neu")
+        tabs.append(
+            {
+                "id": ov_id,
+                "kind": "ov",
+                "ov_slug": vm,
+                "label": label_vm,
+                "termin_upcoming": up,
+                "termin_past": [],
+                **tb,
+            },
+        )
+        arch_tb = _empty_toolbar()
+        tabs.append(
+            {
+                "id": "archiv",
+                "kind": "archiv",
+                "ov_slug": None,
+                "label": "Archiv",
+                "termin_upcoming": [],
+                "termin_past": past,
+                **arch_tb,
+            },
+        )
+        default_id = _termin_tabs_resolve_default(tabs, requested_tab)
+        has_any = bool(up or past)
+        return tabs, default_id, has_any
+
+    labels = _ov_display_labels_for_slugs(pdb, slugs)
+
+    up_alle, _ = _split_termine_upcoming_past(
+        _termin_list_rows_multi(pdb, slugs, user, viewing_ms=vm),
+    )
+    tabs.append(
+        {
+            "id": "alle",
+            "kind": "alle",
+            "ov_slug": None,
+            "label": "Alle",
+            "termin_upcoming": up_alle,
+            "termin_past": [],
+            **_empty_toolbar(),
+        },
+    )
+
+    for s in slugs:
+        rows_ov = _termin_list_rows(pdb, s, user)
+        up_ov, _ = _split_termine_upcoming_past(rows_ov)
+        oid = _termin_tab_ov_id(s)
+        tb = _empty_toolbar()
+        tb["show_neuer_termin_button"] = True
+        tb["neuer_termin_href"] = _href_under_ov(request, s, "termine/neu")
+        tabs.append(
+            {
+                "id": oid,
+                "kind": "ov",
+                "ov_slug": s,
+                "label": labels.get(s, s),
+                "termin_upcoming": up_ov,
+                "termin_past": [],
+                **tb,
+            },
+        )
+
+    for s in slugs:
+        if not is_mandant_feature_enabled(pdb, s, FEATURE_FRAKTION):
+            continue
+        if not user_is_fraktionsmitglied(pdb, user.id, s):
+            continue
+        rows_f = _termin_list_rows_fraktion(pdb, s, user)
+        up_f, _ = _split_termine_upcoming_past(rows_f)
+        fid = _termin_tab_fraktion_id(s)
+        tb = _empty_toolbar()
+        kann_f = _can_anlegen_fraktionstermin(pdb, user, s)
+        tb["show_neue_sitzung_button"] = kann_f
+        tb["neue_sitzung_href"] = _href_under_ov(request, s, "fraktion/termine/neu") if kann_f else None
+        tabs.append(
+            {
+                "id": fid,
+                "kind": "fraktion",
+                "ov_slug": s,
+                "label": f"Fraktion · {labels.get(s, s)}",
+                "termin_upcoming": up_f,
+                "termin_past": [],
+                **tb,
+            },
+        )
+
+    past_lists: list[list[dict]] = []
+    _, pm = _split_termine_upcoming_past(
+        _termin_list_rows_multi(pdb, slugs, user, viewing_ms=vm),
+    )
+    past_lists.append(pm)
+    for s in slugs:
+        _, p_ov = _split_termine_upcoming_past(_termin_list_rows(pdb, s, user))
+        past_lists.append(p_ov)
+        if is_mandant_feature_enabled(pdb, s, FEATURE_FRAKTION) and user_is_fraktionsmitglied(
+            pdb,
+            user.id,
+            s,
+        ):
+            _, p_fr = _split_termine_upcoming_past(_termin_list_rows_fraktion(pdb, s, user))
+            past_lists.append(p_fr)
+    archiv = _merge_unique_past_rows(past_lists)
+    tabs.append(
+        {
+            "id": "archiv",
+            "kind": "archiv",
+            "ov_slug": None,
+            "label": "Archiv",
+            "termin_upcoming": [],
+            "termin_past": archiv,
+            **_empty_toolbar(),
+        },
+    )
+
+    default_id = _termin_tabs_resolve_default(tabs, requested_tab)
+    has_any = any(bool(t["termin_upcoming"] or t["termin_past"]) for t in tabs)
+    return tabs, default_id, has_any
+
+
 @tenant_router.get("/termine", response_class=HTMLResponse)
 def termine_list(
     mandant_slug: str,
     request: Request,
     pdb: Annotated[Session, Depends(get_platform_db)],
     user: CurrentUser,
+    tab: Annotated[str | None, Query()] = None,
 ):
-    termin_rows = _termin_list_rows(pdb, mandant_slug, user)
-    termin_upcoming, termin_past = _split_termine_upcoming_past(termin_rows)
+    termin_tabs, default_tab_id, termin_has_any = _build_termin_tabs_for_user(
+        pdb,
+        mandant_slug,
+        request,
+        user,
+        requested_tab=tab,
+    )
+    slugs = _approved_ov_slugs_for_user_feeds(pdb, user)
+    termin_multi_ov_mode = bool(slugs)
+    termin_fallback_neu_href = (
+        None if termin_multi_ov_mode else _href_under_ov(request, mandant_slug.strip().lower(), "termine/neu")
+    )
     token = ensure_ics_token_for_ui(pdb, mandant_slug, ICS_TOKEN)
     base = str(request.base_url).rstrip("/")
     my_token = ensure_user_calendar_token(pdb, user.platform_user)
     mp = _mp(request)
-    feed_url_my = f"{base}{mp}/calendar/me.ics?t={my_token}"
-    feed_url_all = f"{base}{mp}/calendar.ics?t={token}"
-    neuer_termin_href = f"{mp}/termine/neu"
+    if slugs:
+        feed_url_my = f"{base}{mp}/calendar/zusagen-alle.ics?t={my_token}"
+        feed_url_all = f"{base}{mp}/calendar/termine-alle.ics?t={my_token}"
+        ics_my_label = "Meine Zusagen (alle Verbände)"
+        ics_all_label = "Alle Termine (alle Verbände)"
+    else:
+        feed_url_my = f"{base}{mp}/calendar/me.ics?t={my_token}"
+        feed_url_all = f"{base}{mp}/calendar.ics?t={token}"
+        ics_my_label = "Meine Zusagen"
+        ics_all_label = "Alle Termine"
     return templates.TemplateResponse(
         request,
         "termine_list.html",
         {
             "user": user,
-            "termin_upcoming": termin_upcoming,
-            "termin_past": termin_past,
+            "termin_tabs": termin_tabs,
+            "default_tab_id": default_tab_id,
+            "termin_has_any": termin_has_any,
+            "termin_multi_ov_mode": termin_multi_ov_mode,
+            "termin_fallback_neu_href": termin_fallback_neu_href,
             "feed_url_my": feed_url_my,
             "feed_url_all": feed_url_all,
             "page_title": "Termine",
-            "show_neuer_termin_button": True,
-            "ics_my_label": "Meine Zusagen",
-            "ics_all_label": "Alle Termine",
-            "neuer_termin_button_label": "Neuer Termin",
-            "neuer_termin_href": neuer_termin_href,
+            "ics_my_label": ics_my_label,
+            "ics_all_label": ics_all_label,
         },
     )
 
@@ -2289,35 +2493,8 @@ def termine_list_alle(
     slugs = _approved_ov_slugs_for_user_feeds(pdb, user)
     if not slugs:
         return RedirectResponse(f"{_mp(request)}/termine", status_code=302)
-    if len(slugs) <= 1:
-        sole = slugs[0]
-        if not (
-            user_is_fraktionsmitglied(pdb, user.id, sole)
-            and is_mandant_feature_enabled(pdb, sole, FEATURE_FRAKTION)
-        ):
-            return RedirectResponse(f"{_mp(request)}/termine", status_code=302)
-    termin_rows = _termin_list_rows_multi(pdb, slugs, user, viewing_ms=mandant_slug.strip().lower())
-    termin_upcoming, termin_past = _split_termine_upcoming_past(termin_rows)
-    my_token = ensure_user_calendar_token(pdb, user.platform_user)
-    base = str(request.base_url).rstrip("/")
-    mp = _mp(request)
-    feed_url_my = f"{base}{mp}/calendar/zusagen-alle.ics?t={my_token}"
-    feed_url_all = f"{base}{mp}/calendar/termine-alle.ics?t={my_token}"
-    return templates.TemplateResponse(
-        request,
-        "termine_list.html",
-        {
-            "user": user,
-            "termin_upcoming": termin_upcoming,
-            "termin_past": termin_past,
-            "feed_url_my": feed_url_my,
-            "feed_url_all": feed_url_all,
-            "page_title": "Alle Termine",
-            "show_neuer_termin_button": False,
-            "ics_my_label": "Meine Zusagen (alle Verbände)",
-            "ics_all_label": "Alle Termine (alle Verbände)",
-        },
-    )
+    dest = f"{_mp(request)}/termine?{urlencode({'tab': 'alle'})}"
+    return RedirectResponse(dest, status_code=302)
 
 
 @tenant_router.get("/termine/neu", response_class=HTMLResponse)
@@ -2505,33 +2682,9 @@ def fraktion_termine_list(
     user: CurrentUser,
 ):
     _require_mandant_feature(pdb, mandant_slug, FEATURE_FRAKTION)
-    termin_rows = _termin_list_rows_fraktion(pdb, mandant_slug, user)
-    termin_upcoming, termin_past = _split_termine_upcoming_past(termin_rows)
-    token = ensure_ics_token_for_ui(pdb, mandant_slug, ICS_TOKEN)
-    base = str(request.base_url).rstrip("/")
-    my_token = ensure_user_calendar_token(pdb, user.platform_user)
-    mp = _mp(request)
-    feed_url_my = f"{base}{mp}/calendar/me.ics?t={my_token}"
-    feed_url_all = f"{base}{mp}/calendar.ics?t={token}"
-    neuer_termin_href = f"{mp}/fraktion/termine/neu"
-    kann_fraktionstermin_anlegen = _can_anlegen_fraktionstermin(pdb, user, mandant_slug)
-    return templates.TemplateResponse(
-        request,
-        "termine_list.html",
-        {
-            "user": user,
-            "termin_upcoming": termin_upcoming,
-            "termin_past": termin_past,
-            "feed_url_my": feed_url_my,
-            "feed_url_all": feed_url_all,
-            "page_title": "Fraktion",
-            "show_neuer_termin_button": kann_fraktionstermin_anlegen,
-            "ics_my_label": "Meine Zusagen",
-            "ics_all_label": "Alle Termine",
-            "neuer_termin_button_label": "Neue Sitzung",
-            "neuer_termin_href": neuer_termin_href,
-        },
-    )
+    tid = _termin_tab_fraktion_id(mandant_slug)
+    dest = f"{_mp(request)}/termine?{urlencode({'tab': tid})}"
+    return RedirectResponse(dest, status_code=302)
 
 
 @tenant_router.get("/fraktion/termine/neu", response_class=HTMLResponse)
