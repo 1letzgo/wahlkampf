@@ -78,9 +78,23 @@
     display: inline !important;
   }
   .admin-users-ov-tablist {
+    display: flex !important;
+    flex-flow: row nowrap !important;
+    flex-wrap: nowrap !important;
+    align-items: flex-end;
+    overflow-x: auto !important;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    overscroll-behavior-x: contain;
+    white-space: nowrap;
     margin-bottom: 1rem;
   }
   .admin-users-ov-tab {
+    display: inline-flex !important;
+    flex: 0 0 auto !important;
+    width: auto !important;
+    max-width: none;
     text-decoration: none;
   }
   .admin-users-ov-tab:hover,

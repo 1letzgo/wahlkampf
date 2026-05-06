@@ -868,13 +868,15 @@ dialog.popup-dialog::backdrop {
 
 /* Terminliste: Tab-Leiste — eine Zeile, horizontal scrollbar (kein Umbruch) */
 .termin-tablist {
-  display: flex;
-  flex-flow: row nowrap;
+  display: flex !important;
+  flex-flow: row nowrap !important;
+  flex-wrap: nowrap !important;
   align-items: flex-end;
   gap: 0.25rem;
   width: 100%;
   max-width: 100%;
   min-width: 0;
+  white-space: nowrap;
   margin: 0 0 1rem;
   padding: 0.35rem 0.65rem 0;
   border: 1px solid var(--border);
@@ -882,7 +884,7 @@ dialog.popup-dialog::backdrop {
   background: var(--bg);
   /* Außenring neutral halten — rot getönter Ring wirkte wie „kaputte“ Zusatzlinie an Tabs/Ecken */
   box-shadow: var(--shadow-inset-panel), 0 0 0 1px rgba(0, 0, 0, 0.05);
-  overflow-x: auto;
+  overflow-x: auto !important;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
@@ -897,7 +899,7 @@ dialog.popup-dialog::backdrop {
   -webkit-appearance: none;
   appearance: none;
   margin: 0;
-  display: inline-flex;
+  display: inline-flex !important;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
@@ -910,7 +912,9 @@ dialog.popup-dialog::backdrop {
   font: inherit;
   cursor: pointer;
   color: var(--muted);
-  flex: 0 0 auto;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  max-width: none;
   white-space: nowrap;
   position: relative;
 }
