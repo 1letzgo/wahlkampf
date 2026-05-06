@@ -214,13 +214,20 @@
     ctx.fillStyle = FILL;
     ctx.textAlign = "right";
     ctx.textBaseline = "top";
+    var explicitLines = raw
+      .split(/\n/)
+      .map(function (s) {
+        return s.trim();
+      })
+      .filter(Boolean);
+    var useExplicit = explicitLines.length >= 2;
     var fs = 46;
     var lh;
     var lines;
     for (; fs >= 22; fs -= 2) {
       lh = Math.round(fs * 1.1);
       ctx.font = '700 ' + fs + 'px "Open Sans", system-ui, sans-serif';
-      lines = textToLines(ctx, raw, maxW, SLOGAN_MAX_LINES);
+      lines = useExplicit ? explicitLines : textToLines(ctx, raw, maxW, SLOGAN_MAX_LINES);
       var blockH = lines.length * lh;
       var ok = blockH <= L.headerBottom - 10;
       if (ok) {
@@ -232,7 +239,7 @@
     }
     lh = Math.round(fs * 1.1);
     ctx.font = '700 ' + fs + 'px "Open Sans", system-ui, sans-serif';
-    lines = textToLines(ctx, raw, maxW, SLOGAN_MAX_LINES);
+    lines = useExplicit ? explicitLines : textToLines(ctx, raw, maxW, SLOGAN_MAX_LINES);
     var blockH = lines.length * lh;
     var y0 = Math.max(4, Math.round((L.headerBottom - blockH) / 2) - 10);
     for (var i = 0; i < lines.length; i++) {
