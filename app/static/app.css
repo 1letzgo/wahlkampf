@@ -870,7 +870,7 @@ dialog.popup-dialog::backdrop {
 .termin-tablist {
   display: flex;
   flex-flow: row nowrap;
-  align-items: stretch;
+  align-items: flex-end;
   gap: 0.25rem;
   width: 100%;
   max-width: 100%;
@@ -880,7 +880,8 @@ dialog.popup-dialog::backdrop {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
-  box-shadow: var(--shadow-inset-panel), 0 0 0 1px rgba(196, 30, 58, 0.04);
+  /* Außenring neutral halten — rot getönter Ring wirkte wie „kaputte“ Zusatzlinie an Tabs/Ecken */
+  box-shadow: var(--shadow-inset-panel), 0 0 0 1px rgba(0, 0, 0, 0.05);
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
@@ -893,26 +894,47 @@ dialog.popup-dialog::backdrop {
 }
 
 .termin-tab {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
   background: transparent;
   border: none;
+  border-radius: var(--radius-input) var(--radius-input) 0 0;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
-  padding: 0.55rem 0.85rem;
+  padding: 0.55rem 0.85rem 0.6rem;
   font: inherit;
   cursor: pointer;
   color: var(--muted);
   flex: 0 0 auto;
   white-space: nowrap;
+  position: relative;
 }
 
 .termin-tab:hover {
   color: var(--text);
 }
 
+.termin-tab:hover:not([aria-selected="true"]) {
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.termin-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  z-index: 2;
+}
+
 .termin-tab[aria-selected="true"] {
   color: var(--text);
-  border-bottom-color: var(--accent);
   font-weight: 600;
+  background: var(--card);
+  border-bottom-color: var(--accent);
+  z-index: 1;
 }
 
 .termin-tab-panel:focus-visible {
