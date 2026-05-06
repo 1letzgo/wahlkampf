@@ -123,8 +123,11 @@
     </section>
 
     <footer class="ics-popup__foot" aria-label="Sharepic exportieren">
-      <button type="button" class="btn btn-sm btn-ico btn-with-label" id="sharepic-download" aria-label="JPG herunterladen">
-        {{ ico.svg_check() }}<span class="btn-text">JPG herunterladen</span>
+      <button type="button" class="btn btn-sm btn-ico btn-with-label" id="sharepic-download" aria-label="Speichern">
+        {{ ico.svg_check() }}<span class="btn-text">Speichern</span>
+      </button>
+      <button type="button" class="btn btn-sm btn-ghost btn-ico" id="sharepic-share" aria-label="Sharepic teilen" title="Sharepic teilen">
+        {{ ico.svg_share() }}
       </button>
     </footer>
   </div>
@@ -753,16 +756,48 @@
   syncMidCharCount();
   limitLines(ta2, 2);
 
-  document.getElementById("sharepic-download").addEventListener("click", function () {
+  function exportCanvasBlob(done) {
     redraw();
     canvas.toBlob(function (blob) {
       if (!blob) return;
+      done(blob);
+    }, "image/jpeg", 0.92);
+  }
+
+  function downloadSharepic() {
+    exportCanvasBlob(function (blob) {
       var a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = "sharepic-wahlkampf.jpg";
       a.click();
       URL.revokeObjectURL(a.href);
-    }, "image/jpeg", 0.92);
+    });
+  }
+
+  document.getElementById("sharepic-download").addEventListener("click", downloadSharepic);
+
+  document.getElementById("sharepic-share").addEventListener("click", function () {
+    var shareBtn = this;
+    shareBtn.disabled = true;
+    exportCanvasBlob(function (blob) {
+      var file = new File([blob], "sharepic-wahlkampf.jpg", { type: blob.type || "image/jpeg" });
+      var canShareFile = false;
+      try {
+        canShareFile = !!(navigator.share && navigator.canShare && navigator.canShare({ files: [file] }));
+      } catch (e) {}
+
+      if (canShareFile) {
+        navigator.share({ files: [file], title: "Sharepic" }).catch(function (err) {
+          if (!err || err.name !== "AbortError") downloadSharepic();
+        }).finally(function () {
+          shareBtn.disabled = false;
+        });
+        return;
+      }
+
+      downloadSharepic();
+      shareBtn.disabled = false;
+    });
   });
 
   document.fonts.load(FONT).then(scheduleRedraw).catch(scheduleRedraw);

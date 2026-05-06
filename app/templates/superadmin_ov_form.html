@@ -171,12 +171,17 @@
         </form>
       </fieldset>
 
-      <footer style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border);">
-        <form method="post" action="/admin/ortsverbaende/{{ ov.slug }}/plakate-loeschen" style="margin: 0 0 0.75rem;" onsubmit="return confirm('Wirklich alle Plakate dieses Verbands löschen? Dieser Schritt kann nicht rückgängig gemacht werden.');">
+      <section class="ics-popup__panel" style="margin-top: 1.25rem; border-color: rgba(196, 30, 58, 0.25);">
+        <h3 class="ics-popup__label">Plakate zurücksetzen</h3>
+        <p class="muted" style="margin:0 0 0.65rem;">Löscht alle gemeldeten Plakat-Standorte dieses Verbands. Kann nicht rückgängig gemacht werden.</p>
+        <form method="post" action="/admin/ortsverbaende/{{ ov.slug }}/plakate-loeschen" style="margin:0;" onsubmit="return confirm('Wirklich alle Plakate dieses Verbands löschen? Dieser Schritt kann nicht rückgängig gemacht werden.');">
           <button type="submit" class="btn btn-sm btn-danger btn-ico btn-with-label" aria-label="Alle Plakate dieses Ortsverbands löschen">
             {{ ico.svg_trash() }}<span class="btn-text">Alle Plakate löschen</span>
           </button>
         </form>
+      </section>
+
+      <footer style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border);">
         <p class="muted" style="margin: 0 0 0.65rem; font-size: 0.84rem;">Unwiderruflich: Eintrag unter Ortsverbände, SQLite und alle Uploads dieses OV.</p>
         <a href="/admin/ortsverbaende/{{ ov.slug }}/loeschen" class="btn btn-sm btn-danger btn-ico btn-with-label" aria-label="Ortsverband löschen">
           {{ ico.svg_trash() }}<span class="btn-text">Ortsverband löschen…</span>
