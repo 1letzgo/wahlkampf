@@ -1,7 +1,0 @@
-{# Nur globale Plattform-Superadmin-Seiten (nicht Mandanten-Admin). path_prefix = request.scope.root_path oder '' #}
-{% set pp = path_prefix | default(request.scope.get('root_path') or '') %}
-<nav class="page-toolbar superadmin-platform-nav" aria-label="Plattform-Verwaltung" style="flex-wrap: wrap;">
-  <a href="{{ pp }}/admin/nutzer" class="btn btn-sm btn-ghost btn-ico btn-with-label"><span class="btn-text">Nutzer</span></a>
-  <a href="{{ pp }}/admin/ortsverbaende" class="btn btn-sm btn-ghost btn-ico btn-with-label"><span class="btn-text">Ortsverbände</span></a>
-  <a href="{{ pp }}/admin/kalender-abos" class="btn btn-sm btn-ghost btn-ico btn-with-label"><span class="btn-text">Kalender-Abos</span></a>
-</nav>

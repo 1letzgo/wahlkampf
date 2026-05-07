@@ -38,7 +38,7 @@ class Ortsverband(PlatformBase):
 
 
 class ExternCalSubscription(PlatformBase):
-    """Plattform: ICS/Webcal-Abo → Termine am gewählten Ortsverband (Kategorie konfigurierbar)."""
+    """Plattform: ICS/Webcal- oder RSS-Feed → Termine am gewählten Ortsverband."""
 
     __tablename__ = "extern_cal_subscriptions"
 

@@ -1,4 +1,4 @@
-"""ICS/Webcal-Abo → Termine am Ortsverband (Kategorie pro Abo konfigurierbar)."""
+"""Externe Feeds (ICS/Webcal oder RSS, z. B. Bürgerinfo Ammerland) → Termine im OV."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import hashlib
 import logging
 import re
 import urllib.request
+import xml.etree.ElementTree as ET
 from datetime import date, datetime, time, timezone
 from typing import Any
 from urllib.parse import urlparse
@@ -27,12 +28,12 @@ def validate_and_normalize_cal_subscription_url(raw: str) -> tuple[str | None, s
     if not s:
         return None, None
     if len(s) > 8000:
-        return None, "Die Kalender-URL ist zu lang."
+        return None, "Die Feed-URL ist zu lang."
     if s.lower().startswith("webcal://"):
         s = "https://" + s[len("webcal://") :]
     p = urlparse(s)
     if p.scheme not in ("http", "https") or not p.netloc:
-        return None, "Bitte eine http(s)- oder webcal://-Kalenderadresse angeben."
+        return None, "Bitte eine http(s)-, webcal://- oder RSS-Adresse angeben."
     return s, None
 
 
@@ -45,16 +46,25 @@ def normalize_calendar_fetch_url(raw: str) -> str:
 
 
 def fetch_ics_bytes(cal_url: str, *, timeout: int | None = None) -> bytes:
+    """Alias für :func:`fetch_subscription_bytes` (bestehende Aufrufer)."""
+    return fetch_subscription_bytes(cal_url, timeout=timeout)
+
+
+def fetch_subscription_bytes(feed_url: str, *, timeout: int | None = None) -> bytes:
+    """Lädt Rohbytes (ICS, RSS/XML …)."""
     timeout = CAL_FETCH_TIMEOUT_SECONDS if timeout is None else timeout
-    fetch_u = normalize_calendar_fetch_url(cal_url.strip())
+    fetch_u = normalize_calendar_fetch_url(feed_url.strip())
     parsed = urlparse(fetch_u)
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
-        raise ValueError("Ungültige Kalender-URL.")
+        raise ValueError("Ungültige Feed-URL.")
     req = urllib.request.Request(
         fetch_u,
         headers={
-            "User-Agent": "Wahlkampf-Fraktion-Cal/1.0",
-            "Accept": "text/calendar, application/calendar+json, */*",
+            "User-Agent": "Wahlkampf-FeedImport/1.0",
+            "Accept": (
+                "text/calendar, application/calendar+json, "
+                "application/rss+xml, application/atom+xml, application/xml, text/xml, */*"
+            ),
         },
         method="GET",
     )
@@ -275,33 +285,152 @@ def parse_vevents_from_ics(raw: bytes) -> list[dict]:
     return out
 
 
-def import_fraktion_termine_from_calendar(
+def _fix_malformed_item_url(raw: str) -> str | None:
+    """Korrigiert z. B. ``http:'host/...`` aus manchen RIS/RSS-Feeds."""
+    s = (raw or "").strip()
+    if not s:
+        return None
+    s = re.sub(r"(?i)^http:'", "http://", s)
+    s = re.sub(r"(?i)^https:'", "https://", s)
+    p = urlparse(s)
+    if p.scheme in ("http", "https") and p.netloc:
+        return s[:2000]
+    return None
+
+
+def _rss_element_text(el: ET.Element | None) -> str:
+    if el is None:
+        return ""
+    return "".join(el.itertext()).strip()
+
+
+def _datetime_from_title_suffix(title: str) -> datetime | None:
+    m = re.search(r"(\d{1,2})\.(\d{1,2})\.(\d{4})\s*$", (title or "").strip())
+    if not m:
+        return None
+    day, mon, year = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    try:
+        return datetime(year, mon, day, 10, 0, 0)
+    except ValueError:
+        return None
+
+
+def _parse_ammerland_sitzung_datetime(desc: str, title: str) -> tuple[datetime | None, str]:
+    """Datum/Zeit/Ort aus Bürgerinfo/RSS-Beschreibung (Landkreis Ammerland u. ä.)."""
+    d = (desc or "").strip()
+    m = re.search(
+        r"(?is)Datum:\s*(\d{1,2})\.(\d{1,2})\.(\d{4})\s+"
+        r"Zeit:\s*(\d{1,2}):(\d{2})(?:\s*Uhr)?\s+"
+        r"Ort:\s*(.+)$",
+        d,
+    )
+    if m:
+        day, mon, year, th, tm = (int(m.group(i)) for i in range(1, 6))
+        ort = m.group(6).strip()
+        try:
+            return datetime(year, mon, day, th, tm, 0), ort[:600]
+        except ValueError:
+            pass
+    m2 = re.search(r"(?i)Datum:\s*(\d{1,2})\.(\d{1,2})\.(\d{4})", d)
+    if m2:
+        day, mon, year = int(m2.group(1)), int(m2.group(2)), int(m2.group(3))
+        mzeit = re.search(r"(?i)Zeit:\s*(\d{1,2}):(\d{2})", d)
+        th, tm = (10, 0)
+        if mzeit:
+            th, tm = int(mzeit.group(1)), int(mzeit.group(2))
+        m_ort = re.search(r"(?is)Ort:\s*(.+)$", d)
+        ort = m_ort.group(1).strip() if m_ort else ""
+        try:
+            return datetime(year, mon, day, th, tm, 0), ort[:600]
+        except ValueError:
+            pass
+    dt_title = _datetime_from_title_suffix(title)
+    if dt_title:
+        return dt_title, ""
+    return None, ""
+
+
+def _rss_import_key(link: str | None, title: str, starts_at: datetime) -> str:
+    base = f"rss|{link or ''}|{title}|{starts_at.isoformat()}"
+    return hashlib.sha256(base.encode("utf-8", errors="replace")).hexdigest()
+
+
+def parse_rss_buergerinfo_items(raw: bytes) -> tuple[list[dict], str | None]:
+    """RSS mit Sitzungs-Items (Bürgerinfo Ammerland: Gremium/Datum/Zeit/Ort in description)."""
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError as e:
+        return [], f"RSS/XML konnte nicht gelesen werden: {e}"
+    out: list[dict] = []
+    for item in root.findall(".//item"):
+        title = _rss_element_text(item.find("title"))[:500]
+        desc = _rss_element_text(item.find("description"))
+        link_raw = _rss_element_text(item.find("link"))
+        link_final = _fix_malformed_item_url(link_raw)
+        category = _rss_element_text(item.find("category"))
+        starts_at, location = _parse_ammerland_sitzung_datetime(desc, title)
+        if starts_at is None:
+            logger.debug("RSS item übersprungen (kein Datum): %s", title[:120] if title else "")
+            continue
+        body_lines: list[str] = []
+        if category:
+            body_lines.append(f"Kategorie: {category}")
+        if desc:
+            body_lines.append(desc)
+        description = "\n\n".join(body_lines) if body_lines else desc
+        import_key = _rss_import_key(link_final, title, starts_at)
+        t_short = (title or "(RSS)").strip()[:200] or "(RSS)"
+        out.append(
+            {
+                "title": t_short,
+                "location": (location or "")[:300],
+                "description": description[:20000] if len(description) > 20000 else description,
+                "link_url": link_final,
+                "starts_at": starts_at,
+                "ends_at": None,
+                "import_key": import_key,
+            }
+        )
+    if not out:
+        return [], (
+            "RSS-Feed enthält keine importierbaren Einträge "
+            "(erwartet werden Sitzungen mit Datum/Zeit in der Beschreibung oder im Titel)."
+        )
+    return out, None
+
+
+def parse_feed_to_events(raw: bytes) -> tuple[list[dict], str | None]:
+    """Erkennt ICS oder RSS und liefert eine einheitliche Event-Liste."""
+    head = raw[:16000].lstrip(b"\xef\xbb\xbf").decode("utf-8", errors="replace")
+    hl = head.lower()
+    if "begin:vcalendar" in hl:
+        try:
+            return parse_vevents_from_ics(raw), None
+        except Exception as e:
+            logger.warning("ICS parse failed: %s", e)
+            return [], f"Kalender konnte nicht gelesen werden: {e}"
+    if "<rss" in hl or ("<channel" in hl and "<item" in hl):
+        return parse_rss_buergerinfo_items(raw)
+    try:
+        ev = parse_vevents_from_ics(raw)
+        if ev:
+            return ev, None
+    except Exception:
+        pass
+    ev, err = parse_rss_buergerinfo_items(raw)
+    if ev:
+        return ev, None
+    return [], err or "Unbekanntes Feed-Format (weder ICS noch unterstütztes RSS)."
+
+
+def _persist_feed_events(
     db: Session,
     mandant_slug: str,
-    cal_url: str,
-    *,
-    termin_kategorie: str = "verband",
-) -> tuple[int, str | None]:
-    """Legt fehlende Termine aus ICS/Webcal an; Kategorie wie konfiguriert (Sichtbarkeit im OV)."""
+    events: list[dict],
+    kat: str,
+) -> int:
+    """Legt fehlende Termine an; gleiche Dedupe-Logik für ICS und RSS."""
     ms = mandant_slug.strip().lower()
-    url = cal_url.strip()
-    if not url:
-        return 0, "Keine Kalender-URL konfiguriert."
-
-    kat = normalize_termin_kategorie(termin_kategorie)
-
-    try:
-        raw = fetch_ics_bytes(url)
-    except Exception as e:
-        logger.warning("Kalender fetch failed mandant=%s: %s", ms, e)
-        return 0, f"Kalender konnte nicht geladen werden: {e}"
-
-    try:
-        events = parse_vevents_from_ics(raw)
-    except Exception as e:
-        logger.warning("Kalender parse failed mandant=%s: %s", ms, e)
-        return 0, f"Kalender konnte nicht gelesen werden: {e}"
-
     created = 0
     for ev in events:
         dedupe = ev["import_key"]
@@ -313,7 +442,7 @@ def import_fraktion_termine_from_calendar(
         if exists:
             continue
 
-        title = ev["title"].strip() or "(Kalender)"
+        title = ev["title"].strip() or "(Feed)"
         desc = (ev["description"] or "").strip()
         loc = (ev["location"] or "").strip()
 
@@ -335,7 +464,35 @@ def import_fraktion_termine_from_calendar(
             created += 1
         except IntegrityError:
             db.rollback()
+    return created
 
+
+def import_fraktion_termine_from_calendar(
+    db: Session,
+    mandant_slug: str,
+    cal_url: str,
+    *,
+    termin_kategorie: str = "verband",
+) -> tuple[int, str | None]:
+    """Legt fehlende Termine aus ICS/Webcal oder RSS (z. B. Bürgerinfo) an."""
+    ms = mandant_slug.strip().lower()
+    url = cal_url.strip()
+    if not url:
+        return 0, "Keine Feed-URL konfiguriert."
+
+    kat = normalize_termin_kategorie(termin_kategorie)
+
+    try:
+        raw = fetch_subscription_bytes(url)
+    except Exception as e:
+        logger.warning("Feed fetch failed mandant=%s: %s", ms, e)
+        return 0, f"Feed konnte nicht geladen werden: {e}"
+
+    events, perr = parse_feed_to_events(raw)
+    if perr:
+        return 0, perr
+
+    created = _persist_feed_events(db, ms, events, kat)
     return created, None
 
 

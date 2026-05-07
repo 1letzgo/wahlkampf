@@ -23,7 +23,7 @@
         <div>
           <h2 class="ics-popup__h">{% if sub %}Abo #{{ sub.id }}{% else %}Neues Abo{% endif %}</h2>
           <p class="ics-popup__lead">
-            ICS/Webcal (z. B. RIS). Neue Termine werden mit der gewählten <strong>Kategorie</strong> im Ortsverband angelegt (Sichtbarkeit wie bei manuellen Terminen).
+            <strong>ICS/Webcal</strong> (z. B. RIS-Kalender) oder <strong>RSS</strong> (z. B. Bürgerinfo Ammerland mit Sitzungen in der Beschreibung). Der Server erkennt das Format automatisch. Neue Termine werden mit der gewählten <strong>Kategorie</strong> im Ortsverband angelegt.
           </p>
         </div>
       </header>
@@ -32,7 +32,7 @@
       {% if sub %}
       {% if flash_ok %}<div class="success" style="margin-bottom:0.85rem;">Gespeichert.</div>{% endif %}
       {% if cal_flash_created is not none %}<div class="success" style="margin-bottom:0.85rem;">{{ cal_flash_created }} neue Termine übernommen.</div>{% endif %}
-      {% if cal_flash_err %}<div class="error" style="margin-bottom:0.85rem;">Kalender-Abruf: {{ cal_flash_err }}</div>{% endif %}
+      {% if cal_flash_err %}<div class="error" style="margin-bottom:0.85rem;">Feed-Abruf: {{ cal_flash_err }}</div>{% endif %}
       {% endif %}
 
       <form method="post" action="{% if sub %}{{ path_prefix }}/admin/kalender-abos/{{ sub.id }}/bearbeiten{% else %}{{ path_prefix }}/admin/kalender-abos/neu{% endif %}">
@@ -64,9 +64,9 @@
           </label>
         </fieldset>
 
-        <label for="cal-sub-url" style="margin-top:0.85rem;">Kalender-URL</label>
+        <label for="cal-sub-url" style="margin-top:0.85rem;">Feed-URL (ICS/Webcal oder RSS)</label>
         <input id="cal-sub-url" name="feed_url" type="text" inputmode="url" maxlength="8000"
-          placeholder="webcal://… oder https://…"
+          placeholder="https://…/calendar.ics oder …/rssfeed.asp?…"
           value="{{ feed_url_input if feed_url_input is not none else (sub.feed_url or '' if sub else '') }}">
 
         <label style="display:flex;align-items:center;gap:0.5rem;font-weight:600;margin-top:0.65rem;cursor:pointer;">

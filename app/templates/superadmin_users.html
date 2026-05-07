@@ -26,10 +26,6 @@
 {% block body %}
 {{ app_header(ph) }}
 
-{% if tenant_ov_slug is not defined %}
-{% include '_superadmin_platform_nav.html' %}
-{% endif %}
-
 <div class="admin-page">
   {% if admin_tabs and admin_tabs|length > 1 %}
   <nav class="termin-tablist admin-users-ov-tablist" aria-label="Ortsverband wechseln">

@@ -36,9 +36,9 @@
       <header class="ics-popup__head">
         <div class="ics-popup__head-icon" aria-hidden="true">{{ ico.svg_calendar() }}</div>
         <div>
-          <h2 class="ics-popup__h">RIS / externe ICS-Feeds</h2>
+          <h2 class="ics-popup__h">Externe Feeds (ICS &amp; RSS)</h2>
           <p class="ics-popup__lead">
-            Mehrere Abos pro Plattform; Ziel ist jeweils ein <strong>Ortsverband</strong>. Pro Abo legst du die <strong>Import-Kategorie</strong> fest (Verband / Vorstand / Fraktion). Aktive Abos werden im Hintergrund abgerufen.
+            <strong>ICS/Webcal</strong> oder <strong>RSS</strong> (u. a. Kreis-Bürgerinfo mit Sitzungsliste). Pro Abo: Ziel-OV, Import-Kategorie und Feed-URL. Aktive Abos werden im Hintergrund abgerufen.
           </p>
         </div>
       </header>
@@ -60,7 +60,7 @@
               <th scope="col">ID</th>
               <th scope="col">Kategorie</th>
               <th scope="col">Ortsverband</th>
-              <th scope="col">Kalender-URL</th>
+              <th scope="col">Feed-URL</th>
               <th scope="col" class="admin-users-th-actions">Aktionen</th>
             </tr>
           </thead>
@@ -89,7 +89,7 @@
                 <span class="muted" style="font-size:0.75rem;">Abo aus</span>
                 {% endif %}
               </td>
-              <td data-label="URL" class="cal-sub-url-cell">
+              <td data-label="Feed-URL" class="cal-sub-url-cell">
                 {% if s.feed_url %}<code>{{ s.feed_url }}</code>{% else %}<span class="muted">—</span>{% endif %}
               </td>
               <td data-label="Aktionen" class="admin-users-td-actions">

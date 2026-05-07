@@ -339,7 +339,7 @@ def superadmin_cal_sub_new_submit(
             _cal_sub_form_ctx(
                 sub=None,
                 ovs=ovs,
-                error="Für ein aktives Abo ist eine Kalender-URL erforderlich.",
+                error="Für ein aktives Abo ist eine Feed-URL erforderlich.",
                 feed_url_input=feed_url.strip(),
                 flash_ok=False,
                 cal_flash_created=None,
@@ -486,7 +486,7 @@ def superadmin_cal_sub_edit_submit(
             _cal_sub_form_ctx(
                 sub=sub,
                 ovs=ovs,
-                error="Für ein aktives Abo ist eine Kalender-URL erforderlich.",
+                error="Für ein aktives Abo ist eine Feed-URL erforderlich.",
                 feed_url_input=feed_url.strip(),
                 flash_ok=False,
                 cal_flash_created=None,
@@ -520,7 +520,7 @@ def superadmin_cal_sub_sync_now(
     url = (sub.feed_url or "").strip()
     if not url:
         return RedirectResponse(
-            f"/admin/kalender-abos/{sub_id}/bearbeiten?cal_import_err={quote('Keine Kalender-URL gespeichert.')}",
+            f"/admin/kalender-abos/{sub_id}/bearbeiten?cal_import_err={quote('Keine Feed-URL gespeichert.')}",
             status_code=302,
         )
     n, err = import_fraktion_termine_from_calendar(
