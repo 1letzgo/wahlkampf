@@ -1039,6 +1039,19 @@ def app_menu(
     user: CurrentUser,
 ):
     my_ovs_items = _my_ovs_menu_items(pdb, mandant_slug, user.id, user.username)
+    sharepic_admin_ovs = [
+        o for o in my_ovs_items if o["is_admin"] and o["feature_sharepic"]
+    ]
+    sharepic_vorlagen_href: str | None = None
+    if sharepic_admin_ovs:
+        ms_now = mandant_slug.strip().lower()
+        target = next(
+            (o for o in sharepic_admin_ovs if o["slug"] == ms_now),
+            sharepic_admin_ovs[0],
+        )
+        sharepic_vorlagen_href = _href_under_ov(
+            request, target["slug"], "admin/sharepic-vorlagen"
+        )
     return templates.TemplateResponse(
         request,
         "menu.html",
@@ -1051,6 +1064,8 @@ def app_menu(
             "administration_pending_total": sum(
                 o["admin_pending_count"] for o in my_ovs_items if o["is_admin"]
             ),
+            "show_sharepic_vorlagen_link": bool(sharepic_admin_ovs),
+            "sharepic_vorlagen_href": sharepic_vorlagen_href,
             "menu_ov_open": _menu_ov_open_map_for_user(pdb, user),
             "menu_ov_card_save_url": f"{_mp(request)}/menu/ov-card-open",
         },

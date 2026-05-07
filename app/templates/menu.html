@@ -129,7 +129,7 @@
 {% endif %}
 {% endfor %}
 
-{% if (show_administration_card | default(false)) or (show_superadmin_link | default(false)) %}
+{% if (show_administration_card | default(false)) or (show_sharepic_vorlagen_link | default(false)) or (show_superadmin_link | default(false)) %}
 <div class="card card--flush">
   <ul class="menu-list" role="list">
     <li class="menu-list-section">
@@ -139,6 +139,13 @@
     <li>
       <a href="{{ request.state.mandanten_prefix }}/administration">
         <span class="menu-list__main">{{ ico.svg_user() }}<span>Mitglieder verwalten</span>{% if administration_pending_total | default(0) %}<span class="menu-admin-pending-hint" aria-label="{{ administration_pending_total }} ausstehend">({{ administration_pending_total }})</span>{% endif %}</span>
+      </a>
+    </li>
+    {% endif %}
+    {% if show_sharepic_vorlagen_link | default(false) %}
+    <li>
+      <a href="{{ sharepic_vorlagen_href }}">
+        <span class="menu-list__main">{{ ico.svg_image() }}<span>Sharepic-Vorlagen</span></span>
       </a>
     </li>
     {% endif %}
