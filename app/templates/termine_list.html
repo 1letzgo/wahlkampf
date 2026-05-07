@@ -43,6 +43,19 @@
             <p class="termin-card-list__link"><a href="{{ t.link_url }}" target="_blank" rel="noopener noreferrer" title="{{ t.link_url }}" aria-label="Link öffnen: {{ t.link_url }}">&lt;&lt; LINK &gt;&gt;</a></p>
           </section>
           {% endif %}
+          {% if row.anhaenge and row.anhaenge|length %}
+          <section class="ics-popup__panel" aria-label="Dateianhänge">
+            <h3 class="ics-popup__label">Dateien</h3>
+            <ul class="termin-anhang-list" aria-label="Dateianhänge">
+              {% for a in row.anhaenge %}
+              <li class="termin-anhang-list__item">
+                <span class="termin-anhang-list__icon" aria-hidden="true">{{ ico.svg_document() }}</span>
+                <a href="{{ owner_mp }}/media/{{ a.path }}" download class="termin-anhang-list__link">{{ a.name }}</a>
+              </li>
+              {% endfor %}
+            </ul>
+          </section>
+          {% endif %}
           <section class="ics-popup__panel termin-card-list__panel-teilnehmer{% if not t.description and not t.link_url %} ics-popup__panel--accent{% endif %}" aria-label="Teilnehmer">
             <div data-live-teilnehmer-inner>
               <h3 class="ics-popup__label">Teilnehmer{% set _n = row.teilnehmer|length + row.teilnehmer_extern|length %}{% if _n %} ({{ _n }}){% endif %}</h3>
@@ -174,6 +187,65 @@
   .termin-card-list__link a {
     word-break: break-all;
     font-size: 0.95rem;
+  }
+  .termin-anhang-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.95rem;
+    line-height: 1.4;
+  }
+  .termin-anhang-list__item {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+  }
+  .termin-anhang-list__icon {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    color: var(--muted);
+  }
+  .termin-anhang-list__icon .ico {
+    width: 1.05em;
+    height: 1.05em;
+  }
+  .termin-anhang-list__link {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    min-width: 0;
+  }
+  /* Mobile: Bild als eigene Card mit voller Breite oben, Inhalts-Cards darunter. */
+  @media (max-width: 640px) {
+    .termin-card-list__media-row {
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+    .termin-card-list__thumb {
+      width: 100%;
+      flex: 1 1 100%;
+      padding: 0.6rem;
+      background: var(--bg, #fff);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-sizing: border-box;
+    }
+    .termin-card-list__thumb img {
+      width: 100%;
+      max-width: 100%;
+      border: 0;
+      border-radius: calc(var(--radius) - 2px);
+      display: block;
+    }
+    .termin-card-list__columns {
+      width: 100%;
+      flex: 1 1 100%;
+      min-width: 0;
+    }
   }
   .termin-footer-actions__tail {
     display: flex;

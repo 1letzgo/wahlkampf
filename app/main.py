@@ -1949,6 +1949,7 @@ def _termin_row_from_instance(
         "ich_abgesagt": ich_abgesagt,
         "kann_verwalten": kann,
         "kommentar_count": kommentar_count,
+        "anhaenge": attachments_decode(t.attachments_json),
     }
 
 

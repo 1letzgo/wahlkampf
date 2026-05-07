@@ -79,6 +79,38 @@
     flex: 1;
     min-width: min(100%, 200px);
   }
+  /* Mobile: Bild als eigene Card mit voller Breite oben, Inhalts-Cards darunter. */
+  @media (max-width: 640px) {
+    .termin-card-list__media-row {
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+    .termin-card-list__thumb {
+      width: 100%;
+      flex: 1 1 100%;
+      padding: 0.6rem;
+      background: var(--bg, #fff);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-sizing: border-box;
+    }
+    .termin-card-list__thumb img {
+      width: 100%;
+      max-width: 100%;
+      border: 0;
+      border-radius: calc(var(--radius) - 2px);
+      display: block;
+    }
+    .termin-card-list__thumb--detail img {
+      width: 100%;
+      max-width: 100%;
+    }
+    .termin-card-list__columns {
+      width: 100%;
+      flex: 1 1 100%;
+      min-width: 0;
+    }
+  }
   .termin-card-list__columns > .ics-popup__panel:first-of-type {
     margin-top: 0;
   }
