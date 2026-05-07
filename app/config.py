@@ -12,7 +12,7 @@ PLATFORM_DATABASE_PATH = Path(
 
 # Mandanten: je OV eigener Ordner mit SQLite + uploads/
 MANDANTEN_ROOT = Path(os.environ.get("MANDANTEN_ROOT", str(BASE_DIR / "mandanten")))
-# Fallback Slug nur für Migration / ICS ohne Session (ein OV pro öffentlicher ICS-URL)
+# Plattform-Standard-OV: Migration, Session-Fallback (deps), Kurzpfad /api/v1 → /m/<slug>/api/v1 (Mobile-API).
 DEFAULT_MANDANT_SLUG = os.environ.get("DEFAULT_MANDANT_SLUG", "westerstede").strip().lower()
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-change-me-in-production")
@@ -90,9 +90,8 @@ def _parse_public_site_hosts(raw: str) -> frozenset[str]:
     return frozenset(out)
 
 
-# Öffentliche Domain(n): Host eingetragen → Kurz-URLs im Browser (/login statt /m/slug/login).
-# PUBLIC_SITE_MANDANT_SLUG: fester Mandant; wird u. a. für Kurz-URL /api/v1/… (Mobile-API) genutzt,
-# auch wenn der Request-Host nicht in PUBLIC_SITE_HOSTS steht.
+# Optional: feste öffentliche Site — nur Browser-Kurz-URLs (/login statt /m/<slug>/login) auf diesen Hosts.
+# Nicht nötig für die Mobile-API; dafür siehe DEFAULT_MANDANT_SLUG.
 # PUBLIC_SITE_HOSTS=wahlkampf.spd-wst.de,wahlkamp.spd-wst.de PUBLIC_SITE_MANDANT_SLUG=westerstede
 PUBLIC_SITE_HOSTS = _parse_public_site_hosts(
     os.environ.get("PUBLIC_SITE_HOSTS", ""),

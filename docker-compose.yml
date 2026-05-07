@@ -15,7 +15,9 @@ services:
       # Statt Subdomain (nur Tests): MANDANT_HOST_IS_RAW_SLUG=true → Hostname = Slug, z. B. http://westerstede:8000/
       # MANDANT_HOST_BASE_DOMAIN: ${MANDANT_HOST_BASE_DOMAIN:-}
       # MANDANT_HOST_IS_RAW_SLUG: ${MANDANT_HOST_IS_RAW_SLUG:-}
-      # URLs ohne /m/<slug> im Browser (Host + Slug müssen gesetzt sein):
+      # Standard-OV (Migration, Mobile-API-Kurzpfad /api/v1 → /m/<slug>/api/v1):
+      # DEFAULT_MANDANT_SLUG=westerstede
+      # Optional: Browser ohne /m/<slug> nur auf diesen Hosts (nicht nötig für iOS-Kurz-API):
       # PUBLIC_SITE_HOSTS=wahlkampf.spd-wst.de
       # PUBLIC_SITE_MANDANT_SLUG=westerstede
       # Achtung: MANDANT_HOST_BASE_DOMAIN=spd-wst.de macht aus wahlkampf.spd-wst.de den Slug „wahlkampf“, nicht „westerstede“.

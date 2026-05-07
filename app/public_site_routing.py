@@ -5,7 +5,7 @@ from __future__ import annotations
 from starlette.requests import Request
 from starlette.responses import RedirectResponse
 
-from app.config import PUBLIC_SITE_HOSTS, PUBLIC_SITE_MANDANT_SLUG
+from app.config import DEFAULT_MANDANT_SLUG, PUBLIC_SITE_HOSTS, PUBLIC_SITE_MANDANT_SLUG
 from app.mandant_host import incoming_hostname
 from app.platform_admin_paths import is_platform_superadmin_scope_path
 
@@ -48,13 +48,12 @@ def redirect_strip_m_prefix_if_public(request: Request) -> RedirectResponse | No
 
 
 def rewrite_short_mobile_api_scope(request: Request) -> None:
-    """`/api/v1/…` (iOS, andere Clients) → `/m/<PUBLIC_SITE_MANDANT_SLUG>/api/v1/…`.
+    """`/api/v1/…` (native Clients) → `/m/<DEFAULT_MANDANT_SLUG>/api/v1/…`.
 
-    Läuft unabhängig vom Host, sobald `PUBLIC_SITE_MANDANT_SLUG` gesetzt ist — damit
-    Kurz-URLs funktionieren, auch wenn `PUBLIC_SITE_HOSTS` den gesehenen Host nicht
-    enthält (Proxy, interne Namen).
+    Nutzt den Plattform-Standard-Slug (`DEFAULT_MANDANT_SLUG`, Env), nicht
+    `PUBLIC_SITE_*` — letztere betreffen nur Browser-Kurz-URLs auf ausgewählten Hosts.
     """
-    slug = (PUBLIC_SITE_MANDANT_SLUG or "").strip().lower()
+    slug = (DEFAULT_MANDANT_SLUG or "").strip().lower()
     if not slug:
         return
     scope = request.scope
