@@ -47,6 +47,33 @@ def redirect_strip_m_prefix_if_public(request: Request) -> RedirectResponse | No
     return RedirectResponse(new_full, status_code=307)
 
 
+def rewrite_short_mobile_api_scope(request: Request) -> None:
+    """`/api/v1/…` (iOS, andere Clients) → `/m/<PUBLIC_SITE_MANDANT_SLUG>/api/v1/…`.
+
+    Läuft unabhängig vom Host, sobald `PUBLIC_SITE_MANDANT_SLUG` gesetzt ist — damit
+    Kurz-URLs funktionieren, auch wenn `PUBLIC_SITE_HOSTS` den gesehenen Host nicht
+    enthält (Proxy, interne Namen).
+    """
+    slug = (PUBLIC_SITE_MANDANT_SLUG or "").strip().lower()
+    if not slug:
+        return
+    scope = request.scope
+    path = scope.get("path") or "/"
+    rp = (scope.get("root_path") or "").rstrip("/")
+    rel = strip_root_path(path, rp)
+    if rel.startswith("/m/"):
+        return
+    if rel != "/api/v1" and not rel.startswith("/api/v1/"):
+        return
+    new_rel = f"/m/{slug}{rel}"
+    new_path = (rp + new_rel) if rp else new_rel
+    scope["path"] = new_path
+    try:
+        scope["raw_path"] = new_path.encode("latin-1")
+    except UnicodeEncodeError:
+        scope["raw_path"] = new_path.encode("utf-8", errors="replace")
+
+
 def rewrite_scope_to_internal_m_path(request: Request) -> None:
     """Kurze URL /login → intern /m/<slug>/login (nur öffentlicher Host)."""
     if not getattr(request.state, "hide_mandant_path_prefix", False):

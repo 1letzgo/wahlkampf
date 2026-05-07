@@ -90,7 +90,9 @@ def _parse_public_site_hosts(raw: str) -> frozenset[str]:
     return frozenset(out)
 
 
-# Öffentliche Domain(n): Host ist eingetragen → fester Mandanten-Slug, Kurz-URLs (/login statt /m/slug/login).
+# Öffentliche Domain(n): Host eingetragen → Kurz-URLs im Browser (/login statt /m/slug/login).
+# PUBLIC_SITE_MANDANT_SLUG: fester Mandant; wird u. a. für Kurz-URL /api/v1/… (Mobile-API) genutzt,
+# auch wenn der Request-Host nicht in PUBLIC_SITE_HOSTS steht.
 # PUBLIC_SITE_HOSTS=wahlkampf.spd-wst.de,wahlkamp.spd-wst.de PUBLIC_SITE_MANDANT_SLUG=westerstede
 PUBLIC_SITE_HOSTS = _parse_public_site_hosts(
     os.environ.get("PUBLIC_SITE_HOSTS", ""),

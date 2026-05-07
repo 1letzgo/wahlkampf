@@ -174,12 +174,14 @@ async def mandanten_kontext(request: Request, call_next):
         hide_mandant_prefix_for_request,
         redirect_strip_m_prefix_if_public,
         rewrite_scope_to_internal_m_path,
+        rewrite_short_mobile_api_scope,
     )
 
     request.state.hide_mandant_path_prefix = hide_mandant_prefix_for_request(request)
     redir = redirect_strip_m_prefix_if_public(request)
     if redir:
         return redir
+    rewrite_short_mobile_api_scope(request)
     rewrite_scope_to_internal_m_path(request)
 
     request.state.mandanten_prefix = ""
