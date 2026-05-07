@@ -14,9 +14,10 @@ Die App ist erreichbar unter: https://vorort.spd-wst.de
 ## Anmeldung und Rechte
 
 1. **Registrierung:** Unter **https://vorort.spd-wst.de/registrierung** könnt ihr euch registrieren.
-2. **OV-Zugehörigkeit:** Unter **„Mein Konto“** beantragt ihr die Mitgliedschaft in einem Ortsverband. Ein **OV-Administrator** (oder Superadmin) muss die Mitgliedschaft freigeben (`is_approved`).
-3. **OV-Admin:** Kann Nutzer im OV verwalten (über die OV-Administration in der App).
-4. **Plattform-Superadmin:** Pflege der Ortsverbände, Feature-Schalter, Fraktions-Kalender-URL, Sharepic-Vorlagen-Slogan usw. unter **`/admin/…`** (Benutzername über Env, siehe oben).
+2. **OV-Zugehörigkeit:** Bitte wählt dort Euren Heimat Ortsverband aus.
+3. Der Administrator des OV kriegt eine Benachristigung und schaltet Euch frei.
+4. Nach Freischaltung könnt Ihr die App dann nutzen.
+5. Wer in mehr als einem OV oder auch im Kreis mitarbeitet, kann unter mein Profil weitere Verbände anfragen. Auch dies wird dann jeweils vom Administrator des Verbandes freigegeben.
 
 ---
 

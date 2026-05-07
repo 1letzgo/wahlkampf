@@ -5,7 +5,7 @@
 {% block body %}
 {% set reg_action_slug = preselect_ov_slug if preselect_ov_slug else (ovs[0].slug if ovs else '') %}
 {{ app_header('Registrieren') }}
-<div class="card" style="max-width: 400px; margin: 0 auto;">
+<div class="card">
   <h2 style="margin-top:0;">Registrieren</h2>
   <p class="muted" style="margin-top:0;"><strong>Name</strong> ist dein Anzeigename (z. B. bei Terminen). <strong>Benutzername</strong> nutzt du nur zum Anmelden — ohne Leerzeichen. Keine E-Mail nötig. <strong>Der erste Nutzer</strong> eines Ortsverbands wird automatisch freigeschaltet und Administrator.</p>
   {% if error %}<div class="error">{{ error }}</div>{% endif %}
