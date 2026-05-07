@@ -367,24 +367,19 @@ def parse_rss_buergerinfo_items(raw: bytes) -> tuple[list[dict], str | None]:
         desc = _rss_element_text(item.find("description"))
         link_raw = _rss_element_text(item.find("link"))
         link_final = _fix_malformed_item_url(link_raw)
-        category = _rss_element_text(item.find("category"))
         starts_at, location = _parse_ammerland_sitzung_datetime(desc, title)
         if starts_at is None:
             logger.debug("RSS item übersprungen (kein Datum): %s", title[:120] if title else "")
             continue
-        body_lines: list[str] = []
-        if category:
-            body_lines.append(f"Kategorie: {category}")
-        if desc:
-            body_lines.append(desc)
-        description = "\n\n".join(body_lines) if body_lines else desc
+        # Titel, Ort, Zeit und Link kommen aus strukturierten Feldern — Beschreibung nur Platzhalter.
+        description = "Sitzung"
         import_key = _rss_import_key(link_final, title, starts_at)
         t_short = (title or "(RSS)").strip()[:200] or "(RSS)"
         out.append(
             {
                 "title": t_short,
                 "location": (location or "")[:300],
-                "description": description[:20000] if len(description) > 20000 else description,
+                "description": description,
                 "link_url": link_final,
                 "starts_at": starts_at,
                 "ends_at": None,

@@ -266,7 +266,7 @@
 {% endblock %}
 {% block body %}
 {% call app_header_toolbar('Termine') %}
-  <button type="button" class="btn btn-ghost btn-sm btn-ico btn-with-label" id="ics-open" aria-label="Kalender abonnieren">
+  <button type="button" class="btn btn-ghost btn-sm btn-ico btn-with-label {{ row.termin_kat_icon_class }}" id="ics-open" aria-label="Kalender abonnieren">
     {{ ico.svg_calendar() }}<span class="btn-text">Abonnieren</span>
   </button>
 {% endcall %}
@@ -422,7 +422,7 @@
 <dialog id="ics-dialog" class="popup-dialog ics-popup" aria-labelledby="ics-dialog-title">
   <form method="dialog" class="ics-popup__form">
     <header class="ics-popup__head">
-      <div class="ics-popup__head-icon" aria-hidden="true">{{ ico.svg_calendar() }}</div>
+      <div class="ics-popup__head-icon termin-kat-icon {{ row.termin_kat_icon_class }}" aria-hidden="true">{{ ico.svg_calendar() }}</div>
       <div>
         <h2 id="ics-dialog-title" class="ics-popup__h">Kalender abonnieren</h2>
         <p class="ics-popup__lead">Apple, Google oder Link kopieren — für jeden Feed einzeln.</p>

@@ -782,10 +782,10 @@ dialog.popup-dialog::backdrop {
 .ics-popup__head-icon.termin-kat-icon--verband {
   background: linear-gradient(
     145deg,
-    rgba(180, 83, 9, 0.26),
-    rgba(180, 83, 9, 0.09)
+    rgba(196, 30, 58, 0.28),
+    rgba(196, 30, 58, 0.1)
   );
-  color: #b45309;
+  color: #c41e3a;
 }
 
 .ics-popup__head-icon.termin-kat-icon--vorstand {
@@ -804,6 +804,43 @@ dialog.popup-dialog::backdrop {
     rgba(29, 78, 216, 0.09)
   );
   color: #1d4ed8;
+}
+
+/* Kalender „Abonnieren“ im roten Site-Header: heller Chip + Kategoriefarbe */
+.site-header .header-toolbar .btn-ghost#ics-open.termin-kat-icon--verband {
+  background: rgba(255, 255, 255, 0.92) !important;
+  color: #c41e3a !important;
+  border-color: rgba(255, 255, 255, 0.55) !important;
+}
+
+.site-header .header-toolbar .btn-ghost#ics-open.termin-kat-icon--verband:hover {
+  background: #fff !important;
+  color: #9e1830 !important;
+  border-color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.site-header .header-toolbar .btn-ghost#ics-open.termin-kat-icon--vorstand {
+  background: rgba(255, 255, 255, 0.92) !important;
+  color: #15803d !important;
+  border-color: rgba(255, 255, 255, 0.55) !important;
+}
+
+.site-header .header-toolbar .btn-ghost#ics-open.termin-kat-icon--vorstand:hover {
+  background: #fff !important;
+  color: #166534 !important;
+  border-color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.site-header .header-toolbar .btn-ghost#ics-open.termin-kat-icon--fraktion {
+  background: rgba(255, 255, 255, 0.92) !important;
+  color: #1d4ed8 !important;
+  border-color: rgba(255, 255, 255, 0.55) !important;
+}
+
+.site-header .header-toolbar .btn-ghost#ics-open.termin-kat-icon--fraktion:hover {
+  background: #fff !important;
+  color: #1e40af !important;
+  border-color: rgba(255, 255, 255, 0.9) !important;
 }
 
 .ics-popup__h {
