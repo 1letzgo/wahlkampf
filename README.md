@@ -7,13 +7,13 @@ Mandantenfähige **FastAPI**-Webapp für die Organisation auf Oortsvereins-Ebene
 
 ## URLs und Mandanten
 
-Die App ist erreichbar unter https://vorort.spd-wst.de
+Die App ist erreichbar unter: https://vorort.spd-wst.de
 
 ---
 
 ## Anmeldung und Rechte
 
-1. **Registrierung:** Unter **`/m/<slug>/registrierung`** (bzw. öffentlicher Host ohne `/m/…`) könnt ihr euch registrieren.
+1. **Registrierung:** Unter **https://vorort.spd-wst.de/registrierung** könnt ihr euch registrieren.
 2. **OV-Zugehörigkeit:** Unter **„Mein Konto“** beantragt ihr die Mitgliedschaft in einem Ortsverband. Ein **OV-Administrator** (oder Superadmin) muss die Mitgliedschaft freigeben (`is_approved`).
 3. **OV-Admin:** Kann Nutzer im OV verwalten (über die OV-Administration in der App).
 4. **Plattform-Superadmin:** Pflege der Ortsverbände, Feature-Schalter, Fraktions-Kalender-URL, Sharepic-Vorlagen-Slogan usw. unter **`/admin/…`** (Benutzername über Env, siehe oben).
