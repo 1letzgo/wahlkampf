@@ -24,6 +24,18 @@
   </nav>
   {% endif %}
 
+  {% set _current_tab = (admin_tabs | selectattr('id', 'equalto', current_admin_tab_id) | list | first) %}
+  <div class="page-toolbar" aria-label="Verwaltungsbereich">
+    <span class="btn btn-sm btn-ico btn-with-label" aria-current="page" aria-label="Mitgliederverwaltung" style="pointer-events:none;">
+      {{ ico.svg_user() }}<span class="btn-text">Mitglieder</span>
+    </span>
+    {% if _current_tab and _current_tab.feature_sharepic %}
+    <a href="{{ _current_tab.vorlagen_href }}" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Zur Sharepic-Vorlagen-Verwaltung">
+      {{ ico.svg_image() }}<span class="btn-text">Sharepic-Vorlagen</span>
+    </a>
+    {% endif %}
+  </div>
+
   <div class="card card--flush admin-users-card">
     <div class="admin-users-shell">
       {% if pending_users %}

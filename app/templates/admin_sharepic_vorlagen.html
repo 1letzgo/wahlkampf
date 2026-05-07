@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% from '_ui_macros.html' import app_header with context %}
+{% import '_icons.html' as ico %}
+{% block title %}Sharepic-Vorlagen — Wahlkampf{% endblock %}
+{% block head %}
+{% include '_admin_shell_styles.html' %}
+{% include '_admin_data_table_styles.html' %}
+<style>
+  .admin-sharepic-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin: 0 0 1rem;
+  }
+  .admin-sharepic-row {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg, #fff);
+  }
+  .admin-sharepic-row__thumb {
+    flex: 0 0 auto;
+    width: 64px;
+    height: 64px;
+    overflow: hidden;
+    border-radius: calc(var(--radius) - 2px);
+    border: 1px solid var(--border);
+    background: #f4f3ef;
+  }
+  .admin-sharepic-row__thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .admin-sharepic-row__meta {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-weight: 600;
+    word-break: break-word;
+  }
+  .admin-sharepic-row__actions {
+    flex: 0 0 auto;
+  }
+  .admin-sharepic-empty {
+    color: var(--muted);
+    margin: 0 0 0.85rem;
+  }
+  .admin-sharepic-upload {
+    margin-top: 0.85rem;
+    padding-top: 0.95rem;
+    border-top: 1px solid var(--border);
+  }
+  .admin-sharepic-upload label {
+    display: block;
+    font-weight: 600;
+    margin-top: 0.65rem;
+  }
+  .admin-sharepic-upload label:first-of-type {
+    margin-top: 0;
+  }
+  .admin-sharepic-upload input[type="text"],
+  .admin-sharepic-upload input[type="file"] {
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 0.25rem;
+  }
+</style>
+{% endblock %}
+{% block body %}
+{{ app_header('Sharepic-Vorlagen verwalten') }}
+
+<div class="admin-page">
+  {% if admin_tabs and admin_tabs|length > 1 %}
+  <nav class="termin-tablist admin-users-ov-tablist" aria-label="Ortsverband wechseln">
+    {% for t in admin_tabs %}
+    <a
+      href="{{ t.vorlagen_href }}"
+      class="termin-tab admin-users-ov-tab"
+      role="tab"
+      aria-selected="{{ 'true' if t.id == current_admin_tab_id else 'false' }}"
+      {% if t.id == current_admin_tab_id %}aria-current="page"{% endif %}
+    >{{ t.label }}</a>
+    {% endfor %}
+  </nav>
+  {% endif %}
+
+  <div class="page-toolbar" aria-label="Verwaltungsbereich">
+    <a href="{{ request.state.mandanten_prefix }}/admin/benutzer" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Zur Mitgliederverwaltung">
+      {{ ico.svg_user() }}<span class="btn-text">Mitglieder</span>
+    </a>
+    <span class="btn btn-sm btn-ico btn-with-label" aria-current="page" aria-label="Sharepic-Vorlagen verwalten" style="pointer-events:none;">
+      {{ ico.svg_image() }}<span class="btn-text">Sharepic-Vorlagen</span>
+    </span>
+  </div>
+
+  <div class="card card--flush admin-users-card">
+    <div class="admin-users-shell">
+      <header class="ics-popup__head">
+        <div class="ics-popup__head-icon" aria-hidden="true">{{ ico.svg_image() }}</div>
+        <div>
+          <h2 class="ics-popup__h">Sharepic-Hintergrundvorlagen</h2>
+          <p class="ics-popup__lead">
+            Bilder für den Sharepic-Generator dieses Ortsverbands (im Modul „Sharepic“ als Auswahl).
+            JPEG oder PNG, bis {{ max_upload_mb }} MB pro Datei, höchstens {{ sharepic_vorlagen_max }} Vorlagen.
+          </p>
+        </div>
+      </header>
+
+      {% if vorlage_success %}<div class="success" style="margin: 0.85rem 0 0;">{{ vorlage_success }}</div>{% endif %}
+      {% if vorlage_error %}<div class="error" style="margin: 0.85rem 0 0;">{{ vorlage_error }}</div>{% endif %}
+
+      {% if not feature_sharepic %}
+      <section class="ics-popup__panel ics-popup__panel--accent" aria-label="Hinweis">
+        <p style="margin: 0;">Die Sharepic-Funktion ist für diesen Ortsverband deaktiviert. Bitte einen Plattform-Superadmin um Aktivierung.</p>
+      </section>
+      {% else %}
+
+      <section class="ics-popup__panel" aria-label="Vorhandene Vorlagen" style="margin-top: 1rem;">
+        <h3 class="ics-popup__label">Vorhandene Vorlagen ({{ sharepic_vorlagen|length }} / {{ sharepic_vorlagen_max }})</h3>
+
+        {% if sharepic_vorlagen %}
+        <ul class="admin-sharepic-list" role="list">
+          {% for v in sharepic_vorlagen %}
+          <li class="admin-sharepic-row">
+            <div class="admin-sharepic-row__thumb">
+              <img src="{{ v.url }}" alt="">
+            </div>
+            <div class="admin-sharepic-row__meta">{{ v.label }}</div>
+            <div class="admin-sharepic-row__actions">
+              <form method="post" action="{{ request.state.mandanten_prefix }}/admin/sharepic-vorlagen/loeschen" style="margin:0;" onsubmit="return confirm('Vorlage „{{ v.label }}“ wirklich entfernen?');">
+                <input type="hidden" name="template_id" value="{{ v.id }}">
+                <button type="submit" class="btn btn-sm btn-danger btn-ico btn-with-label" aria-label="Vorlage {{ v.label }} löschen">
+                  {{ ico.svg_trash() }}<span class="btn-text">Löschen</span>
+                </button>
+              </form>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="admin-sharepic-empty">Noch keine Vorlagen hochgeladen.</p>
+        {% endif %}
+
+        <form method="post" action="{{ request.state.mandanten_prefix }}/admin/sharepic-vorlagen/hochladen" enctype="multipart/form-data" class="admin-sharepic-upload">
+          <label for="vorlage-datei">Neue Vorlage</label>
+          <input id="vorlage-datei" name="vorlage_datei" type="file" accept="image/jpeg,image/png" required>
+
+          <label for="vorlage-bezeichnung">Bezeichnung (optional)</label>
+          <input id="vorlage-bezeichnung" name="vorlage_bezeichnung" type="text" maxlength="120" placeholder="z. B. Marktplatz, Rathaus">
+
+          <p style="margin: 0.85rem 0 0;">
+            <button type="submit" class="btn btn-sm btn-ico btn-with-label" aria-label="Sharepic-Vorlage hochladen"
+              {% if sharepic_vorlagen|length >= sharepic_vorlagen_max %}disabled title="Limit erreicht — bitte zuerst eine Vorlage löschen."{% endif %}>
+              {{ ico.svg_check() }}<span class="btn-text">Hochladen</span>
+            </button>
+          </p>
+        </form>
+      </section>
+
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
