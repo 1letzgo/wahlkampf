@@ -5,13 +5,13 @@ Mandantenfähige **FastAPI**-Webapp für die Organisation auf Oortsvereins-Ebene
 ---
 
 
-## URLs und Mandanten
+## Adresse
 
 Die App ist erreichbar unter: https://vorort.spd-wst.de
 
 ---
 
-## Anmeldung und Rechte
+## Registrierung & Anmeldung
 
 1. **Registrierung:** Unter **https://vorort.spd-wst.de/registrierung** könnt ihr euch registrieren.
 2. **OV-Zugehörigkeit:** Bitte wählt dort Euren Heimat Ortsverband aus.
@@ -42,16 +42,18 @@ Die App ist erreichbar unter: https://vorort.spd-wst.de
 - **Kommentare** und die Teilnehmerliste sind pro Termin sichtbar.
 - **Bearbeiten/Löschen:** Nur für Ersteller, OV-Admins oder entsprechend berechtigte Konten (grenzüberschreitend für Kreis-Termine nach den Regeln im Code).
 
+### Sharepic direkt im Terminformular
+
+Wenn Sharepic aktiv ist, könnt ihr im Terminformular ein **Sharepic erzeugen und als Terminfoto setzen** (wird vor dem Speichern als JPEG in das Foto-Feld übernommen). Datum/Zeit, Titel und Ort werden aus dem Formular übernommen.
+
 ---
 
 ## Fraktion — Besonderheiten
 
-Die Fraktionsfunktion ist pro OV **deaktivierbar** (Superadmin: Feature **„Fraktion“**). Wenn sie an ist:
-
 ### Wer darf was?
 
-- **Fraktionstermine anlegen** dürfen nur **Fraktionsmitglieder** (und Superadmins). Das Flag **„Fraktionsmitglied“** setzt der OV-Admin bei der Mitgliedschaft eines Nutzers.
-- Die Oberfläche liegt unter **`/m/<slug>/fraktion/termine`** (Menüpunkt bzw. Tab „Fraktion“ in der Terminübersicht).
+- **Fraktions Sitzung anlegen** dürfen nur **Fraktionsmitglieder** (und Superadmins). Die Freischaltung erfolgt auch hier vom Administrator des OV. 
+
 
 ### Unterschiede zu normalen Terminen
 
@@ -60,12 +62,10 @@ Die Fraktionsfunktion ist pro OV **deaktivierbar** (Superadmin: Feature **„Fra
   - **Ohne** diesen Haken sehen **alle freigegebenen Verbandsmitglieder** den Termin.
   - **Mit** Haken sehen nur **Fraktionsmitglieder** (und Superadmin) den Termin — in der Web-UI und in **Kalender-Feeds** (siehe unten: vertrauliche Termine fehlen in öffentlichen Feeds ohne passende Identität).
 
-### Sharepic direkt im Terminformular
-
-Wenn Sharepic aktiv ist, könnt ihr im Terminformular ein **Sharepic erzeugen und als Terminfoto setzen** (wird vor dem Speichern als JPEG in das Foto-Feld übernommen). Datum/Zeit, Titel und Ort werden aus dem Formular übernommen.
 
 
-### Persönliche Feeds (eingeloggt)
+
+### Termine abbonieren
 
 Auf der **Terminliste** (und analog in der Termin-Detailansicht) gibt es **„Abonnieren“**. Es werden zwei Feeds angeboten:
 
@@ -74,17 +74,12 @@ Auf der **Terminliste** (und analog in der Termin-Detailansicht) gibt es **„Ab
 | **Zugesagt** | Termine, für die ihr **zugesagt** habt — über alle OVs, in denen ihr Mitglied seid (plus Kreis-Termine „für alle OVs“ nach derselben Logik wie in der App). |
 | **ALLE** | **Alle** Termine in euren freigegebenen Verbänden — mit derselben Filterlogik für **vertrauliche Fraktionstermine** (nur sichtbar, wenn ihr Fraktionsmitglied im jeweiligen OV seid). |
 
-- Links **Apple** nutzen `webcal://…` (Kalender-App).
-- **Google** öffnet die Google-Kalender-Einstellung „per URL hinzufügen“.
-- **Kopieren** legt die **HTTPS-**ICS-Adresse in die Zwischenablage — für **Microsoft Outlook**, **Outlook im Web** oder **Kalender in Microsoft 365**: dort „Kalender abonnieren“ / „Abonnement von Web“ / „Aus dem Internet“ und die URL einfügen.
-
-Die URLs enthalten einen **geheimen Token** (`t=…`), der eurem Konto zugeordnet ist. **Nicht öffentlich teilen** — wer die URL kennt, sieht den entsprechenden Feed.
 
 ---
 
 ## Sharepic-Generator
 
-Menüpunkt **„Sharepic“** (`/m/<slug>/sharepic`), sofern das Feature für den OV **nicht abgeschaltet** ist.
+Menüpunkt **„Sharepic“** , sofern das Feature für den OV **nicht abgeschaltet** ist.
 
 - **Format:** 768×1024 Pixel, mit **SPD-Maske** (Logo, roter Balken, Fußzeile).
 - **Foto:** eigenes Bild oder **Hintergrundvorlage** (vom Superadmin pro OV hochladbar, begrenzte Anzahl Vorlagen).
@@ -99,7 +94,7 @@ Menüpunkt **„Sharepic“** (`/m/<slug>/sharepic`), sofern das Feature für de
 
 ## Plakate
 
-Menüpunkt **„Plakate“** (`/m/<slug>/plakate`), sofern aktiviert.
+Menüpunkt **„Plakate“**, sofern aktiviert.
 
 - **Karte** (OpenStreetMap / Leaflet) mit allen **aktuell hängenden** Plakat-Meldungen.
 - **Neues Plakat:** Standort durch **Tippen auf die Karte**, **„Neues Plakat am aktuellen Standort“** (wenn der Browser Standortfreigabe hat) oder **„Mein Standort“** zur Orientierung.
