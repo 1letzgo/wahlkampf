@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from app.config import is_superadmin_username
-from app.platform_models import OvMembership, PlatformUser, Termin
+from app.platform_models import OvMembership, Termin
 
 TERMIN_KAT_VERBAND = "verband"
 TERMIN_KAT_VORSTAND = "vorstand"
@@ -65,13 +64,10 @@ def user_darf_kategorie_anlegen(
     pdb: Session,
     *,
     user_id: int,
-    username: str,
     ov_slug: str,
     kategorie: str,
 ) -> bool:
     """Wer darf einen Termin dieser Kategorie neu anlegen."""
-    if is_superadmin_username(username):
-        return True
     kat = normalize_termin_kategorie(kategorie)
     if kat == TERMIN_KAT_VERBAND:
         return _membership_approved(pdb, user_id, ov_slug) is not None
@@ -91,23 +87,24 @@ def termin_sichtbar_nach_kategorie(
     t: Termin,
     *,
     user_id: int,
-    username: str,
 ) -> bool:
-    """Zusatzregeln nach Kategorie (Basis: Mitgliedschaft / Kreis bereits geprüft)."""
-    if is_superadmin_username(username):
-        return True
+    """Zusatzregeln nach Kategorie (Basis: Mitgliedschaft / Kreis bereits geprüft).
+
+    Vorstand/Fraktion: nur echte Gruppenmitglieder — nicht automatisch nur wegen
+    OV-Admin-Rolle. Plattform-Superadmins gelten hier wie normale Nutzer nach
+    Mitgliedschaft/Rollen. Der Ersteller sieht seinen eigenen Termin weiterhin.
+    """
     kat = termin_kategorie_effective(t)
     ms = t.mandant_slug.strip().lower()
     if kat == TERMIN_KAT_VERBAND:
         return True
+    created_by = getattr(t, "created_by_id", None)
+    if created_by is not None and created_by == user_id:
+        return True
     if kat == TERMIN_KAT_VORSTAND:
-        return user_is_vorstandsmitglied(pdb, user_id, ms) or user_is_ov_admin_in(
-            pdb, user_id, ms
-        )
+        return user_is_vorstandsmitglied(pdb, user_id, ms)
     if kat == TERMIN_KAT_FRAKTION:
-        return user_is_fraktionsmitglied(pdb, user_id, ms) or user_is_ov_admin_in(
-            pdb, user_id, ms
-        )
+        return user_is_fraktionsmitglied(pdb, user_id, ms)
     return True
 
 
@@ -119,22 +116,14 @@ def filter_termine_fuer_ics(
 ) -> list[Termin]:
     """Öffentlicher Feed ohne Nutzer: nur Verband. Persönliche Feeds: Kategorie + Rechte."""
     out: list[Termin] = []
-    pu: PlatformUser | None = None
-    uname = ""
-    if calendar_owner_user_id is not None:
-        pu = pdb.get(PlatformUser, calendar_owner_user_id)
-        if pu:
-            uname = pu.username
     for t in termine:
         kat = termin_kategorie_effective(t)
         if kat == TERMIN_KAT_VERBAND:
             out.append(t)
             continue
-        if calendar_owner_user_id is None or pu is None:
+        if calendar_owner_user_id is None:
             continue
-        if termin_sichtbar_nach_kategorie(
-            pdb, t, user_id=calendar_owner_user_id, username=uname
-        ):
+        if termin_sichtbar_nach_kategorie(pdb, t, user_id=calendar_owner_user_id):
             out.append(t)
     return out
 

@@ -162,24 +162,22 @@
     </section>
     {% endif %}
 
+    {% if show_termin_kategorie_wahl %}
     <section class="ics-popup__panel" aria-label="Kategorie">
       <h3 class="ics-popup__label">Kategorie</h3>
-      <p class="muted termin-form-card__hint" style="margin:0 0 0.65rem;font-size:0.84rem;">Verband: alle freigegebenen Mitglieder. Vorstand und Fraktion nur für Nutzer mit dieser Rolle (OV-Administratoren sehen alle Kategorien).</p>
+      <p class="muted termin-form-card__hint" style="margin:0 0 0.65rem;font-size:0.84rem;">Nur Kategorien, für die du Schreibrechte hast. Verband: alle freigegebenen Mitglieder; Vorstand und Fraktion nur für die jeweilige Rolle.</p>
       <div class="termin-form-kat-list" style="display:flex;flex-direction:column;gap:0.45rem;">
+        {% for slug in termin_kategorie_option_slugs %}
         <label style="display:flex;align-items:center;gap:0.5rem;font-weight:600;">
-          <input type="radio" name="termin_kategorie" value="verband" class="js-termin-kat"{% if termin_kategorie_current == 'verband' %} checked{% endif %}{% if not can_kategorie_verband %} disabled{% endif %}>
-          Verband
+          <input type="radio" name="termin_kategorie" value="{{ slug }}" class="js-termin-kat"{% if termin_kategorie_current == slug %} checked{% endif %}>
+          {% if slug == 'verband' %}Verband{% elif slug == 'vorstand' %}Vorstand{% else %}Fraktion{% endif %}
         </label>
-        <label style="display:flex;align-items:center;gap:0.5rem;font-weight:600;">
-          <input type="radio" name="termin_kategorie" value="vorstand" class="js-termin-kat"{% if termin_kategorie_current == 'vorstand' %} checked{% endif %}{% if not can_kategorie_vorstand %} disabled{% endif %}>
-          Vorstand
-        </label>
-        <label style="display:flex;align-items:center;gap:0.5rem;font-weight:600;">
-          <input type="radio" name="termin_kategorie" value="fraktion" class="js-termin-kat"{% if termin_kategorie_current == 'fraktion' %} checked{% endif %}{% if not can_kategorie_fraktion %} disabled{% endif %}>
-          Fraktion
-        </label>
+        {% endfor %}
       </div>
     </section>
+    {% elif termin_kategorie_fixed_value %}
+    <input type="hidden" name="termin_kategorie" value="{{ termin_kategorie_fixed_value }}" id="js-termin-kat-fixed" autocomplete="off">
+    {% endif %}
 
     <section class="ics-popup__panel ics-popup__panel--accent termin-form-card__grund-panel" aria-label="Grunddaten">
       <label for="title">Titel</label>
@@ -360,9 +358,14 @@
 (function () {
   var sec = document.getElementById("js-externe-guest-section");
   if (!sec) return;
-  function sync() {
+  function selectedKategorie() {
+    var hid = document.getElementById("js-termin-kat-fixed");
+    if (hid) return (hid.value || "verband").trim() || "verband";
     var sel = document.querySelector('input[name="termin_kategorie"]:checked');
-    var v = sel ? sel.value : "verband";
+    return sel ? sel.value : "verband";
+  }
+  function sync() {
+    var v = selectedKategorie();
     if (v === "verband") sec.removeAttribute("hidden");
     else sec.setAttribute("hidden", "");
   }

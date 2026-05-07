@@ -23,7 +23,7 @@
         <div>
           <h2 class="ics-popup__h">{% if sub %}Abo #{{ sub.id }}{% else %}Neues Abo{% endif %}</h2>
           <p class="ics-popup__lead">
-            <strong>ICS/Webcal</strong> (z. B. RIS-Kalender) oder <strong>RSS</strong> (z. B. Bürgerinfo Ammerland mit Sitzungen in der Beschreibung). Der Server erkennt das Format automatisch. Neue Termine werden mit der gewählten <strong>Kategorie</strong> im Ortsverband angelegt.
+            <strong>ICS/Webcal</strong> (z. B. RIS-Kalender) oder <strong>RSS</strong> (z. B. Bürgerinfo Ammerland mit Sitzungen in der Beschreibung). Der Server erkennt das Format automatisch. Beim Abruf werden <strong>neue</strong> Termine angelegt und bereits importierte Einträge bei Änderungen im Feed <strong>aktualisiert</strong> (gleicher Import-Schlüssel oder eindeutiger Sitzungs-Link). Die <strong>Kategorie</strong> steuert die Sichtbarkeit im Ortsverband.
           </p>
         </div>
       </header>
@@ -31,7 +31,8 @@
       {% if error %}<div class="error" style="margin-bottom:0.85rem;">{{ error }}</div>{% endif %}
       {% if sub %}
       {% if flash_ok %}<div class="success" style="margin-bottom:0.85rem;">Gespeichert.</div>{% endif %}
-      {% if cal_flash_created is not none %}<div class="success" style="margin-bottom:0.85rem;">{{ cal_flash_created }} neue Termine übernommen.</div>{% endif %}
+      {% if cal_flash_created is not none and cal_flash_created > 0 %}<div class="success" style="margin-bottom:0.85rem;">{{ cal_flash_created }} neue Termine übernommen.</div>{% endif %}
+      {% if cal_flash_updated is not none and cal_flash_updated > 0 %}<div class="success" style="margin-bottom:0.85rem;">{{ cal_flash_updated }} bestehende Termine aktualisiert.</div>{% endif %}
       {% if cal_flash_err %}<div class="error" style="margin-bottom:0.85rem;">Feed-Abruf: {{ cal_flash_err }}</div>{% endif %}
       {% endif %}
 

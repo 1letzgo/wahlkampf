@@ -277,6 +277,7 @@ def superadmin_cal_sub_new_form(
             feed_url_input=None,
             flash_ok=False,
             cal_flash_created=None,
+            cal_flash_updated=None,
             cal_flash_err=None,
             termin_kategorie_override=None,
         ),
@@ -309,6 +310,7 @@ def superadmin_cal_sub_new_submit(
                 feed_url_input=feed_url,
                 flash_ok=False,
                 cal_flash_created=None,
+                cal_flash_updated=None,
                 cal_flash_err=None,
                 termin_kategorie_override=tk,
             ),
@@ -326,6 +328,7 @@ def superadmin_cal_sub_new_submit(
                 feed_url_input=feed_url.strip(),
                 flash_ok=False,
                 cal_flash_created=None,
+                cal_flash_updated=None,
                 cal_flash_err=None,
                 termin_kategorie_override=tk,
             ),
@@ -343,6 +346,7 @@ def superadmin_cal_sub_new_submit(
                 feed_url_input=feed_url.strip(),
                 flash_ok=False,
                 cal_flash_created=None,
+                cal_flash_updated=None,
                 cal_flash_err=None,
                 termin_kategorie_override=tk,
             ),
@@ -372,6 +376,7 @@ def _cal_sub_form_ctx(
     feed_url_input: str | None,
     flash_ok: bool,
     cal_flash_created: int | None,
+    cal_flash_updated: int | None,
     cal_flash_err: str | None,
     termin_kategorie_override: str | None = None,
 ) -> dict:
@@ -388,6 +393,7 @@ def _cal_sub_form_ctx(
         "feed_url_input": feed_url_input,
         "flash_ok": flash_ok,
         "cal_flash_created": cal_flash_created,
+        "cal_flash_updated": cal_flash_updated,
         "cal_flash_err": cal_flash_err,
         "termin_kategorie_selected": tk_sel,
     }
@@ -409,6 +415,10 @@ def superadmin_cal_sub_edit_form(
     cal_flash_created: int | None = None
     if cal_created_raw is not None and cal_created_raw.isdigit():
         cal_flash_created = int(cal_created_raw)
+    cal_updated_raw = request.query_params.get("cal_import_updated")
+    cal_flash_updated: int | None = None
+    if cal_updated_raw is not None and cal_updated_raw.isdigit():
+        cal_flash_updated = int(cal_updated_raw)
     cal_flash_err = request.query_params.get("cal_import_err") or None
     return templates.TemplateResponse(
         request,
@@ -420,6 +430,7 @@ def superadmin_cal_sub_edit_form(
             feed_url_input=None,
             flash_ok=flash_ok,
             cal_flash_created=cal_flash_created,
+            cal_flash_updated=cal_flash_updated,
             cal_flash_err=cal_flash_err,
             termin_kategorie_override=None,
         ),
@@ -456,6 +467,7 @@ def superadmin_cal_sub_edit_submit(
                 feed_url_input=feed_url,
                 flash_ok=False,
                 cal_flash_created=None,
+                cal_flash_updated=None,
                 cal_flash_err=None,
                 termin_kategorie_override=tk,
             ),
@@ -473,6 +485,7 @@ def superadmin_cal_sub_edit_submit(
                 feed_url_input=feed_url.strip(),
                 flash_ok=False,
                 cal_flash_created=None,
+                cal_flash_updated=None,
                 cal_flash_err=None,
                 termin_kategorie_override=tk,
             ),
@@ -490,6 +503,7 @@ def superadmin_cal_sub_edit_submit(
                 feed_url_input=feed_url.strip(),
                 flash_ok=False,
                 cal_flash_created=None,
+                cal_flash_updated=None,
                 cal_flash_err=None,
                 termin_kategorie_override=tk,
             ),
@@ -523,7 +537,7 @@ def superadmin_cal_sub_sync_now(
             f"/admin/kalender-abos/{sub_id}/bearbeiten?cal_import_err={quote('Keine Feed-URL gespeichert.')}",
             status_code=302,
         )
-    n, err = import_fraktion_termine_from_calendar(
+    n, u, err = import_fraktion_termine_from_calendar(
         db,
         sub.mandant_slug,
         url,
@@ -532,7 +546,9 @@ def superadmin_cal_sub_sync_now(
     base = f"/admin/kalender-abos/{sub_id}/bearbeiten"
     if err:
         return RedirectResponse(f"{base}?cal_import_err={quote(err)}", status_code=302)
-    return RedirectResponse(f"{base}?cal_import_created={n}", status_code=302)
+    if not q:
+        return RedirectResponse(base, status_code=302)
+    return RedirectResponse(f"{base}?{'&'.join(q)}", status_code=302)
 
 
 @router.get("/admin/kalender-abos/{sub_id}/loeschen", response_class=HTMLResponse)

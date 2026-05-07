@@ -1,4 +1,4 @@
-"""Externe Feeds (ICS/Webcal oder RSS, z. B. Bürgerinfo Ammerland) → Termine im OV."""
+"""Externe Feeds (ICS/Webcal oder RSS, z. B. Bürgerinfo Ammerland) → Termine im OV; Neu + Aktualisieren."""
 
 from __future__ import annotations
 
@@ -267,6 +267,7 @@ def parse_vevents_from_ics(raw: bytes) -> list[dict]:
         if link_final:
             link_final = link_final[:2000]
 
+        link_score = _ris_link_detail_score(link_final) if link_final else 0
         out.append(
             {
                 "title": title,
@@ -280,6 +281,9 @@ def parse_vevents_from_ics(raw: bytes) -> list[dict]:
                     starts_at,
                     component.get("recurrence-id"),
                 ),
+                "match_link": link_final
+                if link_final and link_score >= 100
+                else None,
             }
         )
     return out
@@ -350,8 +354,20 @@ def _parse_ammerland_sitzung_datetime(desc: str, title: str) -> tuple[datetime |
     return None, ""
 
 
-def _rss_import_key(link: str | None, title: str, starts_at: datetime) -> str:
-    base = f"rss|{link or ''}|{title}|{starts_at.isoformat()}"
+def _rss_import_key(
+    link: str | None, guid: str, title: str, starts_at: datetime
+) -> str:
+    """Stabile Identität bevorzugt per Detail-URL oder RSS-GUID — nicht bei jedem Titel-/Zeit-Patch neuer Hash."""
+    link_s = _norm_url_token((link or "").strip())
+    guid_s = (guid or "").strip()[:800]
+    if link_s and _ris_link_detail_score(link_s) >= 100:
+        base = f"rss|url|{link_s}"
+    elif guid_s:
+        base = f"rss|guid|{guid_s}"
+    elif link_s:
+        base = f"rss|urlweak|{link_s}|{title[:240]}|{starts_at.isoformat()}"
+    else:
+        base = f"rss|fallback|{title[:300]}|{starts_at.isoformat()}"
     return hashlib.sha256(base.encode("utf-8", errors="replace")).hexdigest()
 
 
@@ -367,14 +383,19 @@ def parse_rss_buergerinfo_items(raw: bytes) -> tuple[list[dict], str | None]:
         desc = _rss_element_text(item.find("description"))
         link_raw = _rss_element_text(item.find("link"))
         link_final = _fix_malformed_item_url(link_raw)
+        guid_el = item.find("guid")
+        guid_raw = (
+            _rss_element_text(guid_el).strip()[:800] if guid_el is not None else ""
+        )
         starts_at, location = _parse_ammerland_sitzung_datetime(desc, title)
         if starts_at is None:
             logger.debug("RSS item übersprungen (kein Datum): %s", title[:120] if title else "")
             continue
         # Titel, Ort, Zeit und Link kommen aus strukturierten Feldern — Beschreibung nur Platzhalter.
         description = "Sitzung"
-        import_key = _rss_import_key(link_final, title, starts_at)
         t_short = (title or "(RSS)").strip()[:200] or "(RSS)"
+        import_key = _rss_import_key(link_final, guid_raw, t_short, starts_at)
+        link_score = _ris_link_detail_score(link_final) if link_final else 0
         out.append(
             {
                 "title": t_short,
@@ -384,6 +405,9 @@ def parse_rss_buergerinfo_items(raw: bytes) -> tuple[list[dict], str | None]:
                 "starts_at": starts_at,
                 "ends_at": None,
                 "import_key": import_key,
+                "match_link": link_final
+                if link_final and link_score >= 100
+                else None,
             }
         )
     if not out:
@@ -418,30 +442,106 @@ def parse_feed_to_events(raw: bytes) -> tuple[list[dict], str | None]:
     return [], err or "Unbekanntes Feed-Format (weder ICS noch unterstütztes RSS)."
 
 
+def _dt_same(a: datetime | None, b: datetime | None) -> bool:
+    if a is None and b is None:
+        return True
+    if a is None or b is None:
+        return False
+    na = a.replace(tzinfo=None, microsecond=0)
+    nb = b.replace(tzinfo=None, microsecond=0)
+    return na == nb
+
+
+def _apply_feed_event_to_termin(t: Termin, ev: dict, kat: str) -> bool:
+    """Übernimmt Feed-Felder; True bei Änderung (inkl. Kategorie laut Abo)."""
+    nk = normalize_termin_kategorie(kat)
+    title = (ev.get("title") or "").strip() or "(Feed)"
+    title = title[:200]
+    desc = (ev.get("description") or "").strip()
+    if len(desc) > 20000:
+        desc = desc[:20000]
+    loc = (ev.get("location") or "").strip()[:300]
+    starts_at: datetime = ev["starts_at"]
+    ends_at: datetime | None = ev.get("ends_at")
+    link = (ev.get("link_url") or "").strip() or None
+    if link and len(link) > 2000:
+        link = link[:2000]
+
+    changed = False
+    if t.title != title:
+        t.title = title
+        changed = True
+    if (t.description or "") != desc:
+        t.description = desc
+        changed = True
+    if (t.location or "") != loc:
+        t.location = loc
+        changed = True
+    if not _dt_same(t.starts_at, starts_at):
+        t.starts_at = starts_at
+        changed = True
+    if not _dt_same(t.ends_at, ends_at):
+        t.ends_at = ends_at
+        changed = True
+    cur_link = (t.link_url or "").strip() or None
+    if cur_link != link:
+        t.link_url = link
+        changed = True
+    if normalize_termin_kategorie(getattr(t, "termin_kategorie", None)) != nk:
+        changed = True
+    apply_kategorie_to_termin_row(t, nk)
+    return changed
+
+
 def _persist_feed_events(
     db: Session,
     mandant_slug: str,
     events: list[dict],
     kat: str,
-) -> int:
-    """Legt fehlende Termine an; gleiche Dedupe-Logik für ICS und RSS."""
+) -> tuple[int, int]:
+    """Legt neue Termine an und aktualisiert bestehende (Import-Key oder eindeutiger Detail-Link)."""
     ms = mandant_slug.strip().lower()
     created = 0
+    updated = 0
     for ev in events:
         dedupe = ev["import_key"]
-        exists = (
-            db.query(Termin.id)
+        termin = (
+            db.query(Termin)
             .filter(Termin.mandant_slug == ms, Termin.cal_import_key == dedupe)
             .first()
         )
-        if exists:
+        ml = (ev.get("match_link") or "").strip() or None
+        if termin is None and ml:
+            cands = (
+                db.query(Termin)
+                .filter(
+                    Termin.mandant_slug == ms,
+                    Termin.link_url == ml,
+                    Termin.cal_import_key.isnot(None),
+                )
+                .all()
+            )
+            if len(cands) == 1:
+                termin = cands[0]
+
+        if termin is not None:
+            ch = _apply_feed_event_to_termin(termin, ev, kat)
+            if termin.cal_import_key != dedupe:
+                termin.cal_import_key = dedupe
+                ch = True
+            if ch:
+                try:
+                    db.commit()
+                    updated += 1
+                except IntegrityError:
+                    db.rollback()
             continue
 
         title = ev["title"].strip() or "(Feed)"
         desc = (ev["description"] or "").strip()
         loc = (ev["location"] or "").strip()
 
-        termin = Termin(
+        new_t = Termin(
             mandant_slug=ms,
             title=title[:200],
             description=desc[:20000] if len(desc) > 20000 else desc,
@@ -452,14 +552,14 @@ def _persist_feed_events(
             cal_import_key=dedupe,
             link_url=(ev.get("link_url") or None),
         )
-        apply_kategorie_to_termin_row(termin, kat)
-        db.add(termin)
+        apply_kategorie_to_termin_row(new_t, kat)
+        db.add(new_t)
         try:
             db.commit()
             created += 1
         except IntegrityError:
             db.rollback()
-    return created
+    return created, updated
 
 
 def import_fraktion_termine_from_calendar(
@@ -468,12 +568,12 @@ def import_fraktion_termine_from_calendar(
     cal_url: str,
     *,
     termin_kategorie: str = "verband",
-) -> tuple[int, str | None]:
-    """Legt fehlende Termine aus ICS/Webcal oder RSS (z. B. Bürgerinfo) an."""
+) -> tuple[int, int, str | None]:
+    """Import aus ICS/Webcal oder RSS: neue Termine + Aktualisierung bestehender Einträge."""
     ms = mandant_slug.strip().lower()
     url = cal_url.strip()
     if not url:
-        return 0, "Keine Feed-URL konfiguriert."
+        return 0, 0, "Keine Feed-URL konfiguriert."
 
     kat = normalize_termin_kategorie(termin_kategorie)
 
@@ -481,14 +581,14 @@ def import_fraktion_termine_from_calendar(
         raw = fetch_subscription_bytes(url)
     except Exception as e:
         logger.warning("Feed fetch failed mandant=%s: %s", ms, e)
-        return 0, f"Feed konnte nicht geladen werden: {e}"
+        return 0, 0, f"Feed konnte nicht geladen werden: {e}"
 
     events, perr = parse_feed_to_events(raw)
     if perr:
-        return 0, perr
+        return 0, 0, perr
 
-    created = _persist_feed_events(db, ms, events, kat)
-    return created, None
+    created, updated = _persist_feed_events(db, ms, events, kat)
+    return created, updated, None
 
 
 def run_all_fraktion_cal_subscriptions() -> None:
@@ -514,7 +614,7 @@ def run_all_fraktion_cal_subscriptions() -> None:
             if not url:
                 continue
             ms = sub.mandant_slug.strip().lower()
-            n, err = import_fraktion_termine_from_calendar(
+            n, u, err = import_fraktion_termine_from_calendar(
                 db,
                 ms,
                 url,
@@ -522,18 +622,20 @@ def run_all_fraktion_cal_subscriptions() -> None:
             )
             if err:
                 logger.info(
-                    "Kalender sub_id=%s mandant=%s created=%s msg=%s",
+                    "Kalender sub_id=%s mandant=%s created=%s updated=%s msg=%s",
                     sub.id,
                     ms,
                     n,
+                    u,
                     err,
                 )
-            elif n:
+            elif n or u:
                 logger.info(
-                    "Kalender sub_id=%s mandant=%s created=%s",
+                    "Kalender sub_id=%s mandant=%s created=%s updated=%s",
                     sub.id,
                     ms,
                     n,
+                    u,
                 )
     finally:
         db.close()

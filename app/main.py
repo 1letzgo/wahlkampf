@@ -100,6 +100,7 @@ from app.termin_kategorie import (
     TERMIN_KAT_FRAKTION,
     TERMIN_KAT_VERBAND,
     TERMIN_KAT_VORSTAND,
+    TERMIN_KATEGORIEN,
     apply_kategorie_to_termin_row,
     normalize_termin_kategorie,
     termin_kategorie_effective,
@@ -390,8 +391,6 @@ def _termin_visible_base(
     if ms_t == viewing_ms:
         if ks and ms_t == ks:
             if termin_is_promoted(t):
-                if is_superadmin_username(user.username):
-                    return True
                 mem_any = (
                     pdb.query(OvMembership)
                     .filter(
@@ -415,8 +414,6 @@ def _termin_visible_base(
 
     if not ks or ms_t != ks or not termin_is_promoted(t):
         return False
-    if is_superadmin_username(user.username):
-        return True
     mem = (
         pdb.query(OvMembership)
         .filter(
@@ -437,12 +434,7 @@ def termin_sichtbar_instance(
 ) -> bool:
     if not _termin_visible_base(pdb, t, viewing_ms, user):
         return False
-    return termin_sichtbar_nach_kategorie(
-        pdb,
-        t,
-        user_id=user.id,
-        username=user.username,
-    )
+    return termin_sichtbar_nach_kategorie(pdb, t, user_id=user.id)
 
 
 def termin_sichtbar_in_mandant(
@@ -2448,14 +2440,12 @@ def _termin_form_context(
         current_kat = termin_kategorie_effective(termin)
     else:
         current_kat = normalize_termin_kategorie(default_kategorie)
-    show_externe_gaeste = current_kat == TERMIN_KAT_VERBAND
     can_pick = pdb is not None and ms_ctx
     can_verband = bool(
         can_pick
         and user_darf_kategorie_anlegen(
             pdb,
             user_id=user.id,
-            username=user.username,
             ov_slug=ms_ctx,
             kategorie=TERMIN_KAT_VERBAND,
         )
@@ -2465,7 +2455,6 @@ def _termin_form_context(
         and user_darf_kategorie_anlegen(
             pdb,
             user_id=user.id,
-            username=user.username,
             ov_slug=ms_ctx,
             kategorie=TERMIN_KAT_VORSTAND,
         )
@@ -2475,11 +2464,33 @@ def _termin_form_context(
         and user_darf_kategorie_anlegen(
             pdb,
             user_id=user.id,
-            username=user.username,
             ov_slug=ms_ctx,
             kategorie=TERMIN_KAT_FRAKTION,
         )
     )
+    allowed_kat_ui: set[str] = set()
+    if can_verband:
+        allowed_kat_ui.add(TERMIN_KAT_VERBAND)
+    if can_vorstand:
+        allowed_kat_ui.add(TERMIN_KAT_VORSTAND)
+    if can_fraktion:
+        allowed_kat_ui.add(TERMIN_KAT_FRAKTION)
+    if termin is not None:
+        allowed_kat_ui.add(current_kat)
+    elif current_kat not in allowed_kat_ui and allowed_kat_ui:
+        for k in TERMIN_KATEGORIEN:
+            if k in allowed_kat_ui:
+                current_kat = k
+                break
+    show_externe_gaeste = current_kat == TERMIN_KAT_VERBAND
+    show_termin_kategorie_wahl = len(allowed_kat_ui) > 1
+    termin_kategorie_option_slugs = [k for k in TERMIN_KATEGORIEN if k in allowed_kat_ui]
+    if show_termin_kategorie_wahl:
+        termin_kategorie_fixed_value = None
+    elif termin_kategorie_option_slugs:
+        termin_kategorie_fixed_value = termin_kategorie_option_slugs[0]
+    else:
+        termin_kategorie_fixed_value = current_kat
     out = {
         "user": user,
         "termin": termin,
@@ -2497,6 +2508,9 @@ def _termin_form_context(
         "can_kategorie_verband": can_verband,
         "can_kategorie_vorstand": can_vorstand,
         "can_kategorie_fraktion": can_fraktion,
+        "show_termin_kategorie_wahl": show_termin_kategorie_wahl,
+        "termin_kategorie_option_slugs": termin_kategorie_option_slugs,
+        "termin_kategorie_fixed_value": termin_kategorie_fixed_value,
     }
     out.update(_termin_sharepic_form_fields(request, pdb, ms_ctx))
     return out
@@ -2560,8 +2574,6 @@ def _ov_display_labels_for_slugs(pdb: Session, slugs: list[str]) -> dict[str, st
 
 
 def _can_manage_termin_cross_ov(pdb: Session, user: AuthenticatedUser, termin: Termin) -> bool:
-    if is_superadmin_username(user.username):
-        return True
     ms_t = termin.mandant_slug.strip().lower()
     mem = (
         pdb.query(OvMembership)
@@ -2979,7 +2991,6 @@ async def termin_create(
     if not user_darf_kategorie_anlegen(
         pdb,
         user_id=user.id,
-        username=user.username,
         ov_slug=ms_low,
         kategorie=kat,
     ):
@@ -3145,7 +3156,6 @@ async def fraktion_termin_create(
     if not user_darf_kategorie_anlegen(
         pdb,
         user_id=user.id,
-        username=user.username,
         ov_slug=ms_low,
         kategorie=TERMIN_KAT_FRAKTION,
     ):
@@ -3641,7 +3651,6 @@ async def termin_edit_save(
     if not user_darf_kategorie_anlegen(
         pdb,
         user_id=user.id,
-        username=user.username,
         ov_slug=ms,
         kategorie=kat_new,
     ):
