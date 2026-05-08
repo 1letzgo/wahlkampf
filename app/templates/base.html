@@ -23,18 +23,40 @@
   </div>
   <script>
     (function () {
+      var lastApplied = 0;
       function syncWrapHeaderPad() {
         var header = document.querySelector("header.site-header");
         var wrap = document.querySelector(".wrap");
         if (!header || !wrap) return;
         var gapRem = 1.5;
         var gapPx = gapRem * parseFloat(getComputedStyle(document.documentElement).fontSize) || 24;
-        wrap.style.paddingTop = Math.ceil(header.getBoundingClientRect().height + gapPx) + "px";
+        var h = header.getBoundingClientRect().height;
+        if (!h) return;
+        var pad = Math.ceil(h + gapPx);
+        if (pad === lastApplied) return;
+        lastApplied = pad;
+        wrap.style.paddingTop = pad + "px";
       }
-      function init() {
+      function nudge() {
         syncWrapHeaderPad();
         requestAnimationFrame(syncWrapHeaderPad);
+      }
+      function init() {
+        nudge();
+        // PWA-Erststart auf iOS: safe-area-inset, Fonts und Layout brauchen
+        // teils mehrere Frames, bis die endgültige Header-Höhe steht.
+        [50, 150, 350, 800, 1500].forEach(function (ms) {
+          setTimeout(syncWrapHeaderPad, ms);
+        });
         window.addEventListener("resize", syncWrapHeaderPad);
+        window.addEventListener("orientationchange", nudge);
+        window.addEventListener("pageshow", nudge);
+        document.addEventListener("visibilitychange", function () {
+          if (!document.hidden) nudge();
+        });
+        if (document.fonts && document.fonts.ready && typeof document.fonts.ready.then === "function") {
+          document.fonts.ready.then(nudge).catch(function () {});
+        }
         var header = document.querySelector("header.site-header");
         if (header && typeof ResizeObserver !== "undefined") {
           new ResizeObserver(syncWrapHeaderPad).observe(header);
@@ -45,6 +67,7 @@
       } else {
         init();
       }
+      window.addEventListener("load", nudge);
     })();
   </script>
   <script>
