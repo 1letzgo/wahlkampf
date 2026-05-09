@@ -1,69 +1,103 @@
 {% extends "base.html" %}
-{% from '_ui_macros.html' import app_header_toolbar, public_tenant_prefix with context %}
+{% from '_ui_macros.html' import app_header with context %}
 {% import '_icons.html' as ico %}
-{% block title %}{% if aufgabe %}Aufgabe bearbeiten{% else %}Neue Aufgabe{% endif %}{% endblock %}
+{% set mp = request.state.mandanten_prefix %}
+{% block title %}{% if aufgabe %}Aufgabe bearbeiten{% else %}Neue Aufgabe{% endif %} — Wahlkampf{% endblock %}
 {% block body %}
-{% set tp = public_tenant_prefix(request) %}
-{% call app_header_toolbar('Aufgabe' if aufgabe else 'Neue Aufgabe') %}
-  <a href="{{ tp }}/aufgaben" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Zurück zur Liste">
-    {{ ico.svg_arrow_left() }}<span class="btn-text">Liste</span>
+{{ app_header('Aufgabe bearbeiten' if aufgabe else 'Neue Aufgabe') }}
+
+<div class="page-toolbar" aria-label="Navigation">
+  {% if aufgabe %}
+  <a href="{{ mp }}/aufgaben/{{ aufgabe.id }}" class="btn btn-sm btn-ico btn-with-label" aria-label="Zur Aufgabenansicht">
+    {{ ico.svg_arrow_left() }}<span class="btn-text">Zurück</span>
   </a>
-{% endcall %}
+  {% else %}
+  <a href="{{ mp }}/aufgaben" class="btn btn-sm btn-ico btn-with-label" aria-label="Zur Aufgabenliste">
+    {{ ico.svg_arrow_left() }}<span class="btn-text">Aufgaben</span>
+  </a>
+  {% endif %}
+</div>
 
-<div class="card" style="max-width: 640px; margin: 0 auto;">
-  {% if error %}<div class="error">{{ error }}</div>{% endif %}
-  <form method="post" action="{% if aufgabe %}{{ tp }}/aufgaben/{{ aufgabe.id }}/bearbeiten{% else %}{{ tp }}/aufgaben/neu{% endif %}">
-    <label for="a-title">Titel</label>
-    <input id="a-title" name="title" type="text" required maxlength="200" value="{{ aufgabe.title if aufgabe else '' }}">
+<div class="card card--flush termin-form-card">
+  <form method="post" class="ics-popup__form termin-form-card__form" action="{% if aufgabe %}{{ mp }}/aufgaben/{{ aufgabe.id }}/bearbeiten{% else %}{{ mp }}/aufgaben/neu{% endif %}">
+    <header class="ics-popup__head">
+      <div class="ics-popup__head-icon" aria-hidden="true">
+        {% if aufgabe %}{{ ico.svg_pencil() }}{% else %}{{ ico.svg_plus() }}{% endif %}
+      </div>
+      <div>
+        <h2 class="ics-popup__h">{% if aufgabe %}Aufgabe bearbeiten{% else %}Neue Aufgabe{% endif %}</h2>
+        <p class="ics-popup__lead">
+          {% if aufgabe %}Änderungen gelten für die Aufgabenliste und den Kalender-Feed.{% else %}Titel, Fälligkeit und Zuständige — sichtbar nach den gleichen Regeln wie bei Terminen.{% endif %}
+        </p>
+      </div>
+    </header>
 
-    <label for="a-desc">Beschreibung</label>
-    <textarea id="a-desc" name="description" rows="5" maxlength="8000" placeholder="Optional">{{ aufgabe.description if aufgabe else '' }}</textarea>
-
-    <label for="a-due">Fällig am (optional)</label>
-    <input id="a-due" name="due_datum" type="date" value="{% if aufgabe and aufgabe.due_at %}{{ aufgabe.due_at.strftime('%Y-%m-%d') }}{% endif %}">
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
 
     {% if show_aufgabe_kategorie_wahl %}
-    <fieldset style="margin: 1rem 0; border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 1rem;">
-      <legend class="ics-popup__label" style="padding: 0 0.35rem;">Sichtbarkeit</legend>
+    <section class="ics-popup__panel" aria-label="Sichtbarkeit">
+      <h3 class="ics-popup__label">Sichtbarkeit</h3>
+      <p class="muted" style="margin:0 0 0.65rem;font-size:0.84rem;">Wie bei Terminen: Verband, Vorstand oder Fraktion.</p>
       {% for k in aufgabe_kategorie_option_slugs %}
-      <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; cursor: pointer;">
-        <input type="radio" name="termin_kategorie" value="{{ k }}" {% if aufgabe_kategorie_current == k %}checked{% endif %}>
+      <label style="display:flex;align-items:center;gap:0.5rem;font-weight:600;margin-bottom:0.35rem;">
+        <input type="radio" name="termin_kategorie" value="{{ k }}"{% if aufgabe_kategorie_current == k %} checked{% endif %}>
         {% if k == 'verband' %}Verband{% elif k == 'vorstand' %}Vorstand{% else %}Fraktion{% endif %}
       </label>
       {% endfor %}
-    </fieldset>
+    </section>
     {% else %}
     <input type="hidden" name="termin_kategorie" value="{{ aufgabe_kategorie_fixed_value or 'verband' }}">
     {% endif %}
 
+    <section class="ics-popup__panel ics-popup__panel--accent" aria-label="Grunddaten">
+      <label for="a-title">Titel</label>
+      <input id="a-title" name="title" type="text" required maxlength="200" value="{{ aufgabe.title if aufgabe else '' }}">
+
+      <label for="a-due">Fällig am (optional)</label>
+      <input id="a-due" name="due_datum" type="date" value="{% if aufgabe and aufgabe.due_at %}{{ aufgabe.due_at.strftime('%Y-%m-%d') }}{% endif %}">
+
+      <label for="a-desc">Beschreibung</label>
+      <textarea id="a-desc" name="description" rows="5" maxlength="8000" placeholder="Optional">{{ aufgabe.description if aufgabe else '' }}</textarea>
+    </section>
+
     {% if aufgabe %}
-    <input type="hidden" name="is_done" value="0">
-    <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0.75rem 0; font-weight: 600; cursor: pointer;">
-      <input type="checkbox" name="is_done" value="1" {% if aufgabe.is_done %}checked{% endif %}>
-      Erledigt
-    </label>
+    <section class="ics-popup__panel" aria-label="Status">
+      <h3 class="ics-popup__label">Status</h3>
+      <input type="hidden" name="is_done" value="0">
+      <label style="display:flex;align-items:center;gap:0.5rem;font-weight:600;">
+        <input type="checkbox" name="is_done" value="1"{% if aufgabe.is_done %} checked{% endif %}>
+        Erledigt
+      </label>
+    </section>
     {% endif %}
 
-    <fieldset style="margin: 1rem 0; border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 1rem;">
-      <legend class="ics-popup__label" style="padding: 0 0.35rem;">Zugewiesen</legend>
-      <p class="muted" style="margin: 0 0 0.5rem; font-size: 0.84rem;">Nur freigegebene Mitglieder dieses Ortsverbands.</p>
+    <section class="ics-popup__panel" aria-label="Zugewiesen">
+      <h3 class="ics-popup__label">Zugewiesen</h3>
+      <p class="muted" style="margin:0 0 0.65rem;font-size:0.84rem;">Nur freigegebene Mitglieder dieses Ortsverbands.</p>
       {% if not mitglieder %}
       <p class="muted">Keine Mitglieder vorhanden.</p>
       {% else %}
-      {% for m in mitglieder %}
-      <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; cursor: pointer;">
-        <input type="checkbox" name="zugewiesen" value="{{ m.id }}" {% if m.id in selected_user_ids %}checked{% endif %}>
-        {{ (m.display_name or '').strip() or m.username }}
-      </label>
-      {% endfor %}
+      <div class="termin-form-card__guest-list">
+        {% for m in mitglieder %}
+        <label>
+          <input type="checkbox" name="zugewiesen" value="{{ m.id }}"{% if m.id in selected_user_ids %} checked{% endif %}>
+          {{ (m.display_name or '').strip() or m.username }}
+        </label>
+        {% endfor %}
+      </div>
       {% endif %}
-    </fieldset>
+    </section>
 
-    <p style="margin-top: 1.25rem;">
-      <button type="submit" class="btn btn-sm btn-ico btn-with-label" aria-label="Speichern">
-        {{ ico.svg_check() }}<span class="btn-text">Speichern</span>
-      </button>
-    </p>
+    <footer class="ics-popup__foot">
+      <div class="termin-form-card__actions">
+        <a href="{% if aufgabe %}{{ mp }}/aufgaben/{{ aufgabe.id }}{% else %}{{ mp }}/aufgaben{% endif %}" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Abbrechen">
+          {{ ico.svg_x() }}<span class="btn-text">Abbrechen</span>
+        </a>
+        <button type="submit" class="btn btn-sm btn-ico btn-with-label" aria-label="Speichern">
+          {{ ico.svg_check() }}<span class="btn-text">Speichern</span>
+        </button>
+      </div>
+    </footer>
   </form>
 </div>
 {% endblock %}

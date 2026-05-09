@@ -30,47 +30,51 @@
     color: #fff !important;
     border-color: var(--accent);
   }
-  .aufgaben-card {
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 0.85rem 1rem;
-    margin-bottom: 0.65rem;
-    background: var(--card);
+  .termin-card-list--aufgabe.termin-card-list--aufgabe-done {
+    opacity: 0.78;
   }
-  .aufgaben-card--done {
-    opacity: 0.72;
+  .termin-card-list .termin-card-list__body {
+    padding: 0;
   }
-  .aufgaben-card__title {
-    font-weight: 650;
-    font-size: 1.02rem;
-    margin: 0 0 0.35rem;
-  }
-  .aufgaben-card__title a {
-    color: inherit;
+  .termin-card-list__title a {
+    color: var(--text) !important;
     text-decoration: none !important;
   }
-  .aufgaben-card__title a:hover {
+  .termin-card-list__title a:hover {
+    color: var(--accent) !important;
     text-decoration: underline !important;
   }
-  .aufgaben-card__meta {
-    font-size: 0.84rem;
-    color: var(--muted);
-    margin: 0;
+  .termin-card-list__footer {
+    margin-top: 1.1rem;
+    padding-top: 0.95rem;
+    border-top: 1px solid var(--border);
   }
-  .aufgaben-kat-pill {
-    display: inline-block;
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    padding: 0.12rem 0.45rem;
-    border-radius: 999px;
-    margin-right: 0.35rem;
-    vertical-align: middle;
+  .termin-card-footer-actions .termin-footer-actions {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
   }
-  .aufgaben-kat-pill--verband { background: rgba(196, 30, 58, 0.12); color: #9e1830; }
-  .aufgaben-kat-pill--vorstand { background: rgba(21, 128, 61, 0.14); color: #166534; }
-  .aufgaben-kat-pill--fraktion { background: rgba(29, 78, 216, 0.12); color: #1e40af; }
+  .termin-card-footer-actions .termin-footer-actions__admin {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .termin-card-footer-actions .termin-footer-actions > form {
+    flex-shrink: 0;
+  }
+  .termin-card-footer-actions .termin-footer-actions .btn {
+    white-space: nowrap;
+  }
 </style>
 {% endblock %}
 {% block body %}
@@ -104,21 +108,61 @@
     {% endfor %}
   </ul>
 
-  {% if not aufgaben %}
+  {% if not aufgaben_rows %}
   <p class="muted">Keine Aufgaben in dieser Ansicht.</p>
   {% else %}
-  {% for a in aufgaben %}
-  {% set kat = (a.termin_kategorie or 'verband')|lower %}
-  {% set pill = 'verband' if kat == 'verband' else ('vorstand' if kat == 'vorstand' else 'fraktion') %}
-  <article class="aufgaben-card{% if a.is_done %} aufgaben-card--done{% endif %}">
-    <h2 class="aufgaben-card__title">
-      <a href="{{ tp }}/aufgaben/{{ a.id }}">{{ a.title }}</a>
-    </h2>
-    <p class="aufgaben-card__meta">
-      <span class="aufgaben-kat-pill aufgaben-kat-pill--{{ pill }}">{% if kat == 'verband' %}Verband{% elif kat == 'vorstand' %}Vorstand{% else %}Fraktion{% endif %}</span>
-      {% if a.is_done %}<strong>Erledigt</strong> · {% endif %}
-      {% if a.due_at %}Fällig {{ a.due_at.strftime('%d.%m.%Y') }}{% else %}Ohne Fälligkeit{% endif %}
-    </p>
+  {% for row in aufgaben_rows %}
+  {% set a = row.a %}
+  <article class="card card--flush termin-card-list termin-card-list--aufgabe{% if a.is_done %} termin-card-list--aufgabe-done{% endif %}">
+    <div class="termin-card-list__shell">
+      <header class="ics-popup__head termin-card-list__head">
+        <div class="ics-popup__head-icon termin-kat-icon {{ row.aufgabe_kategorie_icon_class }}" role="img" aria-label="Kategorie: {{ row.aufgabe_kategorie_label }}">{{ ico.svg_calendar() }}</div>
+        <div class="termin-card-list__head-main">
+          <h2 class="ics-popup__h termin-card-list__title"><a href="{{ tp }}/aufgaben/{{ a.id }}">{{ a.title }}</a></h2>
+          <p class="ics-popup__lead termin-card-list__meta">
+            {{ row.aufgabe_kategorie_label }}
+            {% if a.is_done %} · erledigt{% endif %}
+            {% if a.due_at %} · Fällig {{ a.due_at.strftime('%d.%m.%Y') }}{% else %} · ohne Fälligkeit{% endif %}
+          </p>
+        </div>
+      </header>
+
+      <div class="termin-card-list__body">
+        <div class="termin-card-list__columns">
+          {% if a.description %}
+          <section class="ics-popup__panel ics-popup__panel--accent termin-card-list__panel-desc" aria-label="Beschreibung">
+            <h3 class="ics-popup__label">Beschreibung</h3>
+            <p class="termin-card-list__desc">{{ a.description }}</p>
+          </section>
+          {% endif %}
+          <section class="ics-popup__panel termin-card-list__panel-teilnehmer{% if not a.description %} ics-popup__panel--accent{% endif %}" aria-label="Zugewiesen">
+            <h3 class="ics-popup__label">Zugewiesen{% if a.zuweisungen %} ({{ a.zuweisungen|length }}){% endif %}</h3>
+            {% if a.zuweisungen %}
+            <p class="termin-panel-body" style="margin:0;">{% for z in a.zuweisungen %}{{ (z.user.display_name or '').strip() or z.user.username }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+            {% else %}
+            <p class="muted" style="margin:0;">Niemand zugewiesen.</p>
+            {% endif %}
+          </section>
+        </div>
+      </div>
+
+      {% if row.kann_verwalten %}
+      <footer class="termin-card-list__footer termin-card-footer-actions" aria-label="Aktionen zur Aufgabe">
+        <div class="termin-footer-actions">
+          <div class="termin-footer-actions__admin">
+            <a href="{{ tp }}/aufgaben/{{ a.id }}/bearbeiten" class="btn btn-sm btn-ghost btn-ico" aria-label="Aufgabe bearbeiten" title="Bearbeiten">
+              {{ ico.svg_pencil() }}
+            </a>
+            <form method="post" action="{{ tp }}/aufgaben/{{ a.id }}/loeschen" style="margin:0;display:inline;" onsubmit="return confirm('Aufgabe wirklich löschen?');">
+              <button type="submit" class="btn btn-sm btn-danger btn-ico" aria-label="Aufgabe löschen" title="Löschen">
+                {{ ico.svg_trash() }}
+              </button>
+            </form>
+          </div>
+        </div>
+      </footer>
+      {% endif %}
+    </div>
   </article>
   {% endfor %}
   {% endif %}

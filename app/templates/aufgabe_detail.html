@@ -1,57 +1,208 @@
 {% extends "base.html" %}
 {% from '_ui_macros.html' import app_header_toolbar, public_tenant_prefix with context %}
 {% import '_icons.html' as ico %}
-{% block title %}{{ aufgabe.title }}{% endblock %}
-{% block body %}
+{% set mp = request.state.mandanten_prefix %}
 {% set tp = public_tenant_prefix(request) %}
-{% call app_header_toolbar('Aufgabe') %}
-  <a href="{{ tp }}/aufgaben" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Zurück zur Liste">
-    {{ ico.svg_arrow_left() }}<span class="btn-text">Liste</span>
-  </a>
-  {% if kann_verwalten %}
-  <a href="{{ tp }}/aufgaben/{{ aufgabe.id }}/bearbeiten" class="btn btn-ghost btn-sm btn-ico btn-with-label" aria-label="Bearbeiten">
-    {{ ico.svg_pencil() }}<span class="btn-text">Bearbeiten</span>
-  </a>
-  {% endif %}
+{% block title %}{{ aufgabe.title }} — Aufgabe{% endblock %}
+{% block head %}
+<style>
+  .termin-card-list .termin-card-list__body {
+    padding: 0;
+  }
+  .termin-card-list__title {
+    margin: 0;
+    font-size: 1.35rem;
+    font-weight: 650;
+  }
+  .termin-card-list__meta {
+    margin: 0.35rem 0 0;
+  }
+  .termin-card-list__desc {
+    margin: 0;
+    white-space: pre-wrap;
+    font-size: 0.95rem;
+    line-height: 1.45;
+  }
+  .termin-panel-body {
+    margin: 0;
+    white-space: pre-wrap;
+    font-size: 0.95rem;
+    line-height: 1.45;
+  }
+  .termin-card-list__footer {
+    margin-top: 1.1rem;
+    padding-top: 0.95rem;
+    border-top: 1px solid var(--border);
+  }
+  .termin-card-footer-actions .termin-footer-actions {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .termin-card-footer-actions .termin-footer-actions__signup {
+    flex-shrink: 0;
+  }
+  .termin-card-footer-actions .termin-footer-actions__admin {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .termin-card-footer-actions .termin-footer-actions > form {
+    flex-shrink: 0;
+  }
+  .termin-card-footer-actions .termin-footer-actions .btn {
+    white-space: nowrap;
+  }
+</style>
+{% include '_ics_surface_styles.html' %}
+{% endblock %}
+{% block body %}
+{% call app_header_toolbar('Aufgaben') %}
+  <button type="button" class="btn btn-ghost btn-sm btn-ico btn-with-label {{ aufgabe_kategorie_icon_class }}" id="ics-aufgaben-open" aria-label="Aufgaben abonnieren">
+    {{ ico.svg_calendar() }}<span class="btn-text">Abonnieren</span>
+  </button>
 {% endcall %}
 
-<div class="card" style="max-width: 640px; margin: 0 auto;">
-  <p class="muted" style="margin: 0 0 0.5rem;">
-    <strong>{{ aufgabe_kategorie_label }}</strong>
-    {% if aufgabe.is_done %} · <strong>Erledigt</strong>{% endif %}
-    {% if aufgabe.due_at %} · Fällig {{ aufgabe.due_at.strftime('%d.%m.%Y') }}{% endif %}
-  </p>
-  <h1 style="margin: 0 0 0.75rem; font-size: 1.35rem;">{{ aufgabe.title }}</h1>
-  {% if aufgabe.description %}
-  <div style="white-space: pre-wrap;">{{ aufgabe.description }}</div>
-  {% endif %}
-
-  <h2 class="ics-popup__label" style="margin: 1.25rem 0 0.5rem;">Zugewiesen</h2>
-  {% if aufgabe.zuweisungen %}
-  <ul style="margin: 0; padding-left: 1.2rem;">
-    {% for z in aufgabe.zuweisungen %}
-    <li>{{ (z.user.display_name or '').strip() or z.user.username }}</li>
-    {% endfor %}
-  </ul>
-  {% else %}
-  <p class="muted">Niemand zugewiesen.</p>
-  {% endif %}
-
-  {% if kann_erledigt_toggle %}
-  <form method="post" action="{{ tp }}/aufgaben/{{ aufgabe.id }}/erledigt" style="margin-top: 1.25rem;">
-    <input type="hidden" name="erledigt" value="{% if aufgabe.is_done %}0{% else %}1{% endif %}">
-    <button type="submit" class="btn btn-sm btn-ico btn-with-label">
-      {% if aufgabe.is_done %}{{ ico.svg_minus_circle() }}<span class="btn-text">Als offen markieren</span>{% else %}{{ ico.svg_check() }}<span class="btn-text">Als erledigt markieren</span>{% endif %}
-    </button>
-  </form>
-  {% endif %}
-
-  {% if kann_verwalten %}
-  <form method="post" action="{{ tp }}/aufgaben/{{ aufgabe.id }}/loeschen" style="margin-top: 1rem;" onsubmit="return confirm('Aufgabe wirklich löschen?');">
-    <button type="submit" class="btn btn-sm btn-danger btn-ico btn-with-label" aria-label="Löschen">
-      {{ ico.svg_trash() }}<span class="btn-text">Löschen</span>
-    </button>
-  </form>
-  {% endif %}
+<div class="page-toolbar" aria-label="Navigation">
+  <a href="{{ mp }}/aufgaben" class="btn btn-sm btn-ico btn-with-label" aria-label="Zur Aufgabenliste">
+    {{ ico.svg_arrow_left() }}<span class="btn-text">Aufgaben</span>
+  </a>
 </div>
+
+<article class="card card--flush termin-card-list">
+  <div class="termin-card-list__shell">
+    <header class="ics-popup__head termin-card-list__head">
+      <div class="ics-popup__head-icon termin-kat-icon {{ aufgabe_kategorie_icon_class }}" role="img" aria-label="Kategorie: {{ aufgabe_kategorie_label }}">{{ ico.svg_calendar() }}</div>
+      <div class="termin-card-list__head-main">
+        <h1 class="ics-popup__h termin-card-list__title">{{ aufgabe.title }}</h1>
+        <p class="ics-popup__lead termin-card-list__meta">
+          {{ aufgabe_kategorie_label }}
+          {% if aufgabe.is_done %} · erledigt{% endif %}
+          {% if aufgabe.due_at %} · Fällig {{ aufgabe.due_at.strftime('%d.%m.%Y') }}{% else %} · ohne Fälligkeit{% endif %}
+        </p>
+      </div>
+    </header>
+
+    <div class="termin-card-list__body">
+      <div class="termin-card-list__columns">
+        {% if aufgabe.description %}
+        <section class="ics-popup__panel ics-popup__panel--accent termin-card-list__panel-desc" aria-label="Beschreibung">
+          <h3 class="ics-popup__label">Beschreibung</h3>
+          <p class="termin-card-list__desc">{{ aufgabe.description }}</p>
+        </section>
+        {% endif %}
+        <section class="ics-popup__panel termin-card-list__panel-teilnehmer{% if not aufgabe.description %} ics-popup__panel--accent{% endif %}" aria-label="Zugewiesen">
+          <h3 class="ics-popup__label">Zugewiesen{% if aufgabe.zuweisungen %} ({{ aufgabe.zuweisungen|length }}){% endif %}</h3>
+          {% if aufgabe.zuweisungen %}
+          <ul style="margin:0;padding-left:1.2rem;font-size:0.95rem;line-height:1.45;">
+            {% for z in aufgabe.zuweisungen %}
+            <li>{{ (z.user.display_name or '').strip() or z.user.username }}</li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="muted" style="margin:0;">Niemand zugewiesen.</p>
+          {% endif %}
+        </section>
+      </div>
+    </div>
+
+    {% if kann_erledigt_toggle or kann_verwalten %}
+    <footer class="termin-card-list__footer termin-card-footer-actions" aria-label="Aktionen zur Aufgabe">
+      <div class="termin-footer-actions">
+        {% if kann_erledigt_toggle %}
+        <div class="termin-footer-actions__signup">
+          <form method="post" action="{{ tp }}/aufgaben/{{ aufgabe.id }}/erledigt" style="margin:0;">
+            <input type="hidden" name="erledigt" value="{% if aufgabe.is_done %}0{% else %}1{% endif %}">
+            <button type="submit" class="btn btn-sm btn-ico btn-with-label" title="{% if aufgabe.is_done %}Als offen markieren{% else %}Als erledigt markieren{% endif %}">
+              {% if aufgabe.is_done %}{{ ico.svg_minus_circle() }}<span class="btn-text">Offen</span>{% else %}{{ ico.svg_check() }}<span class="btn-text">Erledigt</span>{% endif %}
+            </button>
+          </form>
+        </div>
+        {% endif %}
+        {% if kann_verwalten %}
+        <div class="termin-footer-actions__admin">
+          <a href="{{ tp }}/aufgaben/{{ aufgabe.id }}/bearbeiten" class="btn btn-sm btn-ghost btn-ico" aria-label="Aufgabe bearbeiten" title="Bearbeiten">
+            {{ ico.svg_pencil() }}
+          </a>
+          <form method="post" action="{{ tp }}/aufgaben/{{ aufgabe.id }}/loeschen" style="margin:0;display:inline;" onsubmit="return confirm('Aufgabe wirklich löschen?');">
+            <button type="submit" class="btn btn-sm btn-danger btn-ico" aria-label="Aufgabe löschen" title="Löschen">
+              {{ ico.svg_trash() }}
+            </button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+    </footer>
+    {% endif %}
+  </div>
+</article>
+
+{% if feed_url_aufgaben.startswith('https://') %}
+{% set webcal_a = 'webcal://' ~ feed_url_aufgaben[8:] %}
+{% elif feed_url_aufgaben.startswith('http://') %}
+{% set webcal_a = 'webcal://' ~ feed_url_aufgaben[7:] %}
+{% else %}
+{% set webcal_a = feed_url_aufgaben %}
+{% endif %}
+{% set google_a = 'https://calendar.google.com/calendar/u/0/r/settings/addbyurl?cid=' ~ (feed_url_aufgaben|urlencode) %}
+
+<dialog id="ics-aufgaben-dialog" class="popup-dialog ics-popup" aria-labelledby="ics-aufgaben-d-title">
+  <form method="dialog" class="ics-popup__form">
+    <header class="ics-popup__head">
+      <div class="ics-popup__head-icon termin-kat-icon {{ aufgabe_kategorie_icon_class }}" aria-hidden="true">{{ ico.svg_calendar() }}</div>
+      <div>
+        <h2 id="ics-aufgaben-d-title" class="ics-popup__h">Aufgaben abonnieren</h2>
+        <p class="ics-popup__lead">Kalender-Feed mit VTODO-Einträgen (alle deine freigegebenen Verbände).</p>
+      </div>
+    </header>
+    <section class="ics-popup__panel ics-popup__panel--accent" aria-label="Aufgaben-Feed">
+      <h3 class="ics-popup__label">Alle Aufgaben</h3>
+      <div class="ics-dialog-actions">
+        <a class="btn btn-sm btn-ico btn-with-label" href="{{ webcal_a }}">{{ ico.svg_calendar() }}<span class="btn-text">Apple</span></a>
+        <a class="btn btn-sm btn-ico btn-with-label" href="{{ google_a }}" rel="noopener noreferrer">{{ ico.svg_calendar() }}<span class="btn-text">Google</span></a>
+        <button type="button" class="btn btn-sm btn-ico btn-with-label ics-copy-btn" data-feed-url="{{ feed_url_aufgaben }}">{{ ico.svg_copy() }}<span class="btn-text">Kopieren</span></button>
+      </div>
+    </section>
+    <footer class="ics-popup__foot">
+      <button type="submit" class="btn btn-ghost btn-sm btn-ico btn-with-label">{{ ico.svg_x() }}<span class="btn-text">Schließen</span></button>
+    </footer>
+  </form>
+</dialog>
+<script>
+(function () {
+  var o = document.getElementById("ics-aufgaben-open");
+  var d = document.getElementById("ics-aufgaben-dialog");
+  if (o && d) o.addEventListener("click", function () { d.showModal(); });
+  function fb(t, ok) {
+    var ta = document.createElement("textarea");
+    ta.value = t;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); ok(); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+  document.querySelectorAll("#ics-aufgaben-dialog .ics-copy-btn").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var u = b.getAttribute("data-feed-url");
+      if (!u) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(u).catch(function () { fb(u, function () {}); });
+      } else fb(u, function () {});
+    });
+  });
+})();
+</script>
 {% endblock %}

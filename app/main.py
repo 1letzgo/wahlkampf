@@ -3152,6 +3152,12 @@ def aufgaben_list_view(
         filtered = items
     else:
         filtered = [a for a in items if aufgabe_kategorie_effective(a) == tid]
+    aufgaben_rows: list[dict[str, Any]] = []
+    for a in filtered:
+        row = _aufgabe_kategorie_ui_dict(a)
+        row["a"] = a
+        row["kann_verwalten"] = _can_manage_aufgabe(user, a)
+        aufgaben_rows.append(row)
     base = str(request.base_url).rstrip("/")
     my_token = ensure_user_calendar_token(pdb, user.platform_user)
     mp = _mp(request)
@@ -3162,7 +3168,7 @@ def aufgaben_list_view(
         {
             "user": user,
             "page_title": "Aufgaben",
-            "aufgaben": filtered,
+            "aufgaben_rows": aufgaben_rows,
             "aufgaben_tabs": [{"id": k, "label": tab_labels[k]} for k in tab_ids],
             "tab_active": tid,
             "show_neue_aufgabe": _user_darf_irgendeine_aufgabe_anlegen(pdb, user.id, ms),
@@ -3296,6 +3302,10 @@ def aufgabe_detail_view(
     if not a:
         raise HTTPException(status_code=404, detail="Not found")
     ctx = _aufgabe_kategorie_ui_dict(a)
+    base = str(request.base_url).rstrip("/")
+    my_token = ensure_user_calendar_token(pdb, user.platform_user)
+    mp = _mp(request)
+    feed_url_aufgaben = f"{base}{mp}/calendar/aufgaben-alle.ics?t={my_token}"
     return templates.TemplateResponse(
         request,
         "aufgabe_detail.html",
@@ -3304,6 +3314,7 @@ def aufgabe_detail_view(
             "aufgabe": a,
             "kann_verwalten": _can_manage_aufgabe(user, a),
             "kann_erledigt_toggle": _can_toggle_aufgabe_erledigt(pdb, user, a),
+            "feed_url_aufgaben": feed_url_aufgaben,
             **ctx,
         },
     )
